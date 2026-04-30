@@ -11,6 +11,7 @@ pub struct PythonModule {
     docs: Option<String>,
     functions: IndexMap<PyFunctionName, PythonFunction>,
     imports: IndexSet<PathBuf>,
+    hash: u64,
 }
 
 impl PythonModule {
@@ -18,11 +19,13 @@ impl PythonModule {
         docs: Option<String>,
         functions: IndexMap<PyFunctionName, PythonFunction>,
         imports: IndexSet<PathBuf>,
+        hash: u64,
     ) -> Self {
         Self {
             docs,
             functions,
             imports,
+            hash,
         }
     }
 
@@ -40,6 +43,10 @@ impl PythonModule {
 
     pub const fn get_imports(&self) -> &IndexSet<PathBuf> {
         &self.imports
+    }
+
+    pub const fn get_hash(&self) -> u64 {
+        self.hash
     }
 }
 

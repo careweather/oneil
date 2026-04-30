@@ -1,5 +1,9 @@
 //! Error types for Python integration.
 
+use std::io;
+use std::path::PathBuf;
+
+use indexmap::IndexMap;
 use oneil_shared::error::{AsOneilDiagnostic, Context, DiagnosticKind};
 use pyo3::Python;
 use pyo3::types::PyTracebackMethods;
@@ -12,6 +16,11 @@ pub enum LoadPythonImportError {
     SourceHasNullByte,
     /// Python raised an error while loading the module.
     CouldNotLoadPythonModule(pyo3::PyErr),
+    /// Could not calculate the source hash.
+    CouldNotCalculateSourceHash {
+        /// File errors.
+        file_errors: Box<IndexMap<PathBuf, io::Error>>,
+    },
 }
 
 impl AsOneilDiagnostic for LoadPythonImportError {
@@ -22,7 +31,10 @@ impl AsOneilDiagnostic for LoadPythonImportError {
     fn message(&self) -> String {
         match self {
             Self::SourceHasNullByte => "Python source contains a null byte".to_string(),
-            Self::CouldNotLoadPythonModule(_error) => "Could not load Python module".to_string(),
+            Self::CouldNotLoadPythonModule(_error) => "could not load Python module".to_string(),
+            Self::CouldNotCalculateSourceHash { file_errors: _ } => {
+                "Could not calculate source hash".to_string()
+            }
         }
     }
 
@@ -37,6 +49,12 @@ impl AsOneilDiagnostic for LoadPythonImportError {
                     |traceback| vec![Context::Note(error.to_string()), Context::Note(traceback)],
                 )
             }),
+            Self::CouldNotCalculateSourceHash { file_errors } => file_errors
+                .iter()
+                .map(|(path, error)| {
+                    Context::Note(format!("could not read {}: {}", path.display(), error))
+                })
+                .collect(),
         }
     }
 }

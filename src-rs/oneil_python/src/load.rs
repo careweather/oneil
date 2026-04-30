@@ -2,6 +2,7 @@
 
 use std::{
     ffi::CString,
+    iter,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -18,6 +19,7 @@ use crate::{
     error::LoadPythonImportError,
     function::{PythonFunction, PythonModule},
     py_compat::oneil_python_module,
+    source_hash::calculate_source_hash,
 };
 
 pub fn load_python_import(
@@ -86,7 +88,12 @@ pub fn load_python_import(
     // return the functions
     match functions {
         Ok((module_docs, functions, imports)) => {
-            Ok(PythonModule::new(module_docs, functions, imports))
+            let source_paths = iter::once(path.as_path())
+                .chain(imports.iter().map(|path| path.as_path()))
+                .collect::<Vec<_>>();
+            let hash = calculate_source_hash(source_paths)?;
+
+            Ok(PythonModule::new(module_docs, functions, imports, hash))
         }
         Err(e) => Err(LoadPythonImportError::CouldNotLoadPythonModule(e)),
     }

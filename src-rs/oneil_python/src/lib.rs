@@ -15,6 +15,7 @@ pub mod eval;
 pub mod function;
 pub mod load;
 mod py_compat;
+mod source_hash;
 
 #[cfg(feature = "rust-lib")]
 pub use rust_lib::*;
