@@ -177,14 +177,21 @@ fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool)
             println!("===== {} =====", file.as_path().display());
         }
 
-        let doc_string = module.get_docs();
+        // print the hash
+        let header = stylesheet::PYTHON_MODULE_SECTION_HEADER.style("Hash:");
+        let hash = module.get_hash();
+        let styled_hash = stylesheet::PYTHON_MODULE_SECTION_ITEM.style(format!("{hash:016x}"));
+        println!("{header} {styled_hash}");
+        println!();
 
-        if let Some(doc_string) = doc_string {
+        // print the doc string if it exists
+        if let Some(doc_string) = module.get_docs() {
             let styled_doc_string = stylesheet::PYTHON_MODULE_DOC_STRING.style(doc_string);
             println!("{styled_doc_string}");
             println!();
         }
 
+        // print the functions
         let header = stylesheet::PYTHON_MODULE_SECTION_HEADER.style("Functions:");
         println!("{header}");
 
@@ -202,6 +209,7 @@ fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool)
             }
         }
 
+        // print the imports
         let imports = module.get_imports();
         if !imports.is_empty() {
             println!();
