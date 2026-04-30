@@ -12,6 +12,7 @@ use oneil_shared::{
 };
 
 use super::Runtime;
+use crate::cache::PythonCallCacheRecord;
 use crate::output::{self, error::RuntimeErrors};
 
 impl Runtime {
@@ -140,6 +141,7 @@ impl Runtime {
                 self.add_parameter_cache_entry(
                     &instance_key.model_path,
                     parameter_name,
+                    python_path,
                     identifier,
                     &args_no_spans,
                     eval_result.clone(),
@@ -149,6 +151,7 @@ impl Runtime {
                 self.add_test_cache_entry(
                     &instance_key.model_path,
                     *test_index,
+                    python_path,
                     identifier,
                     &args_no_spans,
                     eval_result.clone(),
@@ -212,16 +215,27 @@ impl Runtime {
         &mut self,
         model_path: &ModelPath,
         parameter_name: &ParameterName,
+        python_path: &PythonPath,
         function_name: &PyFunctionName,
         args: &[output::Value],
         eval_result: Result<output::Value, PythonEvalError>,
     ) {
+        let python_module = self
+            .python_import_cache
+            .get_entry(python_path)
+            .and_then(|result| result.as_ref().ok())
+            .expect("should not be trying to add a parameter cache entry if the import failed");
+
         self.python_call_replacement_cache.add_parameter_entry(
-            model_path,
+            PythonCallCacheRecord {
+                model_path,
+                python_path,
+                function_name,
+                args,
+                eval_result,
+                python_module,
+            },
             parameter_name,
-            function_name,
-            args,
-            eval_result,
         );
     }
 
@@ -229,16 +243,27 @@ impl Runtime {
         &mut self,
         model_path: &ModelPath,
         test_index: TestIndex,
+        python_path: &PythonPath,
         function_name: &PyFunctionName,
         args: &[output::Value],
         eval_result: Result<output::Value, PythonEvalError>,
     ) {
+        let python_module = self
+            .python_import_cache
+            .get_entry(python_path)
+            .and_then(|result| result.as_ref().ok())
+            .expect("should not be trying to add a test cache entry if the import failed");
+
         self.python_call_replacement_cache.add_test_entry(
-            model_path,
+            PythonCallCacheRecord {
+                model_path,
+                python_path,
+                function_name,
+                args,
+                eval_result,
+                python_module,
+            },
             test_index,
-            function_name,
-            args,
-            eval_result,
         );
     }
 }
