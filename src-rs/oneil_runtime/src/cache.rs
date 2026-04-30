@@ -484,6 +484,54 @@ mod python {
                 Err(errors)
             }
         }
+
+        /// Validates that the Python import for `model_path` is still valid by
+        /// checking the hash of the Python module.
+        ///
+        /// If the hash does not match, the Python import is cleared from the
+        /// cache and all cached function calls based on that import are cleared.
+        pub fn validate_or_clear_python_import(
+            &mut self,
+            model_path: &ModelPath,
+            python_path: &PythonPath,
+            python_module_hash: u64,
+        ) {
+            // make sure the model path has been loaded, if it exists
+            let Some(()) = self.load(model_path).ok() else {
+                return;
+            };
+
+            //
+            let Some(model_entry) = self.entries.get_mut(model_path) else {
+                return;
+            };
+
+            // get the import entry for the Python path
+            let Some(import_entry) = model_entry.imports.get(python_path) else {
+                return;
+            };
+
+            // check if the import entry is still valid by comparing the hash
+            if import_entry.hash == python_module_hash {
+                return;
+            }
+
+            // remove the import entry from the model entry
+            let Some(removed_import_entry) = model_entry.imports.remove(python_path) else {
+                return;
+            };
+
+            // remove cached function calls based on the functions from the removed import entry
+            let import_functions = removed_import_entry.functions_used;
+
+            for calls in model_entry.parameters.values_mut() {
+                calls.retain(|call| !import_functions.contains(&call.function));
+            }
+
+            for calls in model_entry.tests.values_mut() {
+                calls.retain(|call| !import_functions.contains(&call.function));
+            }
+        }
     }
 
     fn get_cache_relative_path(model_path: &ModelPath) -> PathBuf {

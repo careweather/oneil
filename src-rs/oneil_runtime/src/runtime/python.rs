@@ -112,12 +112,14 @@ impl Runtime {
                 .try_load_parameter_cache_entry(
                     &instance_key.model_path,
                     parameter_name,
+                    python_path,
                     identifier,
                     &args_no_spans,
                 ),
             CallsiteInfo::Test(instance_key, test_index) => self.try_load_test_cache_entry(
                 &instance_key.model_path,
                 *test_index,
+                python_path,
                 identifier,
                 &args_no_spans,
             ),
@@ -181,9 +183,22 @@ impl Runtime {
         &mut self,
         model_path: &ModelPath,
         parameter_name: &ParameterName,
+        python_path: &PythonPath,
         function_name: &PyFunctionName,
         args: &[output::Value],
     ) -> Option<Result<output::Value, PythonEvalError>> {
+        let python_module = self
+            .python_import_cache
+            .get_entry(python_path)
+            .and_then(|result| result.as_ref().ok())
+            .expect("should not be trying to load a parameter cache entry if the import failed");
+
+        self.python_call_cache.validate_or_clear_python_import(
+            model_path,
+            python_path,
+            python_module.get_hash(),
+        );
+
         let calls = &self
             .python_call_cache
             .get_parameter_entry(model_path, parameter_name)?;
@@ -198,9 +213,22 @@ impl Runtime {
         &mut self,
         model_path: &ModelPath,
         test_index: TestIndex,
+        python_path: &PythonPath,
         function_name: &PyFunctionName,
         args: &[output::Value],
     ) -> Option<Result<output::Value, PythonEvalError>> {
+        let python_module = self
+            .python_import_cache
+            .get_entry(python_path)
+            .and_then(|result| result.as_ref().ok())
+            .expect("should not be trying to load a test cache entry if the import failed");
+
+        self.python_call_cache.validate_or_clear_python_import(
+            model_path,
+            python_path,
+            python_module.get_hash(),
+        );
+
         let calls = &self
             .python_call_cache
             .get_test_entry(model_path, test_index)?;
