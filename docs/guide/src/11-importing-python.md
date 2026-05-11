@@ -69,5 +69,3 @@ Python function results are automatically cached to avoid re-running expensive c
   untouched unless a simulation's latest cached inputs or output changed
 - **Auto-invalidates** when imported Python source files, their local Python
   dependencies, or the simulation inputs change
-
-Use the `cache` command in the CLI to view cache statistics or `cache clear` to clear it.
