@@ -1,0 +1,11 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"python/python_square_area.on\")"
+---
+Model: fixtures/python/python_square_area.on
+Tests: 1/1
+  test 1: PASS
+Parameters:
+  s = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(3.0)), unit: Unit { dimension_map: DimensionMap({Distance: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "m", exponent: 1.0 } } })
+  A = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(9.0)), unit: Unit { dimension_map: DimensionMap({Distance: 2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "m", exponent: 2.0 } } })
+  min_area = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(8.0)), unit: Unit { dimension_map: DimensionMap({Distance: 2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "m", exponent: 2.0 } } })

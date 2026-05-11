@@ -1,0 +1,8 @@
+# Model that calls a Python function from an imported module.
+import py_helpers
+
+Side: s = 3 :m
+Area: A = square_area(s) :m^2
+Floor area: min_area = 8 :m^2
+
+test: A > min_area

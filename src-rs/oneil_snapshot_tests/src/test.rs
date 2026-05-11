@@ -349,3 +349,13 @@ fn chain_apply_validation_cycle() {
     // a generic contribution diagnostic at `mid.on`'s `apply` span.
     insta::assert_snapshot!(run_fixture("chain_apply_validation_cycle/parent.on"));
 }
+
+// =============================================================================
+// Python integration
+// =============================================================================
+
+/// Snapshot for evaluating a model that imports a sibling `.py` module and calls a function.
+#[test]
+fn python_square_area() {
+    insta::assert_snapshot!(run_fixture("python/python_square_area.on"));
+}
