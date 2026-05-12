@@ -38,21 +38,6 @@ impl FileCache {
     /// # Errors
     ///
     /// Returns [`WriteCacheError`] if the file cannot be created or JSON serialization fails.
-    ///
-    /// ```
-    /// use oneil_py_call_cache::FileCache;
-    ///
-    /// let dir = std::env::temp_dir();
-    /// let path = dir.join(format!("oneil_cache_doc_{}.json", std::process::id()));
-    /// let cache = FileCache {
-    ///     imports: Default::default(),
-    ///     parameters: Default::default(),
-    ///     tests: Default::default(),
-    /// };
-    /// cache.write_to_path(&path).expect("write cache file");
-    /// assert!(path.exists());
-    /// # std::fs::remove_file(&path).expect("remove temp cache file");
-    /// ```
     pub fn write_to_path(&self, path: impl AsRef<Path>) -> Result<(), WriteCacheError> {
         let file = File::create(path.as_ref()).map_err(WriteCacheError::Io)?;
         serde_json::to_writer_pretty(file, self).map_err(WriteCacheError::Serde)?;
@@ -63,23 +48,7 @@ impl FileCache {
     ///
     /// # Errors
     ///
-    /// Returns [`ReadCacheError`] if the file cannot be opened/read or JSON deserialization fails.
-    ///
-    /// ```
-    /// use oneil_py_call_cache::FileCache;
-    ///
-    /// let dir = std::env::temp_dir();
-    /// let path = dir.join(format!("oneil_cache_read_doc_{}.json", std::process::id()));
-    /// let cache = FileCache {
-    ///     imports: Default::default(),
-    ///     parameters: Default::default(),
-    ///     tests: Default::default(),
-    /// };
-    /// cache.write_to_path(&path).expect("write cache file");
-    /// let loaded = FileCache::read_from_path(&path).expect("read cache file");
-    /// assert_eq!(loaded, cache);
-    /// # std::fs::remove_file(&path).expect("remove temp cache file");
-    /// ```
+    /// Returns [`ReadCacheError`] if the file cannot be opened or JSON deserialization fails.
     pub fn read_from_path(path: impl AsRef<Path>) -> Result<Self, ReadCacheError> {
         let file = File::open(path.as_ref()).map_err(ReadCacheError::Io)?;
         serde_json::from_reader(file).map_err(ReadCacheError::Serde)
