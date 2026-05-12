@@ -479,12 +479,30 @@ impl Interval {
             || (is_close(min_step_modulo, 3.0) && step_delta < 2.0)
         {
             // monotonically increasing
-            Self::new(min.sin(), max.sin())
+            //
+            // the following would work, except lack of precision can
+            // cause it to produce an invalid interval sometimes...
+            //
+            // Self::new(min.sin(), max.sin())
+
+            let min_sin = min.sin();
+            let max_sin = max.sin();
+
+            Self::new(f64::min(min_sin, max_sin), f64::max(min_sin, max_sin))
         } else if (is_close(min_step_modulo, 1.0) && step_delta < 2.0)
             || (is_close(min_step_modulo, 2.0) && step_delta < 1.0)
         {
             // monotonically decreasing
-            Self::new(max.sin(), min.sin())
+            //
+            // the following would work, except lack of precision can
+            // cause it to produce an invalid interval sometimes...
+            //
+            // Self::new(max.sin(), min.sin())
+
+            let min_sin = min.sin();
+            let max_sin = max.sin();
+
+            Self::new(f64::min(min_sin, max_sin), f64::max(min_sin, max_sin))
         } else if (is_close(min_step_modulo, 0.0) && step_delta < 3.0)
             || (is_close(min_step_modulo, 3.0) && step_delta < 4.0)
         {
