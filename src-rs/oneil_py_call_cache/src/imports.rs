@@ -2,10 +2,9 @@
 
 use std::collections::BTreeSet;
 
+use oneil_shared::symbols::PyFunctionName;
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-use crate::CachedFunctionName;
 
 /// One imported module record.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,7 +16,7 @@ pub struct ImportEntry {
     /// Hash of this module's source plus dependency sources.
     pub hash: ImportHash,
     /// Functions from this module that were invoked.
-    pub functions_used: BTreeSet<CachedFunctionName>,
+    pub functions_used: BTreeSet<PyFunctionName>,
 }
 
 impl ImportEntry {

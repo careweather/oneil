@@ -17,6 +17,7 @@ oneil_builtins = { path = "../oneil_builtins" }
 oneil_output = { path = "../oneil_output" }
 oneil_shared = { path = "../oneil_shared" }
 pyo3 = { workspace = true }
+serde = { workspace = true }
 
 [features]
 default = ["python-lib", "rust-lib"]

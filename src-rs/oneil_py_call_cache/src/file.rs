@@ -4,11 +4,12 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::Path;
 
+use oneil_shared::paths::PythonPath;
+use oneil_shared::symbols::{ParameterName, TestIndex};
 use serde::{Deserialize, Serialize};
 
 use crate::FunctionCall;
 use crate::error::{ReadCacheError, WriteCacheError};
-use crate::identifiers::{CachedParameterName, CachedPythonPath, CachedTestIndex};
 use crate::imports::ImportEntry;
 
 const ONEIL_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -19,11 +20,11 @@ pub struct FileCache {
     /// The version of Oneil that created the cache.
     pub oneil_version: String,
     /// Imported Python modules and their invalidation metadata.
-    pub imports: BTreeMap<CachedPythonPath, ImportEntry>,
+    pub imports: BTreeMap<PythonPath, ImportEntry>,
     /// Function calls originating from named parameters.
-    pub parameters: BTreeMap<CachedParameterName, Vec<FunctionCall>>,
+    pub parameters: BTreeMap<ParameterName, Vec<FunctionCall>>,
     /// Function calls originating from tests, keyed by test index.
-    pub tests: BTreeMap<CachedTestIndex, Vec<FunctionCall>>,
+    pub tests: BTreeMap<TestIndex, Vec<FunctionCall>>,
 }
 
 impl FileCache {

@@ -797,6 +797,7 @@ dependencies = [
  "oneil_output",
  "oneil_shared",
  "pyo3",
+ "serde",
 ]
 
 [[package]]
@@ -821,6 +822,8 @@ name = "oneil_shared"
 version = "0.16.0"
 dependencies = [
  "rand",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
