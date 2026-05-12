@@ -87,12 +87,18 @@ pub fn load_python_import(
 
     // return the functions
     match functions {
-        Ok((module_docs, functions, imports)) => {
+        Ok((module_docs, functions, mut imports)) => {
+            // add the `requirements.txt` path to the imports if it exists
+            let maybe_requirements_txt_path = maybe_requirements_txt_path(&module_directory);
+            imports.extend(maybe_requirements_txt_path);
+
+            // calculate the source hash
             let source_paths = iter::once(path.as_path())
                 .chain(imports.iter().map(|path| path.as_path()))
                 .collect::<Vec<_>>();
             let hash = calculate_source_hash(source_paths)?;
 
+            // return the Python module
             Ok(PythonModule::new(module_docs, functions, imports, hash))
         }
         Err(e) => Err(LoadPythonImportError::CouldNotLoadPythonModule(e)),
@@ -169,6 +175,14 @@ fn get_line_no(value: &Bound<'_, PyAny>, inspect_module: &Bound<'_, PyModule>) -
         .expect("`getsourcelines` should return a tuple of a string and a u32");
 
     Some(line_no)
+}
+
+fn maybe_requirements_txt_path(module_directory: &Path) -> Option<PathBuf> {
+    let requirements_txt_path = module_directory.join("requirements.txt");
+
+    requirements_txt_path
+        .exists()
+        .then_some(requirements_txt_path)
 }
 
 /// Tracks imports made by a Python module.
