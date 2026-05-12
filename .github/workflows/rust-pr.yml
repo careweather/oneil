@@ -20,6 +20,7 @@ jobs:
       FUZZ_TIME: 300
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           # list fuzz targets here
