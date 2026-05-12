@@ -50,10 +50,6 @@ This is particularly useful for:
 
 ## Function Caching
 
-> [!NOTE]
-> This is not currently implemented in the Rust implementation but will be
-> implemented soon.
-
 Python function results are automatically cached to avoid re-running expensive calculations. The cache:
 
 - **Persists across REPL sessions** - Close and reopen Oneil, cached results
@@ -69,3 +65,5 @@ Python function results are automatically cached to avoid re-running expensive c
   untouched unless a simulation's latest cached inputs or output changed
 - **Auto-invalidates** when imported Python source files, their local Python
   dependencies, or the simulation inputs change
+
+For each import, the cache takes into account the imported python file, its local Python dependencies, and the `requirements.txt` file in the same directory (if any exists).
