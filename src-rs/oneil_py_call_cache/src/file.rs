@@ -11,9 +11,13 @@ use crate::error::{ReadCacheError, WriteCacheError};
 use crate::identifiers::{CachedParameterName, CachedPythonPath, CachedTestIndex};
 use crate::imports::ImportEntry;
 
+const ONEIL_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// On-disk cache for one source file: imported modules, parameter calls, and test calls.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FileCache {
+    /// The version of Oneil that created the cache.
+    pub oneil_version: String,
     /// Imported Python modules and their invalidation metadata.
     pub imports: BTreeMap<CachedPythonPath, ImportEntry>,
     /// Function calls originating from named parameters.
@@ -25,8 +29,9 @@ pub struct FileCache {
 impl FileCache {
     /// Creates a new empty file cache.
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
+            oneil_version: ONEIL_VERSION.to_owned(),
             imports: BTreeMap::new(),
             parameters: BTreeMap::new(),
             tests: BTreeMap::new(),
