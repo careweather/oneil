@@ -1,6 +1,7 @@
 //! Python wrapper for Oneil’s [`Unit`].
 
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
+
 use oneil_output::{Dimension, DimensionMap, DisplayUnit, Unit};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyNotImplemented};
@@ -59,7 +60,7 @@ impl PyUnit {
     /// This is a dimensionless unit with no dimensions and a
     /// magnitude of 1. It is also not a decibel unit.
     #[staticmethod]
-    fn one() -> Self {
+    const fn one() -> Self {
         Self { inner: Unit::one() }
     }
 
@@ -75,7 +76,7 @@ impl PyUnit {
         let dict = PyDict::new(py);
 
         for (dim, exp) in self.inner.dimension_map.as_map() {
-            dict.set_item(dimension_to_key(*dim), *exp)?;
+            dict.set_item(dim.as_map_key(), *exp)?;
         }
 
         Ok(dict)
@@ -202,45 +203,14 @@ impl From<&PyUnit> for Unit {
     }
 }
 
-/// Maps a Python dimension key (dict key) to a [`Dimension`]. Returns `None` for invalid keys.
-fn dimension_from_key(key: &str) -> Option<Dimension> {
-    match key {
-        "kg" => Some(Dimension::Mass),
-        "m" => Some(Dimension::Distance),
-        "s" => Some(Dimension::Time),
-        "K" => Some(Dimension::Temperature),
-        "A" => Some(Dimension::Current),
-        "b" => Some(Dimension::Information),
-        "$" => Some(Dimension::Currency),
-        "mol" => Some(Dimension::Substance),
-        "cd" => Some(Dimension::LuminousIntensity),
-        _ => None,
-    }
-}
-
-/// Maps a [`Dimension`] to the Python dimension key (dict key).
-const fn dimension_to_key(dim: Dimension) -> &'static str {
-    match dim {
-        Dimension::Mass => "kg",
-        Dimension::Distance => "m",
-        Dimension::Time => "s",
-        Dimension::Temperature => "K",
-        Dimension::Current => "A",
-        Dimension::Information => "b",
-        Dimension::Currency => "$",
-        Dimension::Substance => "mol",
-        Dimension::LuminousIntensity => "cd",
-    }
-}
-
 /// Builds a [`DimensionMap`] from a Python dict (string -> float). Invalid keys return an error.
 fn dimension_map_from_dict(dict: &Bound<'_, PyDict>) -> PyResult<DimensionMap> {
-    let mut map = IndexMap::new();
+    let mut map = BTreeMap::new();
 
     for (key, value) in dict.iter() {
         let key_str: String = key.extract()?;
 
-        let dim = dimension_from_key(&key_str).ok_or_else(|| {
+        let dim = Dimension::from_map_key(&key_str).ok_or_else(|| {
             pyo3::exceptions::PyValueError::new_err(format!("invalid dimension key: {key_str:?}"))
         })?;
         let exponent: f64 = value.extract()?;

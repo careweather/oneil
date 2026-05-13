@@ -500,7 +500,8 @@ mod serde_tests {
 
     #[test]
     fn python_path_json_rejects_non_py_extension() {
-        let err = serde_json::from_str::<PythonPath>("\"not_python.txt\"").expect_err("expected err");
+        let err =
+            serde_json::from_str::<PythonPath>("\"not_python.txt\"").expect_err("expected err");
         assert!(
             err.to_string().contains("python module path"),
             "unexpected message: {err}"

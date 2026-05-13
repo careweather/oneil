@@ -2,6 +2,8 @@
 
 use std::ops;
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use crate::{Unit, error::BinaryEvalError};
 
 use super::{NormalizedNumber, Number};
@@ -482,5 +484,90 @@ impl ops::Div<MeasuredNumber> for Number {
             normalized_value: self / rhs.normalized_value,
             unit: Unit::one() / rhs.unit,
         }
+    }
+}
+
+/// A measured number in a human-readable format.
+#[derive(Serialize, Deserialize)]
+struct HumanReadableMeasuredNumber {
+    /// The value of the measured number.
+    value: Number,
+    /// The unit of the measured number.
+    unit: Unit,
+}
+
+impl Serialize for MeasuredNumber {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let (value, unit) = self.clone().into_number_and_unit();
+        let human_readable = HumanReadableMeasuredNumber { value, unit };
+        human_readable.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for MeasuredNumber {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let human_readable = HumanReadableMeasuredNumber::deserialize(deserializer)?;
+        let HumanReadableMeasuredNumber { value, unit } = human_readable;
+        Ok(Self::from_number_and_unit(value, unit))
+    }
+}
+
+#[cfg(test)]
+mod serde_tests {
+    use std::collections::BTreeMap;
+
+    use crate::{Dimension, DimensionMap, DisplayUnit, Interval, Value};
+
+    use super::*;
+
+    fn sample_unit() -> Unit {
+        Unit {
+            dimension_map: DimensionMap::new(BTreeMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 2.0),
+                (Dimension::Time, -3.0),
+            ])),
+            magnitude: 1.0,
+            is_db: false,
+            display_unit: DisplayUnit::Unit {
+                name: "W".to_string(),
+                exponent: 1.0,
+            },
+        }
+    }
+
+    #[test]
+    fn measured_scalar_round_trip() {
+        let m = MeasuredNumber::from_number_and_unit(Number::Scalar(100.0), sample_unit());
+        let json = serde_json::to_string(&m).expect("serialize");
+        let back: MeasuredNumber = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, m);
+    }
+
+    #[test]
+    fn measured_interval_round_trip() {
+        let m = MeasuredNumber::from_number_and_unit(
+            Number::Interval(Interval::new(1.0, 2.0)),
+            sample_unit(),
+        );
+        let json = serde_json::to_string(&m).expect("serialize");
+        let back: MeasuredNumber = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, m);
+    }
+
+    #[test]
+    fn measured_json_matches_value_measured_json() {
+        let m = MeasuredNumber::from_number_and_unit(Number::Scalar(2.5), Unit::one());
+        let as_value = Value::MeasuredNumber(m.clone());
+        assert_eq!(
+            serde_json::to_string(&m).expect("serialize measured"),
+            serde_json::to_string(&as_value).expect("serialize value"),
+        );
     }
 }

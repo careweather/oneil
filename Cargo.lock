@@ -756,6 +756,8 @@ dependencies = [
  "arbitrary",
  "indexmap",
  "oneil_shared",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
