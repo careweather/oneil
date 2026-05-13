@@ -1,5 +1,7 @@
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     MeasuredNumber, Number, Unit, ValueType,
     error::{BinaryEvalError, ExpectedType, UnaryEvalError, UnitConversionError},
@@ -14,7 +16,8 @@ use crate::{
 /// - a string
 /// - a number
 /// - a measured number
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Value {
     /// A boolean value
     Boolean(bool),
@@ -671,5 +674,108 @@ impl fmt::Display for Value {
                 write!(f, "<{number} {unit}>")
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod serde_tests {
+    use std::collections::BTreeMap;
+
+    use crate::{Dimension, DimensionMap, DisplayUnit, Interval};
+
+    use super::*;
+    use serde_json::json;
+
+    fn sample_unit() -> Unit {
+        Unit {
+            dimension_map: DimensionMap::new(BTreeMap::from([
+                (Dimension::Mass, 1.0),
+                (Dimension::Distance, 2.0),
+                (Dimension::Time, -3.0),
+            ])),
+            magnitude: 1.0,
+            is_db: false,
+            display_unit: DisplayUnit::Unit {
+                name: "W".to_string(),
+                exponent: 1.0,
+            },
+        }
+    }
+
+    #[test]
+    fn bool_round_trip() {
+        let v = Value::Boolean(true);
+        let json = serde_json::to_string(&v).expect("serialize");
+        let back: Value = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn string_round_trip() {
+        let v = Value::String("array".into());
+        let json = serde_json::to_string(&v).expect("serialize");
+        let back: Value = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn scalar_round_trip() {
+        let v = Value::Number(Number::Scalar(10.0));
+        let json = serde_json::to_string(&v).expect("serialize");
+        let back: Value = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn interval_round_trip() {
+        let v = Value::Number(Number::new_interval(1.0, 2.0));
+        let json = serde_json::to_string(&v).expect("serialize");
+        let back: Value = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn measured_scalar_round_trip() {
+        let unit = sample_unit();
+        let v = Value::MeasuredNumber(MeasuredNumber::from_number_and_unit(
+            Number::Scalar(100.0),
+            unit,
+        ));
+        let json = serde_json::to_string(&v).expect("serialize");
+        let back: Value = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn measured_interval_round_trip() {
+        let unit = sample_unit();
+        let v = Value::MeasuredNumber(MeasuredNumber::from_number_and_unit(
+            Number::Interval(Interval::new(1.0, 2.0)),
+            unit,
+        ));
+        let json = serde_json::to_string(&v).expect("serialize");
+        let back: Value = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn unknown_dimension_rejected_on_deserialize() {
+        let j = json!({ "value": 1.0, "unit": {
+            "dimension_map": { "parsec": 1.0 },
+            "magnitude": 1.0,
+            "is_db": false,
+            "display_unit": "pc"
+        }});
+        let err: Result<Value, _> = serde_json::from_value(j);
+        let err = err.expect_err("unknown dimension");
+        assert!(err.to_string().contains("did not match any variant"));
+    }
+
+    #[test]
+    fn serde_json_round_trip_preserves_value() {
+        let v = Value::Number(Number::Scalar(std::f64::consts::PI));
+        let json = serde_json::to_string(&v).expect("serialize");
+        let back: Value = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, v);
     }
 }

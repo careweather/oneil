@@ -1,6 +1,6 @@
 [package]
-name = "oneil_python"
-description = "Python integration for the Oneil programming language"
+name = "oneil_py_call_cache"
+description = "Caching python function calls for the Oneil programming language"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,17 +12,12 @@ categories.workspace = true
 readme = "README.md"
 
 [dependencies]
-indexmap.workspace = true
-oneil_builtins = { path = "../oneil_builtins" }
+indexmap = { workspace = true }
 oneil_output = { path = "../oneil_output" }
+oneil_python = { path = "../oneil_python" }
 oneil_shared = { path = "../oneil_shared" }
-pyo3 = { workspace = true }
 serde = { workspace = true }
-
-[features]
-default = ["python-lib", "rust-lib"]
-python-lib = []
-rust-lib = []
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

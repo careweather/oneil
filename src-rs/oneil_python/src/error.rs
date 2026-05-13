@@ -3,6 +3,7 @@
 use oneil_shared::error::{AsOneilDiagnostic, Context, DiagnosticKind};
 use pyo3::Python;
 use pyo3::types::PyTracebackMethods;
+use serde::{Deserialize, Serialize};
 
 /// Error that can occur when loading a Python import.
 #[derive(Debug)]
@@ -41,7 +42,9 @@ impl AsOneilDiagnostic for LoadPythonImportError {
 }
 
 /// Error from evaluating a Python function (argument conversion, call, or result conversion failed).
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "error")]
+#[serde(rename_all = "snake_case")]
 pub enum PythonEvalError {
     PyErr {
         /// Error message from Python or from conversion.

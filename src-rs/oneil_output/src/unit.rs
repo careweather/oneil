@@ -1,6 +1,9 @@
+use std::collections::BTreeMap;
 use std::{fmt, ops};
 
-use indexmap::IndexMap;
+use serde::de::{self, Deserializer};
+use serde::ser::Serializer;
+use serde::{Deserialize, Serialize};
 
 use crate::util::is_close;
 
@@ -12,9 +15,10 @@ use crate::util::is_close;
 /// for equality, you probably actually want to check if the dimension maps
 /// are equal. If you would like to check if two units are exactly the same,
 /// check the individual components for equality.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Unit {
     /// The dimensions of the unit
+    #[serde(rename = "dimensions")]
     pub dimension_map: DimensionMap,
     /// The magnitude of the unit (e.g. 1000 for km)
     pub magnitude: f64,
@@ -30,7 +34,7 @@ impl Unit {
     /// This is a unit with no dimensions and a
     /// magnitude of 1. It is also not a decibel unit.
     #[must_use]
-    pub fn one() -> Self {
+    pub const fn one() -> Self {
         Self {
             dimension_map: DimensionMap::dimensionless(),
             magnitude: 1.0,
@@ -154,8 +158,9 @@ impl fmt::Display for Unit {
         write!(f, "{}", self.display_unit)
     }
 }
+
 /// The dimension of a base unit
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Dimension {
     /// Base unit is 'kilogram'
     Mass,
@@ -177,23 +182,86 @@ pub enum Dimension {
     LuminousIntensity,
 }
 
+impl Dimension {
+    /// SI-style key for this dimension (used in interchange maps).
+    #[must_use]
+    pub const fn as_map_key(self) -> &'static str {
+        match self {
+            Self::Mass => "kg",
+            Self::Distance => "m",
+            Self::Time => "s",
+            Self::Temperature => "K",
+            Self::Current => "A",
+            Self::Information => "bit",
+            Self::Currency => "$",
+            Self::Substance => "mol",
+            Self::LuminousIntensity => "cd",
+        }
+    }
+
+    /// Parses a dimension from an interchange map key (see [`Self::as_map_key`]).
+    #[must_use]
+    pub fn from_map_key(s: &str) -> Option<Self> {
+        match s {
+            "kg" => Some(Self::Mass),
+            "m" => Some(Self::Distance),
+            "s" => Some(Self::Time),
+            "K" => Some(Self::Temperature),
+            "A" => Some(Self::Current),
+            "bit" => Some(Self::Information),
+            "$" => Some(Self::Currency),
+            "mol" => Some(Self::Substance),
+            "cd" => Some(Self::LuminousIntensity),
+            _ => None,
+        }
+    }
+}
+
+impl Serialize for Dimension {
+    /// Serializes as the interchange string key (see [`Dimension::as_map_key`]).
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_map_key())
+    }
+}
+
+impl<'de> Deserialize<'de> for Dimension {
+    /// Deserializes from an interchange string key (see [`Dimension::from_map_key`]).
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_map_key(&s).ok_or_else(|| {
+            de::Error::unknown_variant(&s, &["kg", "m", "s", "K", "A", "bit", "$", "mol", "cd"])
+        })
+    }
+}
+
 /// A map of dimensions and their exponents.
 ///
-/// For example, "m/s" is represented as `DimensionMap(IndexMap::from([(Dimension::Distance, 1.0), (Dimension::Time, -1.0)]))`.
-#[derive(Debug, Clone)]
-pub struct DimensionMap(IndexMap<Dimension, f64>);
+/// Stored as a [`BTreeMap`] so iteration and JSON key order are always deterministic
+/// (ordered by [`Dimension`], not insertion order).
+///
+/// For example, "m/s" is represented as
+/// `DimensionMap(BTreeMap::from([(Dimension::Distance, 1.0), (Dimension::Time, -1.0)]))`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DimensionMap(BTreeMap<Dimension, f64>);
 
 impl DimensionMap {
     /// Creates a new dimension map from a map of dimensions and their exponents.
     #[must_use]
-    pub const fn new(units: IndexMap<Dimension, f64>) -> Self {
+    pub const fn new(units: BTreeMap<Dimension, f64>) -> Self {
         Self(units)
     }
 
     /// Creates a dimensionless map
     #[must_use]
-    pub fn dimensionless() -> Self {
-        Self(IndexMap::new())
+    pub const fn dimensionless() -> Self {
+        Self(BTreeMap::new())
     }
 
     /// Checks if the dimension map is dimensionless
@@ -204,7 +272,7 @@ impl DimensionMap {
 
     /// Returns a reference to the underlying map of dimension to exponent.
     #[must_use]
-    pub const fn as_map(&self) -> &IndexMap<Dimension, f64> {
+    pub const fn as_map(&self) -> &BTreeMap<Dimension, f64> {
         &self.0
     }
 
@@ -217,6 +285,12 @@ impl DimensionMap {
                 .map(|(key, value)| (key, value * exponent))
                 .collect(),
         )
+    }
+}
+
+impl FromIterator<(Dimension, f64)> for DimensionMap {
+    fn from_iter<I: IntoIterator<Item = (Dimension, f64)>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
 
@@ -321,6 +395,10 @@ pub enum DisplayUnit {
         /// The exponent of the power unit
         exponent: f64,
     },
+    /// A unit with its contents rendered as a string
+    ///
+    /// Mainly used for serialization/deserialization.
+    RenderedUnit(String),
 }
 
 impl DisplayUnit {
@@ -333,7 +411,7 @@ impl DisplayUnit {
                 name,
                 exponent: exponent * pow_exponent,
             },
-            Self::Multiply(_, _) | Self::Divide(_, _) => Self::Power {
+            Self::Multiply(_, _) | Self::Divide(_, _) | Self::RenderedUnit(_) => Self::Power {
                 base: Box::new(self),
                 exponent: pow_exponent,
             },
@@ -375,7 +453,9 @@ impl fmt::Display for DisplayUnit {
             Self::Multiply(left, right) if **right == Self::One => write!(f, "{left}")?,
             Self::Multiply(left, right) => write!(f, "{left}*{right}")?,
             Self::Divide(left, right) => match **right {
-                Self::Multiply(_, _) | Self::Divide(_, _) => write!(f, "{left}/({right})")?,
+                Self::Multiply(_, _) | Self::Divide(_, _) | Self::RenderedUnit(_) => {
+                    write!(f, "{left}/({right})")?;
+                }
                 Self::One => write!(f, "{left}")?,
                 Self::Unit { .. } | Self::Power { .. } => {
                     write!(f, "{left}/{right}")?;
@@ -390,12 +470,130 @@ impl fmt::Display for DisplayUnit {
                 Self::Unit { .. }
                 | Self::Multiply(_, _)
                 | Self::Divide(_, _)
-                | Self::Power { .. } => {
+                | Self::Power { .. }
+                | Self::RenderedUnit(_) => {
                     write!(f, "({base})^{exponent}")?;
                 }
             },
+            Self::RenderedUnit(contents) => write!(f, "{contents}")?,
         }
 
         Ok(())
+    }
+}
+
+impl Serialize for DisplayUnit {
+    /// Serializes as the same string produced by [`fmt::Display`].
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for DisplayUnit {
+    /// Deserializes a string into a single named unit with exponent `1.0`.
+    ///
+    /// This is to avoid re-parsing the display unit string.
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let name = String::deserialize(deserializer)?;
+        Ok(Self::RenderedUnit(name))
+    }
+}
+
+#[cfg(test)]
+mod serde_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn dimension_map_json_round_trip() {
+        let m = DimensionMap::new(BTreeMap::from([
+            (Dimension::Mass, 1.0),
+            (Dimension::Distance, 2.0),
+            (Dimension::Time, -3.0),
+        ]));
+        let val = serde_json::to_value(&m).expect("serialize");
+        assert_eq!(val["kg"], json!(1.0));
+        assert_eq!(val["m"], json!(2.0));
+        assert_eq!(val["s"], json!(-3.0));
+        let back: DimensionMap = serde_json::from_value(val).expect("deserialize");
+        assert_eq!(back, m);
+    }
+
+    #[test]
+    fn dimension_map_json_key_ordering_is_sorted() {
+        let m = DimensionMap::new(BTreeMap::from([
+            (Dimension::Time, 1.0),
+            (Dimension::Mass, 2.0),
+        ]));
+        let keys: Vec<String> = serde_json::to_value(&m)
+            .expect("serialize")
+            .as_object()
+            .expect("object")
+            .keys()
+            .cloned()
+            .collect();
+        assert_eq!(keys, vec!["kg".to_string(), "s".to_string()]);
+    }
+
+    #[test]
+    fn display_unit_json_round_trip() {
+        let d = DisplayUnit::Unit {
+            name: "N".into(),
+            exponent: 1.0,
+        };
+        let json = serde_json::to_string(&d).expect("serialize");
+        assert_eq!(json, "\"N\"");
+        let back: DisplayUnit = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, DisplayUnit::RenderedUnit(d.to_string()));
+    }
+
+    #[test]
+    fn unit_json_round_trip() {
+        let u = Unit {
+            dimension_map: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 1.0)])),
+            magnitude: 1.0,
+            is_db: false,
+            display_unit: DisplayUnit::Unit {
+                name: "m".into(),
+                exponent: 1.0,
+            },
+        };
+        let json = serde_json::to_string(&u).expect("serialize");
+        let back: Unit = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.dimension_map, u.dimension_map);
+        assert!((back.magnitude - u.magnitude).abs() < f64::EPSILON);
+        assert_eq!(back.is_db, u.is_db);
+        assert_eq!(
+            back.display_unit,
+            DisplayUnit::RenderedUnit(u.display_unit.to_string())
+        );
+    }
+
+    #[test]
+    fn unit_with_exponent_json_round_trip() {
+        let u = Unit {
+            dimension_map: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 2.0)])),
+            magnitude: 1000.0,
+            is_db: false,
+            display_unit: DisplayUnit::Unit {
+                name: "km".into(),
+                exponent: 2.0,
+            },
+        };
+        let json = serde_json::to_string(&u).expect("serialize");
+        let back: Unit = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.dimension_map, u.dimension_map);
+        assert!((back.magnitude - u.magnitude).abs() < f64::EPSILON);
+        assert_eq!(back.is_db, u.is_db);
+        assert_eq!(
+            back.display_unit,
+            DisplayUnit::RenderedUnit(u.display_unit.to_string())
+        );
     }
 }

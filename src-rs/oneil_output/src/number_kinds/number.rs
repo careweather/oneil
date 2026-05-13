@@ -2,6 +2,8 @@
 
 use std::{fmt, ops};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     Interval, NumberType,
     util::{DEFAULT_SIG_FIGS, float_to_string, is_close},
@@ -10,7 +12,8 @@ use crate::{
 /// A number value in Oneil.
 ///
 /// A number value is either a scalar or an interval.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Number {
     /// A scalar number value.
     Scalar(f64),

@@ -3,6 +3,8 @@
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 /// The extension for ordinary Oneil model files.
 const ON_EXTENSION: &str = "on";
 
@@ -298,7 +300,7 @@ impl TryFrom<ModelPath> for DesignPath {
 }
 
 /// A path to a Python module file.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PythonPath(PathBuf);
 
 impl PythonPath {
@@ -382,6 +384,33 @@ impl PythonPath {
     }
 }
 
+impl Serialize for PythonPath {
+    /// Serializes this path using its [`Path`] representation (for example as a JSON string).
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_path().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for PythonPath {
+    /// Deserializes a [`PathBuf`] and rejects paths whose extension is not `.{PYTHON_EXTENSION}`.
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let path = PathBuf::deserialize(deserializer)?;
+        if path.extension().map(|ext| ext.to_string_lossy()) != Some(PYTHON_EXTENSION.into()) {
+            return Err(serde::de::Error::custom(format!(
+                "python module path must have .{PYTHON_EXTENSION} extension, got {}",
+                path.display()
+            )));
+        }
+        Ok(Self::from_path_with_ext(&path))
+    }
+}
+
 /// A path to a source file.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourcePath(PathBuf);
@@ -452,5 +481,30 @@ impl TryFrom<SourcePath> for PythonPath {
             .filter(|ext| ext.to_string_lossy().as_ref() == PYTHON_EXTENSION)
             .map(|_| Self::from_path_with_ext(value.as_path()))
             .ok_or(())
+    }
+}
+
+#[cfg(test)]
+mod serde_tests {
+    use std::path::Path;
+
+    use super::PythonPath;
+
+    #[test]
+    fn python_path_json_round_trip() {
+        let path = PythonPath::from_path_with_ext(Path::new("pkg/mod.py"));
+        let json = serde_json::to_string(&path).expect("serialize");
+        let back: PythonPath = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, path);
+    }
+
+    #[test]
+    fn python_path_json_rejects_non_py_extension() {
+        let err =
+            serde_json::from_str::<PythonPath>("\"not_python.txt\"").expect_err("expected err");
+        assert!(
+            err.to_string().contains("python module path"),
+            "unexpected message: {err}"
+        );
     }
 }

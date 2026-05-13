@@ -1,6 +1,6 @@
 //! Standard builtin units (SI, derived, legacy, dimensionless).
 
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 
 use oneil_output::{Dimension, DimensionMap, DisplayUnit, Unit};
 use oneil_shared::symbols::UnitBaseName;
@@ -37,7 +37,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "gram",
             aliases: ["g", "gram", "grams"].as_ref(),
             magnitude: 1e-3,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Mass, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -45,7 +45,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "meter",
             aliases: ["m", "meter", "meters", "metre", "metres"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -53,7 +53,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "second",
             aliases: ["s", "second", "seconds", "sec", "secs"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -61,7 +61,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Kelvin",
             aliases: ["K", "Kelvin"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Temperature, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Temperature, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -69,7 +69,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Ampere",
             aliases: ["A", "Ampere", "Amp"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Current, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Current, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -77,7 +77,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "bit",
             aliases: ["b", "bit", "bits"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Information, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -85,7 +85,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "dollar",
             aliases: ["$", "dollar", "dollars"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -93,7 +93,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "mole",
             aliases: ["mol", "mole", "moles"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Substance, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Substance, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -101,7 +101,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "candela",
             aliases: ["cd", "candela"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::LuminousIntensity, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -110,7 +110,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Volt",
             aliases: ["V", "Volt", "Volts"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -123,7 +123,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Watt",
             aliases: ["W", "Watt", "Watts"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -135,7 +135,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Hertz",
             aliases: ["Hz", "Hertz"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, -1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -143,7 +143,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Joule",
             aliases: ["J", "Joule", "Joules"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -2.0),
@@ -155,7 +155,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Watt-hour",
             aliases: ["Wh", "Watt-hour", "Watt-hours"].as_ref(),
             magnitude: 3600.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -2.0),
@@ -167,7 +167,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Amp-hour",
             aliases: ["Ah", "Amp-hour", "Amp-hours"].as_ref(),
             magnitude: 3600.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Current, 1.0),
                 (Dimension::Time, 1.0),
             ])),
@@ -178,7 +178,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Tesla",
             aliases: ["T", "Tesla", "Teslas"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
                 (Dimension::Current, -1.0),
@@ -190,7 +190,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Ohm",
             aliases: ["Ohm", "Ohms"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -3.0),
@@ -203,7 +203,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Newton",
             aliases: ["N", "Newton", "Newtons"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -2.0),
@@ -215,7 +215,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Gauss",
             aliases: ["Gs", "Gauss"].as_ref(),
             magnitude: 0.0001,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
                 (Dimension::Current, -1.0),
@@ -227,7 +227,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Lumen",
             aliases: ["lm", "Lumen", "Lumens"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::LuminousIntensity, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::LuminousIntensity, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -235,7 +235,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Lux",
             aliases: ["lx", "Lux", "Luxes"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::LuminousIntensity, 1.0),
                 (Dimension::Distance, -2.0),
             ])),
@@ -246,7 +246,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "bits per second",
             aliases: ["bps"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Information, 1.0),
                 (Dimension::Time, -1.0),
             ])),
@@ -257,7 +257,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "byte",
             aliases: ["B", "byte", "bytes"].as_ref(),
             magnitude: 8.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Information, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Information, 1.0)])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -265,7 +265,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Pascal",
             aliases: ["Pa", "Pascal", "Pascals"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -277,7 +277,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "henry",
             aliases: ["H", "henry", "henries"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 2.0),
                 (Dimension::Time, -2.0),
@@ -291,7 +291,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "millennium",
             aliases: ["mil", "millennium", "millennia"].as_ref(),
             magnitude: 3.1556952e10,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -299,7 +299,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "century",
             aliases: ["cen", "century", "centuries"].as_ref(),
             magnitude: 3.1556952e9,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -307,7 +307,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "decade",
             aliases: ["dec", "decade", "decades"].as_ref(),
             magnitude: 3.1556952e8,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -315,7 +315,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "year",
             aliases: ["yr", "year", "years"].as_ref(),
             magnitude: 3.1556952e7,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -323,7 +323,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "month",
             aliases: ["mon", "month", "months"].as_ref(),
             magnitude: 2.629746e6,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -331,7 +331,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "week",
             aliases: ["week", "weeks"].as_ref(),
             magnitude: 6.048e5,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -339,7 +339,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "day",
             aliases: ["day", "days"].as_ref(),
             magnitude: 8.64e4,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -347,7 +347,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "hour",
             aliases: ["hr", "hour", "hours"].as_ref(),
             magnitude: 3600.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -355,7 +355,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "minute",
             aliases: ["min", "minute", "minutes"].as_ref(),
             magnitude: 60.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -363,7 +363,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "revolutions per minute",
             aliases: ["rpm"].as_ref(),
             magnitude: 0.10471975511965977,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Time, -1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Time, -1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -371,7 +371,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "thousand dollars",
             aliases: ["k$"].as_ref(),
             magnitude: 1000.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -379,7 +379,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "million dollars",
             aliases: ["M$"].as_ref(),
             magnitude: 1e6,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -387,7 +387,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "billion dollars",
             aliases: ["B$"].as_ref(),
             magnitude: 1e9,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -395,7 +395,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "trillion dollars",
             aliases: ["T$"].as_ref(),
             magnitude: 1e12,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Currency, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Currency, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -403,7 +403,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "Earth gravity",
             aliases: ["g_E"].as_ref(),
             magnitude: 9.81,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Time, -2.0),
             ])),
@@ -421,7 +421,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             ]
             .as_ref(),
             magnitude: 0.01,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -429,7 +429,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "pounds per square inch",
             aliases: ["psi"].as_ref(),
             magnitude: 6894.757293168361,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -441,7 +441,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "atmosphere",
             aliases: ["atm", "atmosphere", "atmospheres"].as_ref(),
             magnitude: 101325.0,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -453,7 +453,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "bar",
             aliases: ["bar", "bars"].as_ref(),
             magnitude: 1e5,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -465,7 +465,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "barye",
             aliases: ["Ba", "barye", "baryes"].as_ref(),
             magnitude: 0.1,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -477,7 +477,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "dyne",
             aliases: ["dyne", "dynes"].as_ref(),
             magnitude: 1e-5,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -2.0),
@@ -489,7 +489,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "millimeter of mercury",
             aliases: ["mmHg"].as_ref(),
             magnitude: 133.322387415,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -501,7 +501,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "torr",
             aliases: ["torr", "torrs"].as_ref(),
             magnitude: 133.3224,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Mass, 1.0),
                 (Dimension::Distance, -1.0),
                 (Dimension::Time, -2.0),
@@ -513,7 +513,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "inch",
             aliases: ["in", "inch", "inches"].as_ref(),
             magnitude: 0.0254,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -521,7 +521,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "foot",
             aliases: ["ft", "foot", "feet"].as_ref(),
             magnitude: 0.3048,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -529,7 +529,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "yard",
             aliases: ["yd", "yard", "yards"].as_ref(),
             magnitude: 0.9144,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -537,7 +537,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "mile",
             aliases: ["mi", "mile", "miles"].as_ref(),
             magnitude: 1609.344,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -545,7 +545,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "nautical mile",
             aliases: ["nmi"].as_ref(),
             magnitude: 1852.0,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Distance, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Distance, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -553,7 +553,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "pound",
             aliases: ["lb", "lbs", "pound", "pounds"].as_ref(),
             magnitude: 0.45359237,
-            dimensions: DimensionMap::new(IndexMap::from([(Dimension::Mass, 1.0)])),
+            dimensions: DimensionMap::new(BTreeMap::from([(Dimension::Mass, 1.0)])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -561,7 +561,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "mile per hour",
             aliases: ["mph"].as_ref(),
             magnitude: 0.44704,
-            dimensions: DimensionMap::new(IndexMap::from([
+            dimensions: DimensionMap::new(BTreeMap::from([
                 (Dimension::Distance, 1.0),
                 (Dimension::Time, -1.0),
             ])),
@@ -573,7 +573,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "revolution",
             aliases: ["rev", "revolution", "revolutions", "rotation", "rotations"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -581,7 +581,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "cycle",
             aliases: ["cyc", "cycle", "cycles"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -589,7 +589,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "radian",
             aliases: ["rad", "radian", "radians"].as_ref(),
             magnitude: 1.0,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: true,
         },
@@ -597,7 +597,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "degree",
             aliases: ["deg", "degree", "degrees"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI / 360.0,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -605,7 +605,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "percent",
             aliases: ["%", "percent"].as_ref(),
             magnitude: 0.01,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -613,7 +613,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "part per million",
             aliases: ["ppm"].as_ref(),
             magnitude: 1e-6,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -621,7 +621,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "part per billion",
             aliases: ["ppb"].as_ref(),
             magnitude: 1e-9,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -629,7 +629,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "arcminute",
             aliases: ["arcmin", "arcminute", "arcminutes"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI / 360.0 / 60.0,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: false,
         },
@@ -637,7 +637,7 @@ pub fn builtin_units_complete() -> impl Iterator<Item = (UnitBaseName, BuiltinUn
             name: "arcsecond",
             aliases: ["arcsec", "arcsecond", "arcseconds"].as_ref(),
             magnitude: 2.0 * std::f64::consts::PI / 360.0 / 60.0 / 60.0,
-            dimensions: DimensionMap::new(IndexMap::from([])),
+            dimensions: DimensionMap::new(BTreeMap::from([])),
             is_db: false,
             uses_prefixes: false,
         },

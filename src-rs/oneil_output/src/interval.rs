@@ -1,5 +1,7 @@
 use std::ops;
 
+use serde::{Deserialize, Serialize};
+
 use crate::util::is_close;
 
 // TODO: maybe add more comparison functions for
@@ -29,7 +31,7 @@ use crate::util::is_close;
 /// and maximum value, and all numbers between
 /// the minimum and maximum value are considered
 /// to be part of the interval.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Interval {
     min: f64,
     max: f64,
