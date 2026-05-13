@@ -395,6 +395,10 @@ pub enum DisplayUnit {
         /// The exponent of the power unit
         exponent: f64,
     },
+    /// A unit with its contents rendered as a string
+    ///
+    /// Mainly used for serialization/deserialization.
+    RenderedUnit(String),
 }
 
 impl DisplayUnit {
@@ -407,7 +411,7 @@ impl DisplayUnit {
                 name,
                 exponent: exponent * pow_exponent,
             },
-            Self::Multiply(_, _) | Self::Divide(_, _) => Self::Power {
+            Self::Multiply(_, _) | Self::Divide(_, _) | Self::RenderedUnit(_) => Self::Power {
                 base: Box::new(self),
                 exponent: pow_exponent,
             },
@@ -449,7 +453,9 @@ impl fmt::Display for DisplayUnit {
             Self::Multiply(left, right) if **right == Self::One => write!(f, "{left}")?,
             Self::Multiply(left, right) => write!(f, "{left}*{right}")?,
             Self::Divide(left, right) => match **right {
-                Self::Multiply(_, _) | Self::Divide(_, _) => write!(f, "{left}/({right})")?,
+                Self::Multiply(_, _) | Self::Divide(_, _) | Self::RenderedUnit(_) => {
+                    write!(f, "{left}/({right})")?;
+                }
                 Self::One => write!(f, "{left}")?,
                 Self::Unit { .. } | Self::Power { .. } => {
                     write!(f, "{left}/{right}")?;
@@ -464,10 +470,12 @@ impl fmt::Display for DisplayUnit {
                 Self::Unit { .. }
                 | Self::Multiply(_, _)
                 | Self::Divide(_, _)
-                | Self::Power { .. } => {
+                | Self::Power { .. }
+                | Self::RenderedUnit(_) => {
                     write!(f, "({base})^{exponent}")?;
                 }
             },
+            Self::RenderedUnit(contents) => write!(f, "{contents}")?,
         }
 
         Ok(())
@@ -493,10 +501,7 @@ impl<'de> Deserialize<'de> for DisplayUnit {
         D: Deserializer<'de>,
     {
         let name = String::deserialize(deserializer)?;
-        Ok(Self::Unit {
-            name,
-            exponent: 1.0,
-        })
+        Ok(Self::RenderedUnit(name))
     }
 }
 
@@ -545,13 +550,7 @@ mod serde_tests {
         let json = serde_json::to_string(&d).expect("serialize");
         assert_eq!(json, "\"N\"");
         let back: DisplayUnit = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(
-            back,
-            DisplayUnit::Unit {
-                name: "N".into(),
-                exponent: 1.0,
-            }
-        );
+        assert_eq!(back, DisplayUnit::RenderedUnit(d.to_string()));
     }
 
     #[test]
@@ -570,7 +569,10 @@ mod serde_tests {
         assert_eq!(back.dimension_map, u.dimension_map);
         assert!((back.magnitude - u.magnitude).abs() < f64::EPSILON);
         assert_eq!(back.is_db, u.is_db);
-        assert_eq!(back.display_unit, u.display_unit);
+        assert_eq!(
+            back.display_unit,
+            DisplayUnit::RenderedUnit(u.display_unit.to_string())
+        );
     }
 
     #[test]
@@ -589,15 +591,9 @@ mod serde_tests {
         assert_eq!(back.dimension_map, u.dimension_map);
         assert!((back.magnitude - u.magnitude).abs() < f64::EPSILON);
         assert_eq!(back.is_db, u.is_db);
-
-        // note that the name is "km^2" because the display unit is not parsed
-        // when the unit is deserialized
         assert_eq!(
             back.display_unit,
-            DisplayUnit::Unit {
-                name: "km^2".into(),
-                exponent: 1.0,
-            }
+            DisplayUnit::RenderedUnit(u.display_unit.to_string())
         );
     }
 }
