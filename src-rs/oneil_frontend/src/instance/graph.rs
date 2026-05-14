@@ -250,6 +250,22 @@ pub fn apply_designs(
             Some(&applied_via),
             &ctx,
         );
+
+        // When a design is applied at the root level (the common case when the
+        // user opens or evaluates a `.one` file directly), propagate its model-
+        // level note onto the composed root. This ensures the design's
+        // introductory prose surfaces in the rendered view rather than being
+        // silently discarded.
+        if app.target.is_root()
+            && let Some(note) = ctx
+                .design_info
+                .get(&design_file)
+                .and_then(|info| info.design_export.as_ref())
+                .and_then(|design| design.note.as_ref())
+        {
+            root.set_note(note.clone());
+        }
+
         *composed.root = root;
     }
 
@@ -406,6 +422,13 @@ fn build_design_unit_graph(
         None,
         ctx,
     );
+
+    // If the design file carries a model-level note, apply it to the composed
+    // root so the rendered view shows the design's introductory prose rather
+    // than the target model's own note (which is absent for most base models).
+    if let Some(note) = &design.note {
+        root.set_note(note.clone());
+    }
 
     graph.root = Box::new(root);
     attach_file_resolution_errors(&mut graph, &design_model_path, ctx);
@@ -698,6 +721,7 @@ fn apply_design_at_host(
             // Attach design provenance so validation errors are attributed to the design file.
             let provenance = ir::DesignProvenance {
                 design_path: design_file.clone(),
+                is_addition: true,
                 assignment_span: test.span().clone(),
                 anchor_path: RelativePath::self_path(),
                 applied_via: applied_via.cloned(),
@@ -801,6 +825,7 @@ fn apply_overlay_at_host(
     for (name, parameter) in additions {
         let provenance = ir::DesignProvenance {
             design_path: design_file.clone(),
+            is_addition: true,
             assignment_span: parameter.span().clone(),
             anchor_path: anchor_path.clone(),
             applied_via: applied_via.cloned(),
@@ -842,12 +867,24 @@ fn apply_overlay_at_host(
         }
         let provenance = ir::DesignProvenance {
             design_path: design_file.clone(),
+            is_addition: false,
             assignment_span: overlay.design_span.clone(),
             anchor_path: anchor_path.clone(),
             applied_via: applied_via.cloned(),
         };
         *parameter = parameter.clone().with_design_provenance(provenance);
         *parameter.value_mut() = overlay.value.clone();
+        // Propagate design-supplied metadata overrides so the rendered view
+        // shows the design's context rather than the base model's boilerplate.
+        if let Some(note) = &overlay.note {
+            parameter.set_note(note.clone());
+        }
+        if let Some(label) = &overlay.label {
+            parameter.set_label(label.clone());
+        }
+        if let Some(render_name) = &overlay.render_name {
+            parameter.set_render_name(render_name.clone());
+        }
     }
 }
 

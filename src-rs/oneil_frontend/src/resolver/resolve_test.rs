@@ -33,6 +33,11 @@ pub fn resolve_tests<E>(
 
         let dependencies = get_expr_dependencies(&test_expr);
 
+        let note = decl
+            .test
+            .note()
+            .map(|n| ir::Note::new(n.value().to_string()));
+
         Ok((
             test_index,
             ir::Test::new(
@@ -41,6 +46,7 @@ pub fn resolve_tests<E>(
                 test_expr,
                 dependencies,
                 decl.section_label.map(|label| label.deref().clone()),
+                note,
             ),
         ))
     });

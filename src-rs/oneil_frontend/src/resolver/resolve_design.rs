@@ -194,6 +194,7 @@ fn register_design_local_scratch<E: ExternalResolutionContext>(
         scratch_span.clone(),
         ParameterLabel::from(name.as_str()),
         None,
+        None,
         ir::ParameterValue::simple(
             ir::Expr::literal(scratch_span, ir::Literal::Number(0.0)),
             None,
@@ -367,20 +368,23 @@ fn handle_design_parameter<E: ExternalResolutionContext>(
             || ParameterLabel::from(p.ident().as_str()),
             |l| ParameterLabel::from(l.as_str()),
         );
+        let render_name = p.render_name().map(|r| r.deref().clone());
         let is_performance = p.performance_marker().is_some();
         let trace_level = resolve_trace_level(p.trace_level());
+        let note = p.note().map(|n| ir::Note::new(n.value().to_string()));
         let local_param = ir::Parameter::new(
             dependencies,
             name.clone(),
             design_span.clone(),
             design_span.clone(),
             label,
+            render_name,
             None,
             value,
             ir::Limits::default(),
             is_performance,
             trace_level,
-            None,
+            note,
         );
         running.parameter_additions.insert(name, local_param);
         return;
@@ -392,6 +396,9 @@ fn handle_design_parameter<E: ExternalResolutionContext>(
         value,
         design_span: design_span.clone(),
         original_model_span,
+        note: p.note().map(|n| ir::Note::new(n.value().to_string())),
+        label: p.label().map(|l| ParameterLabel::from(l.as_str())),
+        render_name: p.render_name().map(|r| r.deref().clone()),
     };
     match instance_path {
         Some(ip) => {

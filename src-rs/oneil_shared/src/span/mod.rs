@@ -16,13 +16,15 @@ use std::{path::Path, sync::Arc};
 /// parameter equation.
 ///
 /// Because [`Rc`] is not [`Copy`], `Span` is deliberately `Clone`-only.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Span {
     start: SourceLocation,
     end: SourceLocation,
     /// Path of the file this span was parsed from.
+    #[serde(skip)]
     path: Arc<Path>,
     /// Full source text of the file this span was parsed from.
+    #[serde(skip)]
     source: Arc<str>,
 }
 
@@ -177,7 +179,7 @@ impl Span {
 //       or
 //       [`LocatedSpan::naive_get_utf8_column`](https://docs.rs/nom_locate/5.0.0/nom_locate/struct.LocatedSpan.html#method.naive_get_utf8_column)
 //       is faster.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SourceLocation {
     /// The offset (in bytes) from the beginning of the source code (0-indexed)
     pub offset: usize,

@@ -217,6 +217,11 @@ fn try_resolve_identifier_as_parameter<E>(
 
     let label = ParameterLabel::from(parameter_decl.parameter.label().as_str());
 
+    let render_name = parameter_decl
+        .parameter
+        .render_name()
+        .map(|n| n.deref().clone());
+
     let value = resolve_parameter_value(parameter_decl.parameter.value(), resolution_context);
 
     let limits = resolve_limits(parameter_decl.parameter.limits(), resolution_context);
@@ -241,6 +246,7 @@ fn try_resolve_identifier_as_parameter<E>(
                 parameter_identifier_span.clone(),
                 parameter_decl.parameter.span().clone(),
                 label,
+                render_name,
                 section_label,
                 value,
                 limits,

@@ -135,11 +135,16 @@ impl Default for ModelInProgress {
 /// (`references`, `submodels`, `aliases`) into a single
 /// name -> [`EvalInstanceKey`] lookup the evaluator uses for
 /// `parameter.alias` resolution.
+///
+/// `pool` is passed so that extraction aliases whose first segment is a
+/// cross-file `reference` (rather than a direct submodel) can pivot to the
+/// correct pool-entry root before descending the remaining segments.
 fn seed_subtree(
     instance: &InstancedModel,
     key: &EvalInstanceKey,
     parent_key: Option<&EvalInstanceKey>,
     models: &mut IndexMap<EvalInstanceKey, ModelInProgress>,
+    pool: &IndexMap<ModelPath, Box<InstancedModel>>,
 ) {
     let parameters: IndexMap<ParameterName, ParamSlot> = instance
         .parameters()
@@ -167,19 +172,50 @@ fn seed_subtree(
     }
 
     // Extraction-list aliases — resolve `alias_path` from this key.
+    //
+    // The first segment may be a direct submodel *or* a cross-file reference
+    // (pool entry). When it is a reference we pivot to the pool entry's root
+    // instance path before descending the remaining segments as submodels.
     for (name, alias) in instance.aliases() {
-        let mut p = key.instance_path.clone();
-        let mut model_path = instance.path().clone();
-        let mut node: &InstancedModel = instance;
-        for seg in alias.alias_path.segments() {
-            p = p.child(seg.clone());
+        let segs = alias.alias_path.segments();
+        let mut seg_iter = segs.iter();
+
+        let Some(first) = seg_iter.next() else {
+            continue;
+        };
+
+        let (mut p, mut model_path, mut node): (_, _, &InstancedModel) =
+            if let Some(sub) = instance.submodels().get(first) {
+                (
+                    key.instance_path.clone().child(first.clone()),
+                    sub.instance.path().clone(),
+                    sub.instance.as_ref(),
+                )
+            } else if let Some(import) = instance.references().get(first) {
+                // Pivot to the pool entry; its instance path starts at root.
+                if let Some(pool_entry) = pool.get(&import.path) {
+                    (
+                        oneil_shared::InstancePath::root(),
+                        import.path.clone(),
+                        pool_entry.as_ref(),
+                    )
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            };
+
+        for seg in seg_iter {
             if let Some(sub) = node.submodels().get(seg) {
+                p = p.child(seg.clone());
                 model_path = sub.instance.path().clone();
                 node = sub.instance.as_ref();
             } else {
                 break;
             }
         }
+
         references.insert(
             name.clone(),
             EvalInstanceKey {
@@ -208,7 +244,7 @@ fn seed_subtree(
             model_path: sub.instance.path().clone(),
             instance_path: key.instance_path.clone().child(alias.clone()),
         };
-        seed_subtree(sub.instance.as_ref(), &child_key, Some(key), models);
+        seed_subtree(sub.instance.as_ref(), &child_key, Some(key), models, pool);
     }
 }
 
@@ -282,10 +318,22 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
     pub fn from_graph(graph: &InstanceGraph, external_context: &'external mut E) -> Self {
         let mut models: IndexMap<EvalInstanceKey, ModelInProgress> = IndexMap::new();
         let root_key = EvalInstanceKey::root(graph.root.path().clone());
-        seed_subtree(graph.root.as_ref(), &root_key, None, &mut models);
+        seed_subtree(
+            graph.root.as_ref(),
+            &root_key,
+            None,
+            &mut models,
+            &graph.reference_pool,
+        );
         for (path, instance) in &graph.reference_pool {
             let pool_key = EvalInstanceKey::root(path.clone());
-            seed_subtree(instance.as_ref(), &pool_key, None, &mut models);
+            seed_subtree(
+                instance.as_ref(),
+                &pool_key,
+                None,
+                &mut models,
+                &graph.reference_pool,
+            );
         }
         Self {
             models,

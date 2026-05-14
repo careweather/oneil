@@ -137,6 +137,25 @@ impl Unit {
     }
 }
 
+impl serde::Serialize for CompositeUnit {
+    /// Serializes a composite unit as its resolved display string.
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let resolved = self.display_unit().to_resolved_display();
+        serializer.serialize_str(&format!("{resolved}"))
+    }
+}
+
+impl serde::Serialize for Unit {
+    /// Serializes a unit as `{"name": "...", "exponent": f64}`.
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("Unit", 2)?;
+        state.serialize_field("name", self.name().as_str())?;
+        state.serialize_field("exponent", &self.exponent())?;
+        state.end()
+    }
+}
+
 /// Computes the [`DimensionMap`] of a list of [`Unit`]s by looking up each
 /// base unit's dimension map and combining them according to the unit's
 /// exponent.
@@ -168,7 +187,8 @@ where
 }
 
 /// Information about a unit.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum UnitInfo {
     /// A standard unit
     Standard {
@@ -194,7 +214,7 @@ pub enum UnitInfo {
 /// the original exponent, rather than converting
 /// it to a list of units that are multiplied
 /// together.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum DisplayCompositeUnit {
     /// Multiplied units
     Multiply(Box<Self>, Box<Self>),
@@ -231,7 +251,7 @@ impl DisplayCompositeUnit {
 /// the original exponent, rather than converting
 /// it to a list of units that are multiplied
 /// together.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct DisplayUnit {
     /// The name of the unit
     pub name: String,

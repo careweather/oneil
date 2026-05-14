@@ -7,7 +7,7 @@ use oneil_shared::paths::{DesignPath, ModelPath};
 
 use crate::{
     debug_info::TraceLevelNode,
-    naming::{DirectoryNode, IdentifierNode, ParameterLabelNode},
+    naming::{DirectoryNode, IdentifierNode, ParameterLabelNode, RenderNameNode},
     node::Node,
     note::NoteNode,
     parameter::{ParameterNode, ParameterValueNode, PerformanceMarkerNode},
@@ -503,6 +503,8 @@ pub struct DesignParameter {
     note: Option<NoteNode>,
     /// Optional human-readable label (`None` for shorthand additions without a label prefix).
     label: Option<ParameterLabelNode>,
+    /// Optional LaTeX render-name written as `{...}` after the `:` (only valid when label is present).
+    render_name: Option<RenderNameNode>,
 }
 
 /// AST node for a [`DesignParameter`].
@@ -511,6 +513,10 @@ pub type DesignParameterNode = Node<DesignParameter>;
 impl DesignParameter {
     /// Creates a design parameter line with the given (possibly absent) instance reference.
     #[must_use]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "all fields are required for full construction"
+    )]
     pub const fn new(
         ident: IdentifierNode,
         instance_path: Option<IdentifierNode>,
@@ -519,6 +525,7 @@ impl DesignParameter {
         trace_level: Option<TraceLevelNode>,
         note: Option<NoteNode>,
         label: Option<ParameterLabelNode>,
+        render_name: Option<RenderNameNode>,
     ) -> Self {
         Self {
             ident,
@@ -528,6 +535,7 @@ impl DesignParameter {
             trace_level,
             note,
             label,
+            render_name,
         }
     }
 
@@ -571,5 +579,11 @@ impl DesignParameter {
     #[must_use]
     pub const fn label(&self) -> Option<&ParameterLabelNode> {
         self.label.as_ref()
+    }
+
+    /// Optional LaTeX render-name written as `{...}` after the `:` (only valid when label is present).
+    #[must_use]
+    pub const fn render_name(&self) -> Option<&RenderNameNode> {
+        self.render_name.as_ref()
     }
 }

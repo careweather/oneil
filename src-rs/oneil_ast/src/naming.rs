@@ -2,7 +2,7 @@
 
 use indexmap::Equivalent;
 use oneil_shared::{
-    labels::{ParameterLabel, SectionLabel},
+    labels::{ParameterLabel, RenderName, SectionLabel},
     symbols::{
         BuiltinFunctionName, BuiltinValueName, ParameterName, PyFunctionName, ReferenceName,
     },
@@ -18,6 +18,9 @@ pub type ParameterNameNode = Node<ParameterName>;
 
 /// A node containing a parameter label
 pub type ParameterLabelNode = Node<ParameterLabel>;
+
+/// A node containing an optional LaTeX render-name
+pub type RenderNameNode = Node<RenderName>;
 
 /// A node containing a section label
 pub type SectionLabelNode = Node<SectionLabel>;

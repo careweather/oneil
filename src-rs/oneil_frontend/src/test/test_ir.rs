@@ -154,6 +154,7 @@ impl ParameterBuilder {
             span,
             label,
             None,
+            None,
             value,
             limits,
             self.is_performance,

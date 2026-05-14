@@ -640,6 +640,17 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         }
     }
 
+    /// Sets the section metadata on the active model.
+    ///
+    /// Called by the resolver after parameters and tests have been resolved so
+    /// that `TestIndex` values are already finalized.
+    pub fn set_active_model_sections(
+        &mut self,
+        sections: indexmap::IndexMap<oneil_shared::labels::SectionLabel, ir::Section>,
+    ) {
+        self.active_model_mut().set_sections(sections);
+    }
+
     /// Sets the design export on the active model's resolution result.
     pub(crate) fn set_active_model_design_export(&mut self, design: Design) {
         let path = self.active_models.last().expect("no active model");
@@ -664,6 +675,21 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
 
     /// Adds tests to the design export on the active model's resolution result.
     ///
+    /// Copies the model-level note onto the active model's design export so it
+    /// can be applied to the composed target node at instance time.
+    ///
+    /// Must be called after `set_active_model_note` and after the design export
+    /// has been stored (i.e. after `resolve_design_surface`).
+    pub(crate) fn add_note_to_design_export(&mut self, note: Option<ir::Note>) {
+        let Some(note) = note else { return };
+        let path = self.active_models.last().expect("no active model");
+        if let Some(result) = self.model_results.get_mut(path)
+            && let Some(design) = result.design_export.as_mut()
+        {
+            design.note = Some(note);
+        }
+    }
+
     /// Tests from design files are added to the design export so they can be
     /// applied to the target model at instance time. This must be called after
     /// tests have been resolved.

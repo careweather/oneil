@@ -11,7 +11,7 @@ use oneil_shared::{
 use crate::CompositeUnit;
 
 /// Abstract syntax tree for mathematical and logical expressions.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum Expr {
     /// Comparison operation with left and right operands, supporting chaining.
     ComparisonOp {
@@ -402,7 +402,8 @@ impl Expr {
 }
 
 /// Binary operators for mathematical and logical operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BinaryOp {
     /// Addition: `a + b`
     Add,
@@ -431,7 +432,8 @@ pub enum BinaryOp {
 /// Comparison operators for expressions.
 ///
 /// Comparison operations support chaining for expressions like `a < b < c`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ComparisonOp {
     /// Less than comparison: `a < b`
     LessThan,
@@ -486,7 +488,8 @@ impl ComparisonOp {
 }
 
 /// Unary operators for single-operand operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum UnaryOp {
     /// Negation: `-a`
     Neg,
@@ -495,7 +498,7 @@ pub enum UnaryOp {
 }
 
 /// Function names for built-in and imported functions.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub enum FunctionName {
     /// Built-in mathematical function.
     Builtin(BuiltinFunctionName, Span),
@@ -536,7 +539,7 @@ impl FunctionName {
 /// scope; eval resolves variables against the active scope at force
 /// time (with overlay parameters pushing the anchor scope first via
 /// [`crate::DesignProvenance::anchor_path`]).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub enum Variable {
     /// Built-in variable.
     Builtin {
@@ -607,7 +610,7 @@ impl Variable {
 }
 
 /// Literal values that can appear in expressions.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum Literal {
     /// Numeric literal (floating-point).
     Number(f64),

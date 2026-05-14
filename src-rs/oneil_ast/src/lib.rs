@@ -25,7 +25,7 @@ pub use expression::{
 pub use model::{Model, ModelNode, Section, SectionHeader, SectionHeaderNode, SectionNode};
 pub use naming::{
     Directory, DirectoryNode, Identifier, IdentifierNode, ParameterLabelNode, ParameterNameNode,
-    ReferenceNameNode, SectionLabelNode,
+    ReferenceNameNode, RenderNameNode, SectionLabelNode,
 };
 pub use node::Node;
 pub use note::{Note, NoteNode};

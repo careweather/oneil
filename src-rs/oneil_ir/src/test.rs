@@ -2,7 +2,7 @@
 
 use oneil_shared::{labels::SectionLabel, span::Span};
 
-use crate::{Dependencies, DesignProvenance, debug_info::TraceLevel, expr::Expr};
+use crate::{Dependencies, DesignProvenance, Note, debug_info::TraceLevel, expr::Expr};
 
 /// A test within a model.
 #[derive(Debug, Clone, PartialEq)]
@@ -12,6 +12,8 @@ pub struct Test {
     expr: Expr,
     dependencies: Dependencies,
     section_label: Option<SectionLabel>,
+    /// Optional documentation note attached to the test.
+    note: Option<Note>,
     /// Set when this test was added by a design file.
     /// `None` for tests defined in the model file itself.
     design_provenance: Option<DesignProvenance>,
@@ -30,6 +32,7 @@ impl Test {
         expr: Expr,
         dependencies: Dependencies,
         section_label: Option<SectionLabel>,
+        note: Option<Note>,
     ) -> Self {
         Self {
             span,
@@ -37,6 +40,7 @@ impl Test {
             expr,
             dependencies,
             section_label,
+            note,
             design_provenance: None,
         }
     }
@@ -83,6 +87,12 @@ impl Test {
     #[must_use]
     pub const fn section_label(&self) -> Option<&SectionLabel> {
         self.section_label.as_ref()
+    }
+
+    /// Returns the optional documentation note for this test.
+    #[must_use]
+    pub const fn note(&self) -> Option<&Note> {
+        self.note.as_ref()
     }
 
     /// Returns the design provenance for this test, if it was added by a design.

@@ -21,6 +21,7 @@ use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_shared::{
     InstancePath,
+    labels::SectionLabel,
     paths::{ModelPath, PythonPath},
     symbols::{ParameterName, ReferenceName, TestIndex},
 };
@@ -93,6 +94,9 @@ pub struct InstancedModel {
     parameters: IndexMap<ParameterName, ir::Parameter>,
     tests: IndexMap<TestIndex, ir::Test>,
     note: Option<ir::Note>,
+    /// Named sections in source order. Each section carries an optional note and an
+    /// ordered item list referencing parameters/tests by ID.
+    sections: IndexMap<SectionLabel, ir::Section>,
 }
 
 impl InstancedModel {
@@ -102,7 +106,7 @@ impl InstancedModel {
         clippy::too_many_arguments,
         reason = "each map type is a distinct import category"
     )]
-    pub const fn new(
+    pub fn new(
         path: ModelPath,
         python_imports: IndexMap<PythonPath, ir::PythonImport>,
         submodels: IndexMap<ReferenceName, SubmodelImport>,
@@ -121,6 +125,7 @@ impl InstancedModel {
             parameters,
             tests,
             note,
+            sections: IndexMap::new(),
         }
     }
 
@@ -138,6 +143,7 @@ impl InstancedModel {
             parameters: IndexMap::new(),
             tests: IndexMap::new(),
             note: None,
+            sections: IndexMap::new(),
         }
     }
 
@@ -236,6 +242,23 @@ impl InstancedModel {
     /// classification pass to reclassify variables in test expressions.
     pub(crate) const fn tests_mut(&mut self) -> &mut IndexMap<TestIndex, ir::Test> {
         &mut self.tests
+    }
+
+    /// Returns named sections in source order.
+    ///
+    /// Each section carries an optional note and an ordered list of
+    /// parameter/test IDs that can be looked up in
+    /// [`parameters`](Self::parameters) / [`tests`](Self::tests).
+    #[must_use]
+    pub const fn sections(&self) -> &IndexMap<SectionLabel, ir::Section> {
+        &self.sections
+    }
+
+    /// Sets the section metadata, replacing any previously stored sections.
+    ///
+    /// Called by the resolver after parameters and tests have been resolved.
+    pub fn set_sections(&mut self, sections: IndexMap<SectionLabel, ir::Section>) {
+        self.sections = sections;
     }
 
     /// Returns the model-level documentation note, if any.

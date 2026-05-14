@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 
 use oneil_shared::{
     RelativePath,
-    labels::{ParameterLabel, SectionLabel},
+    labels::{ParameterLabel, RenderName, SectionLabel},
     paths::{DesignPath, ModelPath},
     span::Span,
     symbols::{BuiltinValueName, ParameterName, ReferenceName},
@@ -52,6 +52,10 @@ pub struct DesignProvenance {
     /// CLI (e.g. `oneil eval design.one`) rather than via an `apply`
     /// declaration, in which case [`applied_via`](Self::applied_via) is `None`.
     pub design_path: ModelPath,
+    /// `true` when the design *added* this parameter to the host model
+    /// (it did not exist on the base model); `false` when the design
+    /// *overrode* a value that already existed on the host.
+    pub is_addition: bool,
     /// Span of the `param = value` assignment line in the design file
     /// that wrote this value.
     pub assignment_span: Span,
@@ -87,6 +91,10 @@ pub struct Parameter {
     name_span: Span,
     span: Span,
     label: ParameterLabel,
+    /// Optional LaTeX render-name written as `{...}` after the `:` in source.
+    /// When `Some`, the frontend uses this raw LaTeX string instead of deriving
+    /// a symbol from the identifier.
+    render_name: Option<RenderName>,
     section_label: Option<SectionLabel>,
     value: ParameterValue,
     limits: Limits,
@@ -112,6 +120,7 @@ impl Parameter {
         name_span: Span,
         span: Span,
         label: ParameterLabel,
+        render_name: Option<RenderName>,
         section_label: Option<SectionLabel>,
         value: ParameterValue,
         limits: Limits,
@@ -125,6 +134,7 @@ impl Parameter {
             name_span,
             span,
             label,
+            render_name,
             section_label,
             value,
             limits,
@@ -189,6 +199,12 @@ impl Parameter {
         &self.label
     }
 
+    /// Returns the optional LaTeX render-name of this parameter.
+    #[must_use]
+    pub const fn render_name(&self) -> Option<&RenderName> {
+        self.render_name.as_ref()
+    }
+
     /// Returns the value of this parameter.
     #[must_use]
     pub const fn value(&self) -> &ParameterValue {
@@ -239,6 +255,31 @@ impl Parameter {
     #[must_use]
     pub const fn note(&self) -> Option<&Note> {
         self.note.as_ref()
+    }
+
+    /// Replaces the documentation note.
+    ///
+    /// Called by the instance-graph build pass when a design override
+    /// carries a design-specific note that should supersede the base
+    /// model's note for this parameter.
+    pub fn set_note(&mut self, note: Note) {
+        self.note = Some(note);
+    }
+
+    /// Replaces the human-readable label.
+    ///
+    /// Called by the instance-graph build pass when a design override
+    /// supplies an alternative label for the parameter.
+    pub fn set_label(&mut self, label: ParameterLabel) {
+        self.label = label;
+    }
+
+    /// Replaces the LaTeX render-name.
+    ///
+    /// Called by the instance-graph build pass when a design override
+    /// supplies an alternative render-name for the parameter.
+    pub fn set_render_name(&mut self, render_name: RenderName) {
+        self.render_name = Some(render_name);
     }
 }
 
@@ -344,7 +385,7 @@ impl Default for Dependencies {
 }
 
 /// The value of a parameter, which can be either a simple expression or a piecewise function.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum ParameterValue {
     /// A simple expression with an optional unit.
     Simple(Box<Expr>, Option<CompositeUnit>),
@@ -367,7 +408,7 @@ impl ParameterValue {
 }
 
 /// A single expression in a piecewise function with its associated condition.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PiecewiseExpr {
     expr: Expr,
     if_expr: Expr,
