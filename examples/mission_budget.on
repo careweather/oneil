@@ -1,0 +1,96 @@
+reference mission_constants as c
+
+submodel rover as rover_a
+submodel rover as rover_b
+
+section Masses
+
+    ~~~
+    The spacecraft dry mass is the total mass after the main propulsion burn,
+    consisting of the bus structure plus all rovers.
+
+    Wet mass (before burn) equals dry mass plus propellant:
+
+    $$m_{wet} = m_{dry} + m_{req}$$
+    ~~~
+
+Vehicle dry mass: m_bus = 4000 :kg
+
+    ~ Bus structure, avionics, and propulsion hardware. Does not include propellant or rover payload.
+
+Rover payload mass: m_pl = m.rover_a + m.rover_b :kg
+
+    ~~~
+    Sum of both rover masses. Since each rover is a submodel,
+    changes to one rover do not affect the other.
+    ~~~
+
+$ Dry mass after maneuver: m_dry = m_bus + m_pl :kg
+
+    ~~~
+    The mass the vehicle must carry after expending all propellant.
+    This is the denominator of the mass ratio in the rocket equation:
+
+    $$\mu = \frac{m_{wet}}{m_{dry}} = e^{\Delta v / v_e}$$
+
+    A higher mass ratio demands exponentially more propellant.
+    ~~~
+
+section Propulsion
+
+    ~~~
+    Propulsion sizing follows the Tsiolkovsky rocket equation [@Tsiolkovsky1903].
+    The effective exhaust velocity $v_e$ relates to specific impulse $I_{sp}$ by:
+
+    $$v_e = I_{sp} \cdot g_0$$
+
+    where $g_0 = 9.81\,m/s^2$ is standard gravity.
+    For a bipropellant MMH/NTO engine, $I_{sp} \approx 300\,s$,
+    giving $v_e \approx 2943\,m/s$ [@Sutton2017].
+    ~~~
+
+Effective exhaust velocity: v_e = 9.81*300 :m/s
+
+    ~~~
+    Specific impulse times standard gravity. Corresponds to
+    $I_{sp} \approx 300\,s$, typical for pressure-fed MMH/NTO
+    bipropellant engines.
+    ~~~
+
+Loaded propellant available: m_p0 = 15000 :kg
+
+    ~ Propellant capacity of the main tank.
+
+Tsiolkovsky propellant required: m_req = m_dry * (e ^ (dv.c / v_e) - 1) :kg
+
+    ~~~
+    Derived directly from the rocket equation. Starting from:
+
+    $$\Delta v = v_e \ln\!\frac{m_{wet}}{m_{dry}}$$
+
+    Substituting $m_{wet} = m_{dry} + m_{req}$ and solving for $m_{req}$:
+
+    $$m_{req} = m_{dry}\!\left(e^{\Delta v / v_e} - 1\right) \implies {{m_req:equation}}$$
+
+    The exponential dependence on $\Delta v / v_e$ makes this the primary
+    mission driver.
+    ~~~
+
+$ Wet mass at ignition: m_wet = m_dry + m_req :kg
+
+    ~ Total spacecraft mass at start of burn.
+
+$ Propellant margin(-1e30, 1e30): m_mg = m_p0 - m_req :kg
+
+    ~ Positive margin means the mission is feasible. Negative means it cannot close.
+
+section Derived Quantities
+
+$ Mass ratio: mu = m_wet / m_dry
+
+    ~~~
+    The Tsiolkovsky mass ratio. Typical values: $\mu \approx 2$ for Earth-orbit
+    missions, $\mu \approx 3$--$5$ for interplanetary missions.
+    ~~~
+
+test: m_req < m_p0

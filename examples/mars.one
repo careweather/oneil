@@ -1,0 +1,110 @@
+~~~
+## Mars — applied design for `planet.on`
+
+This is a **design file**.
+The `design planet` line names the target model (planet.on) that this design refines with 
+Mars-specific numbers and adds a handful of Mars-only quantities used by mission-level models downstream.
+
+Every binding below either **overrides** a parameter on `planet.on` (when the
+name matches one in the target) or **adds** a new parameter that is unique to
+Mars. Run it directly with `oneil eval mars.one`, or apply it to `planet.on`
+via `oneil eval planet.on --design mars.one`.
+
+Why these particular numbers matter:
+
+- $g$ governs everything from atmospheric scale height to lander descent.
+- $R$ and the derived surface area $A$ set comms coverage and how many
+surface assets you can spread out before re-imaging the same ground.
+- $P_a$ being three orders of magnitude below Earth's drives parachute
+sizing, EDL (entry, decent, and landing) strategy, and habitat structural margins.
+- $t_{sol}$ shifts ground-ops cadence: a science team on "Mars time" drifts
+~40 min later each day relative to local Earth clocks.
+~~~
+design planet
+
+g = 3.72 :m/s^2
+
+    ~ Mean surface gravity, roughly 38% of Earth's. A 100 kg lander weighs only ~372 N on the surface.
+
+Mean radius: R = 3389.5 :km
+
+    ~~~
+    Volumetric-mean radius (sphere of equal volume), about 1 km smaller than
+    the equatorial `R_e` below. Prefer `R_mean` whenever you need a
+    "single representative radius" for thermal or mass models.
+   ~~~
+
+R_e = 3396.2 :km
+
+    ~~~
+    Mean equatorial radius (Mars is slightly oblate). Used wherever
+    `planet.on` needs a sphere radius, including {{A:equation}}.
+    ~~~
+
+M = 6.417e23 :kg
+
+    ~~~
+    About one-tenth of Earth's mass. Together with {{R:equation}}, this
+    would fix surface gravity through {{g:equation}}.
+    ~~~
+
+P_a = 0.6105 :kPa
+
+    ~~~
+    Mean surface pressure (≈ 6 mbar) — three orders of magnitude lower than
+    Earth's $101.325\,{kPa}$. Low enough that aerobraking is helpful
+    but never sufficient on its own; powered descent is still required for
+    anything above rover scale [@Wertz2011].
+    ~~~
+
+Number of active rovers: rovers = 2
+
+    ~~~
+    As of 2024: **Curiosity** (MSL, landed 2012) and **Perseverance**
+    (Mars 2020, landed 2021). Earlier surface rovers — Sojourner (1997),
+    Spirit & Opportunity (2004) — have all ended their missions.
+    ~~~
+
+Mars solar day: t_sol = 24.66 :hr
+
+    ~~~
+    A Martian solar day ("sol") is $24\,{h}\,39\,{min}\,35,{s}$,
+    about $2.7\%$ longer than an Earth day. The mismatch matters operationally:
+    teams working on Mars time live by sols that drift ≈ 39 min per Earth day,
+    so a six-month surface mission rotates through every Earth-local time-zone.
+    ~~~
+
+$ Surface area: A = 4 * pi * R^2 :km^2
+
+    ~~~
+    Spherical-approximation surface area.
+
+    `{{param:equation}}` and `{{param:value}}` placeholders are evaluated
+    against the model whenever the note is rendered, keeping narrative and
+    numbers in sync automatically:
+
+    Treating Mars as a sphere of radius {{R:value}}, the surface area works
+    out to {{A:equation}} = {{A:value}}.
+
+    Summary tables also work inside notes:
+
+    | Quantity                | Symbol               | Value               |
+    |-------------------------|----------------------|---------------------|
+    | Mean radius             | {{R:equation}}       | {{R:value}}         |
+    | Mass                    | {{M:equation}}       | {{M:value}}         |
+    | Surface gravity         | {{g:equation}}       | {{g:value}}         |
+    | Surface pressure        | {{P_a:equation}}     | {{P_a:value}}       |
+    | Surface area (sphere)   | {{A:equation}}       | {{A:value}}         |
+    | Sol length              | {{t_sol:equation}}   | {{t_sol:value}}     |
+
+    Images work too — paths resolve against the workspace root or relative to the model file:
+
+    ![View of Mars from ESA's Mars Express, processed from OSIRIS imagery.](./images/mars_globe.jpg)
+    ~~~
+
+True non-spherical surface area: A_ns = 1.448e8 : km^2
+    ~~~
+    Accounting for oblateness, the surface area is
+    $\approx$ {{A_ns:value}} — close enough that the
+    spherical approximation is fine for first-order sizing.
+    ~~~

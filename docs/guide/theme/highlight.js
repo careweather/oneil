@@ -81,19 +81,74 @@ hljs.registerLanguage("oneil", function (hljs) {
     endsWithParent: true,
   };
 
+  // ── Note contents ───────────────────────────────────────────────────────────
+  // Notes are markdown with embedded LaTeX math ($...$, $$...$$) and Oneil
+  // {{var:equation}} / {{var:value}} interpolation placeholders.
+
+  const NOTE_CONTAINS = [
+    // display math: $$...$$  — subLanguage:"latex" highlights the content;
+    // (?<!\\) prevents \$$ from closing the block.
+    { scope: "formula", begin: /\$\$/, end: /(?<!\\)\$\$/, subLanguage: "latex" },
+    // inline math: $..$ (not $$)
+    { scope: "formula", begin: /\$(?!\$)/, end: /(?<!\\)\$/, subLanguage: "latex" },
+    // {{var:equation}} and {{var:value}} placeholders
+    { scope: "variable", match: /\{\{[\w]+:(?:equation|value)\}\}/ },
+    // markdown bold+italic ***…***
+    { scope: "strong", match: /\*{3}[^*\n]+\*{3}/ },
+    // markdown bold **…** and __…__
+    { scope: "strong", begin: /\*\*|__/, end: /\*\*|__/ },
+    // markdown italic *…* (not part of ** or ***)
+    { scope: "emphasis", match: /(?<!\*)\*(?!\*)[^*\n]+\*(?!\*)/ },
+    // markdown strikethrough ~~…~~ (double tilde, not triple)
+    { scope: "deletion", match: /~~(?!~)[^~\n]+~~/ },
+    // ATX heading # ... ######
+    { scope: "section", begin: /^\s*#{1,6}\s+/, end: /$/m },
+    // blockquote > ...
+    { scope: "quote", begin: /^\s*>+\s*/, end: /$/m },
+    // unordered list item  - / * / +
+    { scope: "bullet", match: /^\s*[-*+](?=\s)/ },
+    // ordered list item  1. / 2.
+    { scope: "bullet", match: /^\s*\d+\.(?=\s)/ },
+    // image ![alt](url)
+    { scope: "link", match: /!\[[^\]]*\]\([^)\s]+[^)]*\)/ },
+    // link [text](url)
+    { scope: "link", match: /\[[^\]]+\]\([^)\s]+[^)]*\)/ },
+    // markdown inline code `…`
+    { scope: "code", begin: /`+/, end: /`+/ },
+    // TODO/FIXME/NOTE markers
+    { scope: "doctag", match: /\b(?:TODO|FIXME|NOTE)\b/ },
+  ];
+
+  // ── Render name ─────────────────────────────────────────────────────────────
+  // Optional LaTeX symbol immediately after the parameter colon, e.g. `{\hat{v}}`.
+  // The lookahead confirms a balanced closing } on the same line so that
+  // piecewise branches (whose { never closes on the same line) are not matched.
+  const RENDER_NAME_MODE = {
+    scope: "string",
+    begin: /\s*\{(?=[^{}\n]*(?:\{[^{}\n]*\}[^{}\n]*)*\})/,
+    end: /\}/,
+    subLanguage: "latex",
+  };
+
   return {
     name: "Oneil",
     aliases: [], // no aliases
     contains: [
-      // single-line notes
-      hljs.COMMENT(/^\s*~(?!~~)/m, /$/m, {
-        subLanguage: "tex",
-      }),
+      // single-line notes (~ prefix, not ~~~)
+      {
+        scope: "comment",
+        begin: /^\s*~(?!~~)/m,
+        end: /$/m,
+        contains: NOTE_CONTAINS,
+      },
 
-      // multi-line notes
-      hljs.COMMENT(/^\s*~~~[~]*\s*$/m, /^\s*~~~[~]*\s*$/m, {
-        subLanguage: "tex",
-      }),
+      // multi-line notes (~~~ ... ~~~ block)
+      {
+        scope: "comment",
+        begin: /^\s*~~~+\s*$/m,
+        end: /^\s*~~~+\s*$/m,
+        contains: NOTE_CONTAINS,
+      },
 
       // hash comments
       hljs.HASH_COMMENT_MODE,
@@ -109,6 +164,7 @@ hljs.registerLanguage("oneil", function (hljs) {
         ],
         beginScope: {
           2: "keyword",
+          4: "variable",
         },
         end: END_OF_LINE_RE,
       },
@@ -119,10 +175,11 @@ hljs.registerLanguage("oneil", function (hljs) {
           /^\s*/m,
           /submodel/,
           /\s+/,
-          IDENT_RE,
+          /[A-Za-z_][\w/]*/,
         ],
         beginScope: {
           2: "keyword",
+          4: "title.class",
         },
         end: END_OF_LINE_RE,
         keywords: ["as"],
@@ -142,10 +199,11 @@ hljs.registerLanguage("oneil", function (hljs) {
           /^\s*/m,
           /reference/,
           /\s+/,
-          IDENT_RE,
+          /[A-Za-z_][\w/]*/,
         ],
         beginScope: {
           2: "keyword",
+          4: "title.class",
         },
         end: END_OF_LINE_RE,
         keywords: ["as"],
@@ -157,7 +215,6 @@ hljs.registerLanguage("oneil", function (hljs) {
           /^\s*/m,
           /design/,
           /\s+/,
-          IDENT_RE,
         ],
         beginScope: {
           2: "keyword",
@@ -178,6 +235,13 @@ hljs.registerLanguage("oneil", function (hljs) {
         },
         end: END_OF_LINE_RE,
         keywords: ["to"],
+        contains: [
+          {
+            begin: /\[/,
+            end: /\]/,
+            keywords: ["to"],
+          }
+        ],
       },
 
       // section declaration
@@ -230,6 +294,11 @@ hljs.registerLanguage("oneil", function (hljs) {
           EXPR_MODE,
         ]
       },
+
+      // render name: optional LaTeX symbol after the parameter colon, e.g. `{\hat{v}}`
+      // must come before the piecewise branch so the balanced-brace lookahead can
+      // distinguish render names from piecewise { branches.
+      RENDER_NAME_MODE,
 
       // piecewise branch
       {

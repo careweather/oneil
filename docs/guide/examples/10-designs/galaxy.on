@@ -1,5 +1,5 @@
 submodel solar_system as sol [earth as e]
 
-Probe mass: m_probe = 800 :kg
-$ Landing weight: W = m_probe * g.e :N
-$ Sol gravity reading: g_sol = g_surface.sol :m/s^2
+Probe mass: m_p = 800 :kg
+$ Landing weight: W = m_p * g.e :N
+$ Sol gravity reading: g_s = g_s.sol :m/s^2
