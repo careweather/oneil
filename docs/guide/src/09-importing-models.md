@@ -84,7 +84,7 @@ Like **reference** imports, the name after `as` is an *alias*. If no alias is gi
 # submodel_planet_default_alias.on
 submodel planet
 
-Surface gravity seen: g_local = g.planet :m/s^2
+Surface gravity seen: g_l = g.planet :m/s^2
 ```
 
 It is an error for two submodels to have the same alias.
@@ -117,9 +117,9 @@ For example with solar system defined as follows:
 submodel planet as earth
 submodel mars
 
-Star mass: M_star = 1.989e30 :kg
-Earth orbital period: T_earth = 365.25 :days
-Earth surface gravity: g_surface = g.earth :m/s^2
+Star mass: M_s = 1.989e30 :kg
+Earth orbital period: T_e = 365.25 :days
+Earth surface gravity: g_s = g.earth :m/s^2
 ```
 
 The syntax `[alias]` or `[alias as local_alias]` at the end of the `submodel` line exposes the nested submodels to use locally. In this example we use the solar system in a mission and access earth parameters through a local alias.
@@ -130,14 +130,14 @@ The syntax `[alias]` or `[alias as local_alias]` at the end of the `submodel` li
 # so it can be used directly at the mission level.
 submodel solar_system as sol [earth as e]
 
-Probe mass: m_probe = 800 :kg
+Probe mass: m_p = 800 :kg
 
 # Access the parameters of e here
-Landing weight: W = m_probe * g.e :N
+Landing weight: W = m_p * g.e :N
 
 # Access solar-system parameters as normal
-Star mass: M_star = M_star.sol :kg
-Earth orbit: T = T_earth.sol :days
+Star mass: M_s = M_s.sol :kg
+Earth orbit: T = T_e.sol :days
 ```
 
 You can pull in multiple aliases by separating them with commas:
@@ -149,9 +149,9 @@ submodel solar_system as sol [
     mars as t # landing target
 ]
 
-Probe mass: m_probe = 800 :kg
-Weight on Earth: W_e = m_probe * g.e :N
-Landing weight on target: W_t = m_probe * g.t :N
+Probe mass: m_p = 800 :kg
+Weight on Earth: W_e = m_p * g.e :N
+Landing weight on target: W_t = m_p * g.t :N
 ```
 
 [Designs](./10-designs.md) explains **design files** (`design <target>` in a `.one` file): you **apply** a design to specific `reference` / `submodel` instances. A design **overrides** existing parameters (same name as on the target model) and can **add** new ones.

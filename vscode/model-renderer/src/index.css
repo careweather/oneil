@@ -1,0 +1,187 @@
+/* ── Design tokens ───────────────────────────────────────────────────────── */
+/*
+ * All raw values live here as CSS custom properties. The rest of the
+ * stylesheet references only these variables so themes can be applied by
+ * overriding this block (e.g. a .vscode-light override at the bottom).
+ *
+ * Where a VS Code token exists we use it directly; otherwise we define a
+ * sensible dark-theme default that can be overridden per theme.
+ */
+
+:root {
+    /* Typography */
+    --font-family:        var(--vscode-font-family, sans-serif);
+    --font-size:          var(--vscode-font-size, 13px);
+    --font-size-sm:       0.88em;
+    --font-size-xs:       0.82em;
+    --font-weight-bold:   600;
+    --font-mono:          var(
+        --vscode-editor-font-family,
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        monospace
+    );
+
+    /* Finer spacing (between --space-xs and 0) */
+    --space-2xs: 2px;
+    --space-hairline: 1px;
+    /* Halfway between xs (4px) and sm (8px) — inline pills, tight gaps */
+    --space-compact: calc((var(--space-sm) + var(--space-xs)) / 2);
+
+    /* Foreground */
+    --color-fg:           var(--vscode-foreground);
+    --color-fg-muted:     color-mix(in srgb, var(--vscode-foreground) 75%, transparent);
+    --color-fg-subtle:    color-mix(in srgb, var(--vscode-foreground) 60%, transparent);
+    --color-fg-faint:     color-mix(in srgb, var(--vscode-foreground) 55%, transparent);
+
+    /* Surfaces */
+    --color-bg:           var(--vscode-editor-background);
+    --color-bg-sidebar:   var(--vscode-sideBar-background, var(--vscode-editor-background));
+    --color-bg-group:     color-mix(in srgb, var(--vscode-foreground) 4%, var(--vscode-editor-background));
+
+    /* Borders */
+    --color-border:       var(--vscode-panel-border, var(--vscode-widget-border, color-mix(in srgb, var(--vscode-foreground) 20%, transparent)));
+    --border-accent-width: 2px;
+
+    /* Interactive */
+    --color-hover-bg:     var(--vscode-toolbar-hoverBackground, color-mix(in srgb, var(--vscode-foreground) 8%, transparent));
+    --color-list-hover:   var(--vscode-list-hoverBackground, var(--color-hover-bg));
+    --color-focus-border: var(--vscode-focusBorder, #007fd4);
+
+    /* Code blocks, table stripes — theme mix */
+    --color-bg-subtle:       color-mix(in srgb, var(--vscode-foreground) 6%, var(--vscode-editor-background));
+    --color-bg-subtle-muted: color-mix(in srgb, var(--vscode-foreground) 3%, var(--vscode-editor-background));
+
+    /* Accent colors (chart tokens with readable fallbacks) */
+    --color-accent-blue:   var(--vscode-charts-blue, #4fc1ff);
+    --color-accent-yellow: var(--vscode-charts-yellow, #dcdcaa);
+
+    /* Dividers — prefer editor indent guide line color */
+    --color-divider-subtle: var(
+        --vscode-editorIndentGuide-background,
+        color-mix(in srgb, var(--vscode-foreground) 15%, transparent)
+    );
+
+    /* Semantic */
+    --color-error:        var(--vscode-errorForeground, #f48771);
+    --color-testing-passed: var(--vscode-testing-iconPassed, #73c991);
+    --color-testing-failed: var(--vscode-testing-iconFailed, #f14c4c);
+
+    /* Spacing */
+    --space-xs:  4px;
+    --space-sm:  8px;
+    --space-md:  12px;
+    --space-lg:  16px;
+    --space-xl:  24px;
+    /* Slightly tighter than --space-xs (e.g. inline expression chips) */
+    --padding-inline-expr: calc(var(--space-xs) * 0.75);
+
+    /* Radii */
+    --radius-sm: 3px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+
+    /* Typography extras */
+    --letter-spacing-caps:     0.04em;
+    --text-underline-offset:   2px;
+    --transition-expr-hover:   background-color 0.15s ease, border-color 0.15s ease;
+
+    /* Layering */
+    --z-detail-resize-handle: 20;
+    --z-tooltip:              10000;
+
+    /* Detail panel */
+    --detail-panel-side-min-width:       160px;
+    --detail-panel-bottom-min-height:    100px;
+    --detail-panel-section-min-height:   60px;
+    --resize-handle-size:                5px;
+
+    /* Tooltip / popovers */
+    --tooltip-max-width: 500px;
+    --shadow-tooltip:    0 2px 12px color-mix(in srgb, var(--vscode-foreground) 30%, transparent);
+
+    /* TOC row indent (per depth step) */
+    --toc-indent-base:  var(--space-xs);
+    --toc-indent-step:  14px;
+    --toc-row-pad-y:    3px;
+
+    /* Design overlay — deterministic color palette (0-based).
+     * Colors are chosen to be readable on both light and dark VS Code themes.
+     * The frontend picks --design-color-N by using a node's color_index % 8. */
+    --design-color-0: #4ec9b0;   /* teal        */
+    --design-color-1: #ce9178;   /* terra-cotta */
+    --design-color-2: #9cdcfe;   /* sky blue    */
+    --design-color-3: #dcdcaa;   /* warm yellow */
+    --design-color-4: #c586c0;   /* lavender    */
+    --design-color-5: #6a9955;   /* muted green */
+    --design-color-6: #d16969;   /* muted red   */
+    --design-color-7: #569cd6;   /* cobalt blue */
+
+    /* Alpha variants derived from the design colors */
+    --design-color-tint-alpha: 10%;
+    --design-border-width: 3px;
+    /* Prose blockquote rail — same thickness as design strip by default */
+    --border-blockquote-width: var(--design-border-width);
+}
+
+/* ── Reset / base ────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    color: var(--color-fg);
+    background: var(--color-bg);
+}
+
+/* ── Global library overrides ────────────────────────────────────────────── */
+
+/* Reactflow: nodes manage their own background via styled-components */
+.react-flow__node {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+}
+
+/* KaTeX: render equations at a comfortable reading size */
+.katex {
+    font-size: 1.25em !important;
+}
+
+/* Tooltip trigger: applied via className from useTooltipTrigger hook */
+.has-tooltip {
+    cursor: help !important;
+    pointer-events: auto !important;
+}
+
+/* ── Jump-to flash animation ─────────────────────────────────────────────── */
+/* Global keyframe shared by param rows (via parameters.ts) and model notes. */
+
+@keyframes focus-flash {
+    0%, 100% { background-color: transparent; }
+    25%, 75% { background-color: color-mix(in srgb, var(--color-testing-passed) 30%, transparent); }
+}
+
+/* Applied transiently by BibliographyPanel's handleUsageClick for model notes. */
+.model-note-flash {
+    animation: focus-flash 1.5s ease-out;
+    border-radius: var(--radius-sm);
+}

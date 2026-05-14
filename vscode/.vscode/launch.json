@@ -12,6 +12,9 @@
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}"
 			],
+			"outFiles": [
+				"${workspaceFolder}/out/**/*.js"
+			],
 			"env": {
 				"ONEIL_PATH": "${workspaceFolder}/../target/debug/oneil"
 			}

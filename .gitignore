@@ -15,3 +15,7 @@ oncmp_config.toml
 
 # git worktrees
 /.worktrees
+
+# TypeScript / toolchain source maps (do not commit)
+*.js.map
+*.css.map
