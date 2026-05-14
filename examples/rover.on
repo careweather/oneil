@@ -1,0 +1,84 @@
+section Mass Budget
+
+    ~~~
+    Breakdown of the rover's mass components. All values are notional
+    estimates at the preliminary design review (PDR) level. Actual flight
+    masses may vary by $\pm 15\%$ depending on structural margin
+    requirements [@Wertz2011].
+    ~~~
+
+Chassis mass: m_c = 350 :kg
+
+    ~ Primary structure and suspension frame. Sized for planetary terrain traversal.
+
+Science payload mass: m_s = 120 :kg
+
+    ~~~
+    Notional instrument and harness breakdown:
+
+    | Item                              | Mass (kg) |
+    |-----------------------------------|-----------|
+    | Imaging system                    |   8.0     |
+    | Spectrometry suite                |   5.0     |
+    | Subsurface radar                  |   6.2     |
+    | Drill and sample cache            |  18.0     |
+    | Environmental sensors             |   7.8     |
+    | Electronics boxes                 |  40.0     |
+    | Cabling and harness               |  22.0     |
+    | Structural adapters and brackets  |  13.0     |
+    | **Total**                         | **120.0** |
+    ~~~
+
+Power system mass: m_pw = 280 :kg
+
+    ~~~
+    Radioisotope thermoelectric generator (RTG). Electrical output is
+    modelled in the Power section below.
+    ~~~
+
+Propulsion and mobility mass: m_mo = 250 :kg
+
+    ~ Wheeled mobility system with independent drive and steering on each wheel.
+
+Rover mass: m = m_c + m_s + m_pw + m_mo :kg
+
+    ~~~
+    Total rover mass. The mass budget is currently at $100\%$ of the
+    allocated mass, with no margin. A contingency of $15\%$ should be
+    added before the critical design review (CDR).
+    ~~~
+
+section Power
+
+    ~~~
+    Power is the primary mission constraint. The RTG output sets the
+    duty cycle of all subsystems.
+    ~~~
+
+Beginning-of-mission power: P_0 = 110 :W
+
+    ~ RTG electrical output at launch.
+
+Plutonium-238 half-life: t_half = 87.7 :yr
+
+Mission elapsed time: t = 14 :yr
+
+$ Available power: P = P_0 * e ^ (-ln(2) * t / t_half) :W
+
+    ~~~
+    RTG output decays exponentially with the ${}^{238}Pu$ half-life:
+
+    $$\lambda = \frac{\ln 2}{t_{1/2}}$$
+
+    $$P = P_0 e^{-\lambda t} = P_0 e^{-\ln 2 \cdot t / t_{1/2}} \implies {{P:equation}}$$
+
+    At $t = 14\,yr$, available output falls below the combined subsystem loads.
+    ~~~
+
+Science power: P_s = 45 :W
+Mobility power: P_m = 40 :W
+Housekeeping power: P_h = 25 :W
+
+$ Power balance(-inf, inf): P_b = P - P_s - P_m - P_h :W
+
+    ~ Positive value means feasible mission at the modeled mission time.

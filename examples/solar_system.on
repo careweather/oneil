@@ -1,0 +1,2 @@
+submodel mars as M # Mars
+submodel planet as E # Earth is the default parameters for planet

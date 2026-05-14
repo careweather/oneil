@@ -1,9 +1,74 @@
-Mass (0, 100000000): m = 1e6 :kg
-Cylinder diameter: D = 1 :m
-Angular position: theta_p = pi/2
-Window count: n_w = 20
-Rotation rate: omega = 18 :rpm
-Amplifier efficiency (0, 1): eta = 0.5|0.7
-Boltzmann's constant: C_b = 1.380649e-23 :m^2*kg/s^2/K
-Cylinder radius: r = D/2 :km
-Artificial gravity: g_a = r*omega^2 :m/s^2
+section Geometry
+
+    ~~~
+    **oneil_cylinder** — O'Neill's Island Three design [@ONeill1977].
+
+    The cylinder rotates about its longitudinal axis; inhabitants stand on the
+    **inner** curved surface. The inner surface is divided into six equal-area
+    stripes running the full length: three transparent window stripes alternating
+    with three habitable land stripes.
+    ~~~
+
+Cylinder radius: r = 4000 :m
+
+    ~~~
+    O'Neill's design uses an 8 km diameter (4 km radius) cylinder [@ONeill1977].
+    At this radius, only $\approx 0.47\,rpm$ is needed for 1g — well below the
+    $2\,rpm$ comfort threshold where Coriolis disorientation becomes noticeable
+    [@Stone1973].
+    ~~~
+
+Cylinder length: L = 32000 :m
+
+    ~ Full length of the cylinder along the axis of rotation [@ONeill1977].
+
+Window stripes: n_w = 3
+
+    ~~~
+    Three transparent window stripes alternate with three land stripes,
+    each stripe running the full length of the cylinder. Large hinged mirrors
+    outside each window reflect sunlight inward; opening the mirrors simulates
+    night and radiates heat to space.
+    ~~~
+
+$ Total inner surface area: A = 2 * pi * r * L :m^2
+
+    ~ Full inner curved surface, including both land and window stripes.
+
+$ Habitable land area: A_hab = A / 2 :m^2
+
+    ~ Land stripes only (3 of 6 equal stripes): {{A_hab:equation}} = {{A_hab:value}}.
+
+section Rotation
+
+Earth gravity: g_E = 9.81 :m/s^2
+
+    ~ Design target for rim acceleration magnitude.
+
+Rotation rate: omega = sqrt(g_E/r) :rpm
+
+    ~~~
+    The sizing relation is {{g_a:equation}} with $\omega$ in radians per second.
+    Solving {{omega:equation}} for Earth-like rim gravity at {{r:equation}}
+    gives {{omega:value}} — O'Neill described this as "about 28 times per hour"
+    [@ONeill1977].
+    ~~~
+
+$ Artificial gravity: g_a = r * omega^2 :m/s^2
+
+    ~ Rim acceleration magnitude: {{g_a:equation}}.
+
+$ Gravity fraction: g_f = g_a / g_E
+
+    ~ Ratio of rim acceleration to Earth standard gravity.
+
+section Tests
+
+    ~~~
+    Guardrails on rim acceleration for long-duration habitation. The
+    $0.9\,g$–$1.1\,g$ band targets Earth-normal physiology and is a
+    standard engineering design goal for rotating habitats [@Stone1973].
+    ~~~
+
+test : g_a < 1.1 * g_E
+test : g_a > 0.9 * g_E

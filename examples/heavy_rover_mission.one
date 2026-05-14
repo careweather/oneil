@@ -1,0 +1,12 @@
+~~~
+Heavy-duty Rover A: upgraded science payload and power system push the
+rover mass well above baseline, breaking the propellant budget.
+~~~
+
+design mission_budget
+
+apply heavy to rover_b
+m_c.rover_a = 420 :kg
+m_s.rover_a = 380 :kg
+m_pw.rover_a = 340 :kg
+m_mo.rover_a = 260 :kg

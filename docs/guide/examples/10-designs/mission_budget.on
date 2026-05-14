@@ -6,16 +6,16 @@ submodel rover as rover_a
 submodel rover as rover_b
 
 Vehicle dry mass — structure and engines, excluding propellant and rovers: m_bus = 4000 :kg
-Rover payload mass: m_payload = m.rover_a + m.rover_b :kg
-$ Dry mass after maneuver: m_dry = m_bus + m_payload :kg
+Rover payload mass: m_pl = m.rover_a + m.rover_b :kg
+$ Dry mass after maneuver: m_dry = m_bus + m_pl :kg
 Effective exhaust velocity: v_e = 3000 :m/s
-Loaded propellant available: m_prop0 = 15000 :kg
+Loaded propellant available: m_p0 = 15000 :kg
 
 Tsiolkovsky propellant required: m_req = m_dry * (e ^ (dv.c / v_e) - 1) :kg
 $ Wet mass at ignition: m_wet = m_dry + m_req :kg
-$ Propellant margin(-1e30, 1e30): m_margin = m_prop0 - m_req :kg
+$ Propellant margin(-1e30, 1e30): m_mg = m_p0 - m_req :kg
 
 $ Rover A mass: m_a = m.rover_a :kg
 $ Rover B mass: m_b = m.rover_b :kg
 
-test: m_req < m_prop0
+test: m_req < m_p0

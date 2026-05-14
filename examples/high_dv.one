@@ -1,0 +1,5 @@
+~ High-dv trajectory: models a direct insertion requiring more delta-v than baseline.
+
+design mission_budget
+
+dv.c = 4000 :m/s

@@ -1,0 +1,56 @@
+Surface gravity: g = 9.81 :m/s^2
+
+    ~~~
+    Standard gravitational acceleration at Earth's surface, defined by the
+    International Bureau of Weights and Measures as exactly $9.80665\,{m/s^2}$.
+    ~~~
+
+Radius: R = 6371 :km
+
+    ~~~
+    Mean volumetric radius. The equatorial radius is {{R_e:value}}
+    and the polar radius is {{R_p:value}}.
+    ~~~
+
+Equatorial Radius: R_e = 6378.137 :km
+
+Polar Radius: R_p = 6356.752 :km
+
+Mass: M = 5.972e24 :kg
+
+Atmospheric surface pressure: P_a = 101.325 :kPa
+
+    ~~~
+    Standard atmosphere, defined as $101325\,{Pa}$ exactly.
+
+    The hydrostatic relation gives pressure as a function of altitude $h$:
+
+    $$P(h) = P_0 \exp\!\left(-\frac{M_{air}\, g\, h}{R_{gas}\, T}\right)$$
+
+    where $M_{air}$ is molar mass of air, $R_{gas}$ is the
+    universal gas constant, and $T$ is temperature.
+    ~~~
+
+$ Circular orbital velocity at the surface: v_o = sqrt(g * R) :m/s
+
+    ~~~
+    Speed of a surface-skimming satellite, derived from centripetal force
+    balance. Two forces must be equal for a circular orbit:
+
+    - **Centripetal force** (needed to keep the satellite curving): $F = mv^2/R$
+    - **Gravity** (providing that centripetal force): $F = mg$
+
+    Setting them equal and cancelling the satellite mass $m$ (which appears on
+    both sides, so the result is independent of how heavy the satellite is):
+
+    $$\frac{mv^2}{R} = mg \implies \frac{v^2}{R} = g \implies {{v_o:equation}}$$
+
+    The escape velocity follows from the same logic — it takes exactly twice
+    the kinetic energy of a circular orbit to escape entirely:
+
+    $$v_{esc} = \sqrt{2}\, v_o = \sqrt{2 g R} \implies {{v_esc:equation}}$$
+    ~~~
+
+$ Escape velocity at the surface: v_esc = sqrt(2 * g * R) :m/s
+
+    ~ Twice the specific orbital energy of a circular surface orbit.

@@ -1,6 +1,6 @@
 submodel planet as earth
 submodel mars
 
-Star mass: M_star = 1.989e30 :kg
-Earth orbital period: T_earth = 365.25 :days
-Earth surface gravity: g_surface = g.earth :m/s^2
+Star mass: M_s = 1.989e30 :kg
+Earth orbital period: T_e = 365.25 :days
+Earth surface gravity: g_s = g.earth :m/s^2

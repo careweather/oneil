@@ -1,0 +1,16 @@
+Delta-v budget: dv = 2850 :m/s
+
+    ~~~
+    Total velocity change required for the mission trajectory.
+
+    The Tsiolkovsky rocket equation relates $\Delta v$ to propellant mass:
+
+    $$\Delta v = v_e \ln\!\frac{m_{wet}}{m_{dry}}$$
+
+    Rearranging for required propellant:
+
+    $$m_{req} = m_{dry}\left(e^{\Delta v / v_e} - 1\right)$$
+
+    Higher $\Delta v$ exponentially increases required propellant — hence the
+    sensitivity of mission design to trajectory choice.
+    ~~~
