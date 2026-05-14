@@ -26,9 +26,44 @@
     "commands": [
       {
         "command": "oneil.restartLanguageServer",
-        "title": "Oneil: Restart Language Server"
+        "title": "Oneil: Restart Language Server",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "oneil.openRenderedView",
+        "title": "Oneil: Open Rendered View",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "oneil.reloadRenderedView",
+        "title": "Oneil: Reload Rendered View",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "oneil.pdf.toggleOfflineMode",
+        "title": "Oneil: Toggle PDF Offline Mode",
+        "icon": "$(cloud)"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "oneil.openRenderedView",
+          "when": "resourceLangId == oneil",
+          "group": "navigation"
+        },
+        {
+          "command": "oneil.restartLanguageServer",
+          "when": "resourceLangId == oneil",
+          "group": "navigation"
+        },
+        {
+          "command": "oneil.reloadRenderedView",
+          "when": "activeWebviewPanelId == oneilRenderedView",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Oneil",
       "properties": {
@@ -36,6 +71,21 @@
           "type": "string",
           "default": null,
           "description": "Path to the Oneil language server executable. Use this when the server is not on PATH. Leave empty to use ONEIL_PATH env var or \"oneil\"."
+        },
+        "oneil.pdf.cacheDir": {
+          "type": "string",
+          "default": "",
+          "description": "Directory where citation PDFs are cached. Supports ~ expansion. Defaults to ~/.local/oneil/resources."
+        },
+        "oneil.pdf.autoDownload": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically download citation PDFs to the local cache when opened (no prompt). If false, you are asked each time."
+        },
+        "oneil.pdf.offlineOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Offline mode: only open PDFs that are already in the local cache. Remote URLs will not be followed. Toggle via the status bar or the 'Oneil: Toggle PDF Offline Mode' command."
         }
       }
     },
@@ -62,7 +112,8 @@
         "scopeName": "source.oneil",
         "path": "./syntaxes/oneil.tmLanguage.json",
         "embeddedLanguages": {
-          "meta.embedded.latex": "latex"
+          "meta.embedded.latex": "latex",
+          "meta.embedded.markdown": "markdown"
         },
         "tokenTypes": {
           "meta.embedded.latex": "other"
@@ -71,9 +122,11 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run compile && npm run build:webview",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "build:webview": "npm --prefix model-renderer run build",
+    "watch:webview": "npm --prefix model-renderer run watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"

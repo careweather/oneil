@@ -30,26 +30,36 @@
           ]
         },
         {
-          "comment": "single-line notes (LaTeX)",
+          "comment": "single-line notes (Markdown with LaTeX math and Oneil placeholders)",
           "name": "comment.line.documentation.oneil",
           "begin": "^\\s*~(?!~~)",
           "end": "$",
-          "contentName": "meta.embedded.latex",
           "patterns": [
             {
-              "include": "text.tex.latex"
+              "include": "#note-placeholder"
+            },
+            {
+              "include": "#note-math"
+            },
+            {
+              "include": "#note-markdown-inline"
             }
           ]
         },
         {
-          "comment": "multi-line notes (LaTeX)",
+          "comment": "multi-line notes (Markdown with LaTeX math and Oneil placeholders)",
           "name": "comment.block.documentation.oneil",
           "begin": "^\\s*~~~[~]*\\s*$",
           "end": "^\\s*~~~[~]*\\s*$",
-          "contentName": "meta.embedded.latex",
           "patterns": [
             {
-              "include": "text.tex.latex"
+              "include": "#note-placeholder"
+            },
+            {
+              "include": "#note-math"
+            },
+            {
+              "include": "#note-markdown-inline"
             }
           ]
         }
@@ -72,10 +82,13 @@
         },
         {
           "comment": "submodel declaration",
-          "begin": "^(\\s*)(submodel)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "begin": "^(\\s*)(submodel)(\\s+)([A-Za-z_][A-Za-z0-9_/]*)",
           "beginCaptures": {
             "2": {
               "name": "keyword.control.oneil"
+            },
+            "4": {
+              "name": "entity.name.type.oneil"
             }
           },
           "end": "(?=#)|$",
@@ -98,10 +111,13 @@
         },
         {
           "comment": "reference declaration",
-          "begin": "^(\\s*)(reference)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "begin": "^(\\s*)(reference)(\\s+)([A-Za-z_][A-Za-z0-9_/]*)",
           "beginCaptures": {
             "2": {
               "name": "keyword.control.oneil"
+            },
+            "4": {
+              "name": "entity.name.type.oneil"
             }
           },
           "end": "(?=#)|$",
@@ -181,10 +197,10 @@
           "begin": "([A-Za-z_][A-Za-z0-9_]*)(?:\\.([A-Za-z_][A-Za-z0-9_]*))?\\s*=(?!=)",
           "beginCaptures": {
             "1": {
-              "name": "variable.other.oneil"
+              "name": "entity.name.variable.oneil"
             },
             "2": {
-              "name": "entity.name.type.oneil"
+              "name": "variable.other.oneil"
             }
           },
           "end": "(?=#)|$",
@@ -195,6 +211,18 @@
             },
             {
               "include": "#expression"
+            }
+          ]
+        },
+        {
+          "comment": "render name (LaTeX symbol) after parameter colon, e.g. {\\hat{v}}. The begin lookahead requires a balanced closing } on the same line, so piecewise { branches (which never close on the same line) fall through to the piecewise pattern.",
+          "begin": "\\{(?=[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\})",
+          "end": "\\}",
+          "name": "string.other.render-name.oneil",
+          "contentName": "meta.embedded.latex",
+          "patterns": [
+            {
+              "include": "text.tex.latex"
             }
           ]
         },
@@ -318,9 +346,12 @@
     "external-ref": {
       "patterns": [
         {
-          "comment": "external parameter reference",
+          "comment": "external parameter reference: in foo.bar, foo is the parameter (variable.other) and bar is the submodel alias (entity.name.type)",
           "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\.([A-Za-z_][A-Za-z0-9_]*)\\b",
           "captures": {
+            "1": {
+              "name": "variable.other.oneil"
+            },
             "2": {
               "name": "entity.name.type.oneil"
             }
@@ -337,6 +368,15 @@
         {
           "name": "keyword.operator.oneil",
           "match": "[+\\-*/%^?<>|]"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "comment": "plain identifier usage in an expression (fallback after all more-specific patterns)",
+          "name": "variable.other.oneil",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
         }
       ]
     },
@@ -359,6 +399,131 @@
             {
               "name": "entity.name.type.oneil",
               "match": "[A-Za-z_][A-Za-z0-9_]*(?:\\^[+-]?[0-9]+)?(?:\\s*[*/]\\s*[A-Za-z_][A-Za-z0-9_]*(?:\\^[+-]?[0-9]+)?)*"
+            }
+          ]
+        }
+      ]
+    },
+    "note-placeholder": {
+      "comment": "Oneil-specific parameter interpolation inside note regions: {{var:equation}} renders the parameter expression as KaTeX, {{var:value}} renders the evaluated numeric value. Listed before note-markdown-inline in each note's patterns so it takes priority.",
+      "patterns": [
+        {
+          "comment": "parameter interpolation {{var:equation}} / {{var:value}}",
+          "name": "meta.interpolation.oneil",
+          "match": "\\{\\{(\\w+):(equation|value)\\}\\}",
+          "captures": {
+            "1": {
+              "name": "variable.other.oneil"
+            },
+            "2": {
+              "name": "keyword.other.oneil"
+            }
+          }
+        }
+      ]
+    },
+    "note-markdown-inline": {
+      "comment": "Explicit Markdown patterns for note regions. We do NOT embed text.html.markdown because (a) it contains ~~~ fenced-code-block patterns that conflict with our own ~~~ note delimiters, and (b) it treats lines indented 4+ spaces as indented code blocks, which breaks notes whose content is uniformly indented in source. All patterns here are indentation-agnostic (leading \\s* absorbed or irrelevant). Ordered from most- to least-specific to avoid partial matches.",
+      "patterns": [
+        {
+          "comment": "ATX heading # … ###### — works at any indentation",
+          "match": "^\\s*(#{1,6})\\s+(.+?)(?:\\s+#+)?\\s*$",
+          "captures": {
+            "1": { "name": "punctuation.definition.heading.markdown" },
+            "2": { "name": "markup.heading.markdown" }
+          }
+        },
+        {
+          "comment": "block quote > ...",
+          "match": "^\\s*(>+)\\s*",
+          "captures": {
+            "1": { "name": "punctuation.definition.quote.markdown" }
+          }
+        },
+        {
+          "comment": "unordered list item  - / * / +",
+          "match": "^(\\s*)([-*+])(?=\\s)",
+          "captures": {
+            "2": { "name": "punctuation.definition.list.markdown" }
+          }
+        },
+        {
+          "comment": "ordered list item  1. / 2.",
+          "match": "^(\\s*)(\\d+\\.)(\\s)",
+          "captures": {
+            "2": { "name": "punctuation.definition.list.markdown" }
+          }
+        },
+        {
+          "comment": "bold+italic ***...***",
+          "name": "markup.bold.italic.markdown",
+          "match": "\\*{3}[^*\\n]+\\*{3}"
+        },
+        {
+          "comment": "bold **...**",
+          "name": "markup.bold.markdown",
+          "match": "\\*\\*[^*\\n]+\\*\\*"
+        },
+        {
+          "comment": "italic *...*  (not part of ** or ***)",
+          "name": "markup.italic.markdown",
+          "match": "(?<!\\*)\\*(?!\\*)[^*\\n]+\\*(?!\\*)"
+        },
+        {
+          "comment": "strikethrough ~~text~~ (double tilde, not triple)",
+          "name": "markup.strikethrough.markdown",
+          "match": "~~(?!~)[^~\\n]+~~"
+        },
+        {
+          "comment": "inline code `...`",
+          "name": "markup.inline.raw.string.markdown",
+          "begin": "`",
+          "end": "`"
+        },
+        {
+          "comment": "image ![alt](url)",
+          "name": "meta.image.inline.markdown",
+          "match": "!\\[([^\\]]+)\\]\\(([^)\\s]+)[^)]*\\)",
+          "captures": {
+            "1": { "name": "string.other.link.description.markdown" },
+            "2": { "name": "markup.underline.link.image.markdown" }
+          }
+        },
+        {
+          "comment": "link [text](url)",
+          "name": "meta.link.inline.markdown",
+          "match": "\\[([^\\]]+)\\]\\(([^)\\s]+)[^)]*\\)",
+          "captures": {
+            "1": { "name": "string.other.link.title.markdown" },
+            "2": { "name": "markup.underline.link.markdown" }
+          }
+        }
+      ]
+    },
+    "note-math": {
+      "comment": "LaTeX math inside notes. text.html.markdown does not guarantee $...$ highlighting, so we inject explicit patterns that embed text.tex.latex. $$ display math must come first so it is not consumed as two inline $ spans.",
+      "patterns": [
+        {
+          "comment": "LaTeX display math $$...$$",
+          "begin": "\\$\\$",
+          "end": "\\$\\$",
+          "name": "markup.math.block.markdown",
+          "contentName": "meta.embedded.latex",
+          "patterns": [
+            {
+              "include": "text.tex.latex"
+            }
+          ]
+        },
+        {
+          "comment": "LaTeX inline math $...$  (negative lookahead avoids matching the first $ of $$)",
+          "begin": "\\$(?!\\$)",
+          "end": "\\$",
+          "name": "markup.math.inline.markdown",
+          "contentName": "meta.embedded.latex",
+          "patterns": [
+            {
+              "include": "text.tex.latex"
             }
           ]
         }

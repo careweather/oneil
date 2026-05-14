@@ -1,1 +1,1 @@
-au BufRead,BufNewFile *.on set filetype=oneil
+au BufRead,BufNewFile *.on,*.one set filetype=oneil

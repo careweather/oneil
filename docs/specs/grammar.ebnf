@@ -35,7 +35,10 @@ ApplyBody = [ DirectoryPath ], Identifier, "to", Identifier, { ".", Identifier }
 
 (* Parameter assignment in a design file; supports `param.instance = value` for nested scopes *)
 (* `$` and `*`/`**` only apply to new parameters (additions); they are ignored on overrides *)
-DesignBodyParameterDecl = [ Performance ], [ Trace ], Identifier, [ ".", Identifier ], "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ), EndOfLine, [ Note ] ;
+(* Shorthand form: `id[.instance] = value`; Full form: `Label: [{RenderName}] id = value` *)
+DesignBodyParameterDecl = [ Performance ], [ Trace ], ( DesignParamShorthand | DesignParamFull ), EndOfLine, [ Note ] ;
+DesignParamShorthand = Identifier, [ ".", Identifier ], "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
+DesignParamFull = Label, ":", [ RenderName ], Identifier, "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
 
 (* Notes *)
 Note = SingleLineNote | MultiLineNote ;
@@ -43,6 +46,12 @@ SingleLineNote = "~", { Any character except LineBreak }, LineBreak ;
 MultiLineNote = MultiLineNoteDelimiter, { NoteLine }, MultiLineNoteDelimiter ;
 MultiLineNoteDelimiter = "~~~", "~"*, LineBreak ;
 NoteLine = { Any character except LineBreak or MultiLineNoteDelimiter }, LineBreak ; (* can contain anything except the multi-note delimiter*)
+
+(* Note content is Markdown with embedded LaTeX math ($...$ and $$...$$). This is not parsed / used in Rust, but is the syntax expected for the renderer     *)
+(* Parameter interpolation is also supported using double-brace syntax:         *)
+(*   {{identifier:equation}}  — renders the parameter's expression as KaTeX     *)
+(*   {{identifier:value}}     — renders the parameter's evaluated numeric value  *)
+NoteInterpolation = "{{", Identifier, ":", ( "equation" | "value" ), "}}" ;
 
 (* Sections *)
 Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | ApplyDecl | SubmodelDecl | DesignBodyParameterDecl | ParameterDecl | TestDecl } ;
@@ -61,13 +70,16 @@ SubmodelList = ModelInfo | "[", [ SubmodelListInner ], OptEndOfLine, "]" ;
 SubmodelListInner = OptEndOfLine, ModelInfo, { ",", OptEndOfLine, ModelInfo }, [ "," ] ;
 
 (* Parameters *)
-ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", Assignment, EndOfLine, [ Note ] ;
+ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", [ RenderName ], Assignment, EndOfLine, [ Note ] ;
 Performance = "$" ;
 Trace = "*" | "**" ;
 Name = Label ;
 Limits = ContinuousLimits | DiscreteLimits ;
 ContinuousLimits = "(", Expr, ",", Expr, ")" ;
 DiscreteLimits = "[", Expr, { ",", Expr }, "]" ;
+(* Optional LaTeX render-name for the parameter symbol, e.g. `{\hat{v}}` *)
+RenderName = "{", { Any character except "}" or "{" | "{", RenderNameInner, "}" }, "}" ;
+RenderNameInner = { Any character except "}" or "{" | "{", RenderNameInner, "}" } ;
 Assignment = Identifier, "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
 
 (* Tests *)
