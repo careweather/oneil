@@ -8,8 +8,8 @@ use nom::{
     Parser as _,
     branch::alt,
     bytes::complete::{tag, take_while},
-    character::complete::{none_of, one_of, satisfy},
-    combinator::{opt, recognize, verify},
+    character::complete::{char, none_of, one_of, satisfy},
+    combinator::{eof, opt, recognize, value, verify},
     multi::{many0, many1},
 };
 
@@ -19,6 +19,7 @@ use crate::token::{
     keyword,
     util::{Token, token},
 };
+use crate::util::span_from;
 
 /// Parses an identifier span (alphabetic or underscore, then alphanumeric or underscore).
 fn identifier_span(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
@@ -136,6 +137,60 @@ pub fn label(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
         ),
         // Ensure the label is not a reserved keyword
         |label| !keyword::KEYWORDS.contains(&label.lexeme_str),
+    )
+    .parse(input)
+}
+
+/// Parses a LaTeX render-name block of the form `{content}`.
+///
+/// The opening `{` and closing `}` are included in the token's lexeme span so
+/// that the caller can recover the content by stripping the first and last
+/// characters.  Nested braces inside the content are handled with depth
+/// tracking, so `{\hat{v}}` is parsed correctly.
+///
+/// Returns a soft [`TokenError`] (non-fatal) when the input does not start with
+/// `{`, and a hard `nom::Err::Failure` when `{` is found but has no matching
+/// closing `}`.
+pub fn render_name(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum NextChar {
+        OpenBrace,
+        CloseBrace,
+        Eof,
+    }
+
+    token(
+        |input| {
+            let (rest, open_brace) = tag("{").parse(input)?;
+            let open_brace_span = span_from(&open_brace, &rest);
+
+            let mut rest = rest;
+            let mut depth = 0_i32;
+
+            loop {
+                let (rest_inner, _) = take_while(|c: char| c != '{' && c != '}').parse(rest)?;
+                let (rest_inner, next_char) = alt((
+                    value(NextChar::OpenBrace, char('{')),
+                    value(NextChar::CloseBrace, char('}')),
+                    value(NextChar::Eof, eof),
+                ))
+                .parse(rest_inner)?;
+
+                rest = rest_inner;
+
+                match next_char {
+                    NextChar::CloseBrace if depth == 0 => break,
+                    NextChar::CloseBrace => depth -= 1,
+                    NextChar::OpenBrace => depth += 1,
+                    NextChar::Eof => {
+                        return Err(TokenError::unclosed_render_name(open_brace_span, &rest));
+                    }
+                }
+            }
+
+            Ok((rest, ()))
+        },
+        TokenError::expected_render_name,
     )
     .parse(input)
 }

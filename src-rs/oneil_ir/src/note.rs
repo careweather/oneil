@@ -5,7 +5,8 @@
 /// In source, this corresponds to a tilde-delimited note (`~` …) on a parameter
 /// declaration. The stored string is the note body after trimming and removing
 /// delimiters (single-line and multi-line forms both end up here).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(transparent)]
 pub struct Note {
     content: String,
 }

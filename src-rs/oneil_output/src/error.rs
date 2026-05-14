@@ -1787,7 +1787,7 @@ impl AsOneilDiagnostic for EvalError {
 // EvalWarning and diagnostics.
 
 /// Non-fatal issues produced while evaluating expressions.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub enum EvalWarning {
     /// Python function evaluation failed and a fallback result was used instead.
     UsedFallback {

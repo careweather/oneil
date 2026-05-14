@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve the repo root regardless of where git invokes this hook from.
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Skip entirely if there are no staged Rust files.
+if ! git diff --cached --name-only -- '*.rs' | grep -q '\.rs$'; then
+    exit 0
+fi
 
 echo "» Running fmt..."
-
-cd "$REPO_ROOT"
 cargo fmt
+
+# Re-stage any Rust file that (a) was already staged and (b) was modified by
+# fmt.  Files that were not part of this commit are left untouched.
+while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    git diff --quiet -- "$f" || git add "$f"
+done <<< "$(git diff --cached --name-only -- '*.rs')"

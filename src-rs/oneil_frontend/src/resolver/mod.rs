@@ -87,10 +87,10 @@ where
     let model_note = model_ast
         .note()
         .map(|n| ir::Note::new(n.value().to_string()));
-    resolution_context.set_active_model_note(model_note);
+    resolution_context.set_active_model_note(model_note.clone());
 
-    // split model ast into imports, use models, parameters, and tests
-    let (imports, model_imports, parameters, tests) = split_model_ast(&model_ast);
+    // split model ast into imports, use models, parameters, tests, and section metadata
+    let (imports, model_imports, parameters, tests, sections) = split_model_ast(&model_ast);
 
     // resolve python imports
     resolve_python_import::resolve_python_imports(model_path, imports, resolution_context);
@@ -113,72 +113,80 @@ where
 
     // resolve tests
     resolve_test::resolve_tests(tests, resolution_context);
+    resolution_context.set_active_model_sections(sections);
 
     // add tests to design export (if this is a design file with tests)
     resolve_design::add_tests_to_design_export(resolution_context);
+
+    // propagate the model-level note to the design export so it surfaces in the
+    // rendered view when this design file is evaluated as the entry point.
+    resolution_context.add_note_to_design_export(model_note);
 
     // pop the model from the active models stack
     resolution_context.pop_active_model(model_path);
 }
 
-/// Splits a model AST into its constituent declaration types.
+/// Return type of [`split_model_ast`].
+type SplitModelAst<'a> = (
+    Vec<&'a ast::ImportNode>,
+    Vec<&'a ast::SubmodelDeclNode>,
+    Vec<ParameterWithSection<'a>>,
+    Vec<TestWithSection<'a>>,
+    indexmap::IndexMap<oneil_shared::labels::SectionLabel, ir::Section>,
+);
+
+/// Splits a model AST into its constituent parts in a single pass.
 ///
-/// This function processes the declarations in a model AST and categorizes them into
-/// separate collections for imports, use models, parameters, and tests. It processes
-/// both top-level declarations and declarations within sections.
-///
-/// # Arguments
-///
-/// * `model_ast` - The parsed model AST containing all declarations
+/// Processes top-level declarations and then each named section in source order,
+/// categorising everything into flat collections while simultaneously building the
+/// section metadata that the IR needs.
 ///
 /// # Returns
 ///
 /// A tuple containing:
-/// * `Vec<&ImportNode>` - All import declarations from the model
-/// * `Vec<&SubmodelDeclNode>` - All submodel declarations from the model
-/// * `Vec<ParameterWithSection>` - Parameter declarations with optional enclosing section
-/// * `Vec<TestWithSection>` - Test declarations with optional enclosing section
+/// * `Vec<&ImportNode>` — all import declarations
+/// * `Vec<&SubmodelDeclNode>` — all submodel declarations
+/// * `Vec<ParameterWithSection>` — parameters with their enclosing section label,
+///   ordered top-level first then in section source order
+/// * `Vec<TestWithSection>` — tests in the same order; top-level tests receive
+///   indices `0..k`, then each section's tests continue from `k` onwards
+/// * `IndexMap<SectionLabel, Section>` — ordered section metadata (label → note +
+///   items), where each `SectionItem::Test` holds the pre-assigned `TestIndex`
 ///
-/// # Behavior
+/// # Why a single pass?
 ///
-/// The function processes declarations in the following order:
-/// 1. Top-level declarations in the model
-/// 2. Declarations within each section of the model
-///
-/// This separation is necessary for the different processing steps in model loading.
-fn split_model_ast(
-    model_ast: &ast::Model,
-) -> (
-    Vec<&ast::ImportNode>,
-    Vec<&ast::SubmodelDeclNode>,
-    Vec<ParameterWithSection<'_>>,
-    Vec<TestWithSection<'_>>,
-) {
+/// Test indices stored in `SectionItem::Test` must match each test's position in
+/// the flat `tests` slice.  Processing everything together lets us assign the
+/// indices incrementally via `test_idx` without a second walk or any offset
+/// arithmetic.
+fn split_model_ast(model_ast: &ast::Model) -> SplitModelAst<'_> {
+    use oneil_shared::symbols::{ParameterName, TestIndex};
+
     let mut imports = vec![];
     let mut submodels = vec![];
     let mut parameters = vec![];
     let mut tests = vec![];
+    let mut sections = indexmap::IndexMap::new();
+    // Monotonically increasing counter used to assign each test its `TestIndex`.
+    // Top-level tests consume indices 0..k; section tests continue from k.
+    let mut test_idx = 0_usize;
 
-    let top_level = model_ast.decls().iter().map(|d| (d, None));
-    let in_sections = model_ast
-        .sections()
-        .iter()
-        .flat_map(|s| s.decls().iter().map(move |d| (d, Some(s.header().label()))));
-
-    for (decl, section_label) in top_level.chain(in_sections) {
+    // Top-level declarations first (section_label = None).
+    for decl in model_ast.decls() {
         match &**decl {
             ast::Decl::Import(import) => imports.push(import),
-            ast::Decl::Submodel(submodel) => {
-                submodels.push(submodel);
-            }
+            ast::Decl::Submodel(submodel) => submodels.push(submodel),
             ast::Decl::Parameter(parameter) => parameters.push(ParameterWithSection {
                 parameter,
-                section_label,
+                section_label: None,
             }),
-            ast::Decl::Test(test) => tests.push(TestWithSection {
-                test,
-                section_label,
-            }),
+            ast::Decl::Test(test) => {
+                tests.push(TestWithSection {
+                    test,
+                    section_label: None,
+                });
+                test_idx += 1;
+            }
             // Design declarations are handled by resolve_design_surface.
             ast::Decl::DesignTarget(_)
             | ast::Decl::ApplyDesign(_)
@@ -186,7 +194,44 @@ fn split_model_ast(
         }
     }
 
-    (imports, submodels, parameters, tests)
+    // Named sections — build section metadata and collect parameters/tests.
+    for section in model_ast.sections() {
+        let label = (**section.header().label()).clone();
+        let note = section.note().map(|n| ir::Note::new(n.value().to_string()));
+        let mut items = Vec::new();
+
+        for decl in section.decls() {
+            match &**decl {
+                ast::Decl::Import(import) => imports.push(import),
+                ast::Decl::Submodel(submodel) => submodels.push(submodel),
+                ast::Decl::Parameter(p) => {
+                    parameters.push(ParameterWithSection {
+                        parameter: p,
+                        section_label: Some(section.header().label()),
+                    });
+                    items.push(ir::SectionItem::Parameter(ParameterName::from(
+                        p.ident().as_str(),
+                    )));
+                }
+                ast::Decl::Test(test) => {
+                    items.push(ir::SectionItem::Test(TestIndex::new(test_idx)));
+                    tests.push(TestWithSection {
+                        test,
+                        section_label: Some(section.header().label()),
+                    });
+                    test_idx += 1;
+                }
+                // Design declarations are handled by resolve_design_surface.
+                ast::Decl::DesignTarget(_)
+                | ast::Decl::ApplyDesign(_)
+                | ast::Decl::DesignParameter(_) => {}
+            }
+        }
+
+        sections.insert(label, ir::Section::new(note, items));
+    }
+
+    (imports, submodels, parameters, tests, sections)
 }
 
 /// Recursively loads all submodels referenced by a model.
@@ -258,12 +303,13 @@ mod tests {
     fn split_model_ast_empty() {
         let _model_path = test_model_path("test");
         let model = test_ast::empty_model_node();
-        let (imports, use_models, parameters, tests) = split_model_ast(&model);
+        let (imports, use_models, parameters, tests, sections) = split_model_ast(&model);
 
         assert!(imports.is_empty());
         assert!(use_models.is_empty());
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
+        assert!(sections.is_empty());
     }
 
     #[test]
@@ -272,7 +318,7 @@ mod tests {
         let model = test_ast::ModelBuilder::new()
             .with_submodel("submodel")
             .build();
-        let (imports, use_models, parameters, tests) = split_model_ast(&model);
+        let (imports, use_models, parameters, tests, sections) = split_model_ast(&model);
 
         assert_eq!(imports.len(), 0);
         assert_eq!(use_models.len(), 1);
@@ -283,6 +329,7 @@ mod tests {
         assert!(use_models[0].model_info().subcomponents().is_empty());
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
+        assert!(sections.is_empty());
     }
 
     #[test]
@@ -292,7 +339,7 @@ mod tests {
             .with_submodel("submodel1")
             .with_submodel("submodel2")
             .build();
-        let (imports, use_models, parameters, tests) = split_model_ast(&model);
+        let (imports, use_models, parameters, tests, sections) = split_model_ast(&model);
 
         assert!(imports.is_empty());
         assert_eq!(use_models.len(), 2);
@@ -307,6 +354,7 @@ mod tests {
 
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
+        assert!(sections.is_empty());
     }
 
     #[test]

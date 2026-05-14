@@ -10,9 +10,9 @@ use nom::{
 use oneil_ast::{
     ApplyDesign, ApplyDesignNode, Decl, DeclNode, DesignParameter, DesignTarget, Directory,
     DirectoryNode, IdentifierNode, Import, ModelInfo, ModelInfoNode, ModelKind, Node,
-    ParameterLabelNode, SubmodelDecl, SubmodelList, SubmodelListNode,
+    ParameterLabelNode, RenderNameNode, SubmodelDecl, SubmodelList, SubmodelListNode,
 };
-use oneil_shared::span::Span;
+use oneil_shared::{labels::RenderName, span::Span};
 
 use crate::{
     error::{ParserError, parser_trait::ErrorHandlingParser, reason::SubmodelKeyword},
@@ -21,7 +21,7 @@ use crate::{
     test::parse as parse_test,
     token::{
         keyword::{apply, as_, design, import, reference, submodel, to},
-        naming::{identifier, label},
+        naming::{identifier, label, render_name},
         structure::end_of_line,
         symbol::{bracket_left, bracket_right, colon, comma, dot, dot_dot, equals, slash},
     },
@@ -310,6 +310,20 @@ fn design_parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserErr
     })
     .parse(rest)?;
 
+    // Optional LaTeX render-name (`{...}`) only valid in the full form (when a label
+    // is present). In shorthand form it is skipped entirely so that piecewise `{` is
+    // not mis-parsed as a render-name opener.
+    let (rest, render_name_node): (_, Option<RenderNameNode>) = if label_node.is_some() {
+        let (rest, token) = opt(render_name.convert_errors()).parse(rest)?;
+        let node = token.map(|t| {
+            let content = t.lexeme_str[1..t.lexeme_str.len() - 1].to_string();
+            t.into_node_with_value(RenderName::new(content))
+        });
+        (rest, node)
+    } else {
+        (rest, None)
+    };
+
     let (rest, ident_token) = identifier.convert_errors().parse(rest)?;
     let ident_node = IdentifierNode::from(ident_token);
 
@@ -372,6 +386,7 @@ fn design_parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserErr
         trace_level_node,
         note_node,
         label_node,
+        render_name_node,
     );
     let inner_node = Node::new(inner, param_span.clone(), param_whitespace_span.clone());
     let decl_node = Node::new(
@@ -1267,6 +1282,97 @@ mod tests {
                 .instance_path()
                 .expect("should have one instance segment");
             assert_eq!(seg.as_str(), "main_engine");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn design_parameter_full_with_render_name_no_space_after_colon() {
+            // Render name immediately adjacent to colon (no space).
+            let config = Config {
+                allow_design_shorthand: true,
+                ..Config::default()
+            };
+            let input =
+                InputSpan::new_extra("Surface area:{A_{\\mathrm{s}}} A = 4 * pi * R^2\n", config);
+            let (_, decl) = parse(input).expect("should parse with no space after colon");
+            let Decl::DesignParameter(ref param_node) = *decl else {
+                panic!("Expected design parameter");
+            };
+            assert_eq!(
+                param_node
+                    .render_name()
+                    .expect("should have render name")
+                    .as_str(),
+                "A_{\\mathrm{s}}"
+            );
+            assert_eq!(param_node.ident().as_str(), "A");
+        }
+
+        #[test]
+        fn design_parameter_full_with_render_name() {
+            let config = Config {
+                allow_design_shorthand: true,
+                ..Config::default()
+            };
+            let input =
+                InputSpan::new_extra("Surface area: {A_{\\mathrm{s}}} A = 4 * pi * R^2\n", config);
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::DesignParameter(ref param_node) = *decl else {
+                panic!("Expected design parameter");
+            };
+            assert_eq!(
+                param_node.label().expect("should have label").as_str(),
+                "Surface area"
+            );
+            assert_eq!(
+                param_node
+                    .render_name()
+                    .expect("should have render name")
+                    .as_str(),
+                "A_{\\mathrm{s}}"
+            );
+            assert_eq!(param_node.ident().as_str(), "A");
+            assert!(param_node.instance_path().is_none());
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn design_parameter_full_without_render_name() {
+            let config = Config {
+                allow_design_shorthand: true,
+                ..Config::default()
+            };
+            let input = InputSpan::new_extra("Surface area: A = 4 * pi * R^2\n", config);
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::DesignParameter(ref param_node) = *decl else {
+                panic!("Expected design parameter");
+            };
+            assert_eq!(
+                param_node.label().expect("should have label").as_str(),
+                "Surface area"
+            );
+            assert!(param_node.render_name().is_none());
+            assert_eq!(param_node.ident().as_str(), "A");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn design_parameter_shorthand_no_render_name() {
+            let config = Config {
+                allow_design_shorthand: true,
+                ..Config::default()
+            };
+            let input = InputSpan::new_extra("mass = 5\n", config);
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::DesignParameter(ref param_node) = *decl else {
+                panic!("Expected design parameter");
+            };
+            assert!(param_node.label().is_none());
+            assert!(param_node.render_name().is_none());
+            assert_eq!(param_node.ident().as_str(), "mass");
             assert_eq!(rest.fragment(), &"");
         }
     }

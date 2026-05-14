@@ -9,9 +9,9 @@ use nom::{
 use oneil_ast::{
     IdentifierNode, Limits, LimitsNode, Node, Parameter, ParameterLabelNode, ParameterNode,
     ParameterValue, ParameterValueNode, PerformanceMarker, PerformanceMarkerNode, PiecewisePart,
-    PiecewisePartNode, TraceLevel, TraceLevelNode,
+    PiecewisePartNode, RenderNameNode, TraceLevel, TraceLevelNode,
 };
-use oneil_shared::span::Span;
+use oneil_shared::{labels::RenderName, span::Span};
 
 use crate::{
     error::{ParserError, parser_trait::ErrorHandlingParser},
@@ -19,7 +19,7 @@ use crate::{
     note::parse as parse_note,
     token::{
         keyword::if_,
-        naming::{identifier, label},
+        naming::{identifier, label, render_name},
         structure::end_of_line,
         symbol::{
             brace_left, bracket_left, bracket_right, colon, comma, dollar, equals, paren_left,
@@ -64,6 +64,14 @@ fn parameter_decl(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError
     let (rest, colon_token) = colon
         .convert_error_to(|e| ParserError::expect_parameter(&e))
         .parse(rest)?;
+
+    let (rest, render_name_node) = opt(render_name.convert_errors()).parse(rest)?;
+    let render_name_node: Option<RenderNameNode> = render_name_node.map(|token| {
+        // The token lexeme spans `{content}` — strip the surrounding braces to
+        // recover the inner content string.
+        let content = token.lexeme_str[1..token.lexeme_str.len() - 1].to_string();
+        token.into_node_with_value(RenderName::new(content))
+    });
 
     let (rest, ident_token) = identifier
         .or_fail_with(ParserError::parameter_missing_identifier(
@@ -112,6 +120,7 @@ fn parameter_decl(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError
 
     let param = Parameter::new(
         label_node,
+        render_name_node,
         ident_node,
         value_node,
         limits_node,
@@ -519,6 +528,37 @@ mod tests {
             };
 
             assert_eq!(*op, UnitOp::Divide);
+        }
+
+        #[test]
+        fn parse_parameter_with_render_name() {
+            let input = InputSpan::new_extra("Velocity:{\\hat{v}} v = 0\n", Config::default());
+            let (_, param) = parse(input).expect("should parse with render name (no space)");
+            assert_eq!(param.label().as_str(), "Velocity");
+            assert_eq!(
+                param
+                    .render_name()
+                    .expect("should have render name")
+                    .as_str(),
+                "\\hat{v}"
+            );
+            assert_eq!(param.ident().as_str(), "v");
+        }
+
+        #[test]
+        fn parse_parameter_with_render_name_space_after_colon() {
+            let input = InputSpan::new_extra("Velocity: {\\hat{v}} v = 0\n", Config::default());
+            let (_, param) =
+                parse(input).expect("should parse with render name (space after colon)");
+            assert_eq!(param.label().as_str(), "Velocity");
+            assert_eq!(
+                param
+                    .render_name()
+                    .expect("should have render name")
+                    .as_str(),
+                "\\hat{v}"
+            );
+            assert_eq!(param.ident().as_str(), "v");
         }
 
         #[test]

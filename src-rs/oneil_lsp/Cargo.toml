@@ -13,8 +13,13 @@ readme.workspace = true
 
 [dependencies]
 indexmap = { workspace = true }
-oneil_runtime = { path = "../oneil_runtime" }
+oneil_frontend = { path = "../oneil_frontend" }
+oneil_ir = { path = "../oneil_ir" }
+oneil_output = { path = "../oneil_output" }
+oneil_runtime = { path = "../oneil_runtime", default-features = false }
 oneil_shared = { path = "../oneil_shared" }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 tower-lsp-server = "0.23.0"
 

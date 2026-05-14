@@ -164,6 +164,11 @@ fn unclosed(reason: &ParserErrorReason, _source: &str) -> Vec<(Context, Option<E
                 let location = ErrorLocation::from_span(open_quote_span);
                 vec![(Context::Note(message.to_string()), Some(location))]
             }
+            TokenIncompleteKind::UnclosedRenderName { open_brace_span } => {
+                let message = "unclosed render-name block found here";
+                let location = ErrorLocation::from_span(open_brace_span);
+                vec![(Context::Note(message.to_string()), Some(location))]
+            }
             _ => vec![],
         },
 

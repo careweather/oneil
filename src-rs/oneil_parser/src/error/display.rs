@@ -228,6 +228,9 @@ impl fmt::Display for TokenErrorKind {
                     write!(f, "invalid closing delimiter for note")
                 }
                 TokenIncompleteKind::UnclosedString { .. } => write!(f, "unclosed string"),
+                TokenIncompleteKind::UnclosedRenderName { .. } => {
+                    write!(f, "unclosed `{{` in render-name block")
+                }
                 TokenIncompleteKind::InvalidDecimalPart { .. } => write!(f, "invalid decimal part"),
                 TokenIncompleteKind::InvalidExponentPart { .. } => {
                     write!(f, "invalid exponent part")

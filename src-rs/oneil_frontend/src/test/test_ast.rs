@@ -615,6 +615,7 @@ impl ParameterNodeBuilder {
 
         let parameter = ast::Parameter::new(
             label,
+            None,
             ident,
             value,
             limits,

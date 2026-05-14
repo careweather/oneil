@@ -3,7 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 /// A name for a built-in value (e.g. "pi", "e").
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct BuiltinValueName(String);
 
 impl BuiltinValueName {
@@ -45,7 +46,8 @@ impl From<&str> for BuiltinValueName {
 }
 
 /// A name for a built-in function (e.g. "sin", "max").
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct BuiltinFunctionName(String);
 
 impl BuiltinFunctionName {
@@ -173,7 +175,8 @@ impl From<&str> for ParameterName {
 }
 
 /// A name for a reference to another model.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct ReferenceName(String);
 
 impl ReferenceName {
@@ -299,7 +302,8 @@ impl From<&str> for UnitName {
 }
 
 /// The base part of a unit name without prefix (e.g. "m" in "km", "W" in "dBW").
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct UnitBaseName(String);
 
 impl UnitBaseName {
@@ -341,7 +345,8 @@ impl From<&str> for UnitBaseName {
 }
 
 /// A prefix for a unit name (e.g. "k" in "km", "m" in "ms").
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct UnitPrefix(String);
 
 impl UnitPrefix {

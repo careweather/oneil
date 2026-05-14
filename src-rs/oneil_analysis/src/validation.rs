@@ -339,8 +339,8 @@ fn validate_expr(
             } else if let Some(sub) = instance.submodels().get(reference_name) {
                 Some(sub.instance.path().clone())
             } else if let Some(alias) = instance.aliases().get(reference_name) {
-                // Alias path descends through submodels; get the final node's model path.
-                resolve_alias_model(instance, alias)
+                // Alias path descends through submodels (or starts with a reference pool entry).
+                resolve_alias_model(instance, alias, pool)
             } else {
                 None
             };
@@ -369,7 +369,7 @@ fn validate_expr(
                     .get(reference_name)
                     .map(|sub| sub.instance.as_ref())
             } else if let Some(alias) = instance.aliases().get(reference_name) {
-                resolve_alias_instance(instance, alias)
+                resolve_alias_instance(instance, alias, pool)
             } else {
                 pool.get(&target_path).map(std::convert::AsRef::as_ref)
             };
@@ -414,27 +414,58 @@ fn validate_expr(
 }
 
 /// Resolves an alias to the model path of its target, by walking the
-/// `alias_path` through `host`'s submodels.
+/// `alias_path` starting from `host`.
+///
+/// The first segment may refer to a direct submodel **or** to a cross-file
+/// `reference` (pool entry).  Subsequent segments always descend through
+/// `submodels` of the reached instance.
 fn resolve_alias_model(
     host: &InstancedModel,
     alias: &oneil_frontend::AliasImport,
+    pool: &IndexMap<ModelPath, Box<InstancedModel>>,
 ) -> Option<ModelPath> {
-    let mut node = host;
     let segs = alias.alias_path.segments();
-    for seg in segs {
+    let mut iter = segs.iter();
+    let first = iter.next()?;
+
+    let mut node: &InstancedModel = if let Some(sub) = host.submodels().get(first) {
+        sub.instance.as_ref()
+    } else if let Some(r) = host.references().get(first) {
+        pool.get(&r.path).map(std::convert::AsRef::as_ref)?
+    } else {
+        return None;
+    };
+
+    for seg in iter {
         node = node.submodels().get(seg)?.instance.as_ref();
     }
     Some(node.path().clone())
 }
 
-/// Walks an alias path through `host`'s submodel tree and returns the
-/// target `InstancedModel`, if reachable.
+/// Walks an alias path from `host` and returns the target `InstancedModel`,
+/// if reachable.
+///
+/// The first segment may refer to a direct submodel **or** to a cross-file
+/// `reference` (pool entry).  Subsequent segments always descend through
+/// `submodels` of the reached instance.
 fn resolve_alias_instance<'a>(
     host: &'a InstancedModel,
     alias: &oneil_frontend::AliasImport,
+    pool: &'a IndexMap<ModelPath, Box<InstancedModel>>,
 ) -> Option<&'a InstancedModel> {
-    let mut node: &InstancedModel = host;
-    for seg in alias.alias_path.segments() {
+    let segs = alias.alias_path.segments();
+    let mut iter = segs.iter();
+    let first = iter.next()?;
+
+    let mut node: &InstancedModel = if let Some(sub) = host.submodels().get(first) {
+        sub.instance.as_ref()
+    } else if let Some(r) = host.references().get(first) {
+        pool.get(&r.path).map(std::convert::AsRef::as_ref)?
+    } else {
+        return None;
+    };
+
+    for seg in iter {
         node = node.submodels().get(seg)?.instance.as_ref();
     }
     Some(node)
@@ -998,19 +1029,51 @@ fn collect_param_edges(
                     out.push(idx);
                 }
             } else if let Some(alias) = instance.aliases().get(reference_name) {
-                // Alias: follow alias_path from the host's tree position.
-                let base_path = match host_id {
-                    HostId::Tree(p) => p.clone(),
-                    HostId::Pool(_) => InstancePath::root(),
-                };
-                let target_path = alias
-                    .alias_path
-                    .segments()
-                    .iter()
-                    .fold(base_path, |acc, seg| acc.child(seg.clone()));
-                let target_id = HostId::Tree(target_path);
-                if let Some(&idx) = node_index.get(&(target_id, parameter_name.clone())) {
-                    out.push(idx);
+                // Alias: the first segment may be a submodel (tree) or a reference
+                // (pool entry). Walk accordingly to resolve the dependency target.
+                let segs = alias.alias_path.segments();
+                let mut seg_iter = segs.iter();
+                if let Some(first) = seg_iter.next() {
+                    if instance.submodels().contains_key(first) {
+                        // First segment is a submodel — fold remaining segments into
+                        // a tree path from the host's current position.
+                        let base_path = match host_id {
+                            HostId::Tree(p) => p.clone().child(first.clone()),
+                            HostId::Pool(_) => InstancePath::root().child(first.clone()),
+                        };
+                        let target_path =
+                            seg_iter.fold(base_path, |acc, seg| acc.child(seg.clone()));
+                        let target_id = HostId::Tree(target_path);
+                        if let Some(&idx) = node_index.get(&(target_id, parameter_name.clone())) {
+                            out.push(idx);
+                        }
+                    } else if let Some(r) = instance.references().get(first) {
+                        // First segment is a reference — the rest descend through the
+                        // pool entry's submodels. We address the final instance by its
+                        // ModelPath in the pool.
+                        let mut target_path = r.path.clone();
+                        let mut found = true;
+                        for seg in seg_iter {
+                            if let Some(pool_entry) = pool.get(&target_path) {
+                                if let Some(sub) = pool_entry.submodels().get(seg) {
+                                    target_path = sub.instance.path().clone();
+                                } else {
+                                    found = false;
+                                    break;
+                                }
+                            } else {
+                                found = false;
+                                break;
+                            }
+                        }
+                        if found {
+                            let target_id = HostId::Pool(target_path);
+                            if let Some(&idx) = node_index.get(&(target_id, parameter_name.clone()))
+                            {
+                                out.push(idx);
+                            }
+                        }
+                    }
                 }
             } else if let Some(target_path) = instance
                 .references()

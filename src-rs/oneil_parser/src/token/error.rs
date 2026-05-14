@@ -46,6 +46,8 @@ pub enum ExpectKind {
     String,
     /// Expected a symbol
     Symbol(ExpectSymbol),
+    /// Expected a render-name block (`{…}`)
+    RenderName,
     /// Expected a unit identifier
     UnitIdentifier,
     /// Expected a unit one
@@ -163,6 +165,11 @@ pub enum IncompleteKind {
         /// The span of the opening quote
         open_quote_span: Span,
     },
+    /// Unclosed render-name block
+    UnclosedRenderName {
+        /// The span of the opening `{`
+        open_brace_span: Span,
+    },
     /// Invalid decimal part in a number
     InvalidDecimalPart {
         /// The span of the decimal point
@@ -267,6 +274,25 @@ impl TokenError {
                 open_quote_span: open_quote_span.clone(),
             }))
         }
+    }
+
+    /// Creates a new `TokenError` instance for an expected render-name block.
+    pub fn expected_render_name(error: Self) -> Self {
+        error.update_kind(TokenErrorKind::Expect(ExpectKind::RenderName))
+    }
+
+    /// Creates a `nom::Err::Failure` for an unclosed render-name `{` block.
+    ///
+    /// `input` is the remaining span at the point where parsing ran out of input
+    /// (EOF), so its offset becomes the `error_offset` that diagnostics will
+    /// highlight as the "where the closing `}` was expected" position.
+    pub fn unclosed_render_name(open_brace_span: Span, input: &InputSpan<'_>) -> nom::Err<Self> {
+        nom::Err::Failure(Self {
+            kind: TokenErrorKind::Incomplete(IncompleteKind::UnclosedRenderName {
+                open_brace_span,
+            }),
+            offset: input.location_offset(),
+        })
     }
 
     /// Creates a new `TokenError` instance for an invalid decimal part in a number

@@ -1,2 +1,7 @@
 # Mars surface gravity constant
 Surface Gravity: g = 3.72 :m/s^2
+
+Hello : h = g * 2 : m/s^2
+
+C : c = h * 2: m/s^2 
+    ~ Some notes

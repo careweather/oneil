@@ -1,0 +1,37 @@
+---
+description: Conventions for the Oneil VSCode extension and model-renderer (TypeScript, React, Jotai)
+globs: vscode/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# VSCode Extension & Model Renderer
+
+## Extension (`vscode/src/`)
+
+- Use `vscode-languageclient` for all LSP communication; send custom requests via `client.sendRequest("workspace/executeCommand", { command, arguments })`.
+- Keep `extension.ts` thin: just activate, register commands, and call into helpers.
+- `webview/panel.ts` owns the `WebviewPanel` lifecycle. Refresh is triggered by three paths: `onDidChangeViewState` (visible), `onDidReceiveMessage` "ready", and `onDidSaveTextDocument`.
+
+## Model renderer (`vscode/model-renderer/src/`)
+
+**State management — Jotai**
+- Atoms are the single source of truth. Define them under `store/atoms/` (see `store/atoms/index.ts`).
+- The store is created once at module load in `App.tsx` (survives StrictMode remounts).
+- Write to atoms from outside React via `store.set()` — used in `services/messageService.ts`.
+- Prefer `useAtomValue` (read-only) over `useAtom` unless you need the setter.
+
+**Message service**
+- `initMessageService(store)` is called before React renders so the listener and "ready" signal are in place before any message can arrive.
+- Message types live in `types/messages.ts`; Rust mirror types in `types/model.ts`.
+
+**Component organisation — styled-components**
+- Use `styled-components` for layout and visuals. Keep styled primitives (`styled.div`, `styled.button`, …) in the **same file** as the React components that consume them.
+- Group styled definitions in one contiguous block (typically near the top of the file, after imports), separated from logic with a short comment heading — match the existing `// ── Styled components ──` pattern used in `views/` and `components/`.
+- Prefer one module per screen or feature; split only when a file grows unwieldy or when styled pieces are reused across several modules (then extract a small shared module and import it).
+- App-shell UI (state router, loading/error states) lives in `App.tsx`.
+- Each major view has one file in `views/` that owns its private styled primitives and inner helpers (e.g. `InstanceTree.tsx`, `DetailPanel.tsx`).
+
+**Build**
+- `npm run build:webview` from `vscode/` (or `npm run build` from `vscode/model-renderer/`) outputs to `out/model-renderer/assets/index.js`.
+- After editing the model renderer, rebuild before reloading the extension host.
+- The outer `vscode/tsconfig.json` excludes `model-renderer/` — the renderer has its own `tsconfig.app.json`.

@@ -2,7 +2,7 @@
 
 use indexmap::{IndexMap, IndexSet};
 use oneil_frontend::{
-    self as frontend, CompilationUnit, InstancedModel, ResolutionErrorCollection,
+    self as frontend, CompilationUnit, InstanceGraph, InstancedModel, ResolutionErrorCollection,
     build_unit_graph_for, collect_design_target_path, error::VariableResolutionError,
 };
 use oneil_shared::{
@@ -118,6 +118,18 @@ impl Runtime {
             }
         }
         self.unit_graph_cache = cache;
+    }
+
+    /// Returns the composed [`InstanceGraph`] from the most recent evaluation,
+    /// or `None` if no evaluation has been performed yet or caches were cleared.
+    ///
+    /// The composed graph contains [`oneil_frontend::InstancedModel`] nodes
+    /// whose `ir::Parameter` entries already carry design provenance (labels,
+    /// notes, sections, expression ASTs, `DesignProvenance`). It is the
+    /// authoritative source of IR metadata for the rendered view.
+    #[must_use]
+    pub const fn composed_graph(&self) -> Option<&InstanceGraph> {
+        self.composed_graph.as_ref()
     }
 
     /// Returns the target [`ModelPath`] declared by a `design <target>` line in

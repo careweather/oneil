@@ -3,7 +3,7 @@
 use crate::{
     debug_info::TraceLevelNode,
     expression::ExprNode,
-    naming::{IdentifierNode, ParameterLabelNode},
+    naming::{IdentifierNode, ParameterLabelNode, RenderNameNode},
     node::Node,
     note::NoteNode,
     unit::UnitExprNode,
@@ -13,6 +13,8 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     label: ParameterLabelNode,
+    /// Optional LaTeX render-name written as `{...}` after the `:`.
+    render_name: Option<RenderNameNode>,
     ident: IdentifierNode,
     value: ParameterValueNode,
     limits: Option<LimitsNode>,
@@ -26,9 +28,11 @@ pub type ParameterNode = Node<Parameter>;
 
 impl Parameter {
     /// Creates a new parameter with the given components
+    #[expect(clippy::too_many_arguments, reason = "this is a constructor")]
     #[must_use]
     pub const fn new(
         label: ParameterLabelNode,
+        render_name: Option<RenderNameNode>,
         ident: IdentifierNode,
         value: ParameterValueNode,
         limits: Option<LimitsNode>,
@@ -38,6 +42,7 @@ impl Parameter {
     ) -> Self {
         Self {
             label,
+            render_name,
             ident,
             value,
             limits,
@@ -51,6 +56,12 @@ impl Parameter {
     #[must_use]
     pub const fn label(&self) -> &ParameterLabelNode {
         &self.label
+    }
+
+    /// Returns the optional LaTeX render-name of this parameter
+    #[must_use]
+    pub const fn render_name(&self) -> Option<&RenderNameNode> {
+        self.render_name.as_ref()
     }
 
     /// Returns the identifier of this parameter

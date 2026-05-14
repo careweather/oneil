@@ -13,6 +13,7 @@ mod expr;
 mod note;
 mod parameter;
 mod python_import;
+mod section;
 mod test;
 mod unit;
 
@@ -26,6 +27,7 @@ pub use parameter::{
     PiecewiseExpr,
 };
 pub use python_import::PythonImport;
+pub use section::{Section, SectionItem};
 pub use test::Test;
 pub use unit::{
     CompositeUnit, DisplayCompositeUnit, DisplayUnit, Unit, UnitInfo, compute_dimension_map,

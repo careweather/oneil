@@ -10,17 +10,25 @@ fi
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+# Skip entirely if the commit contains no Rust files.
+if ! git diff-tree --no-commit-id -r --name-only HEAD | grep -q '\.rs$'; then
+    exit 0
+fi
+
 echo "» Running clippy --fix..."
 
 # The index is clean post-commit (it matches HEAD), but the working tree may
-# still have unstaged edits, so --allow-dirty is required. --allow-staged is
-# not needed because nothing should be staged after a commit.
+# still have unstaged edits, so --allow-dirty is required.
 if ! cargo clippy --fix --all-targets --all-features --allow-dirty; then
     echo "  clippy --fix errored; skipping amend."
     exit 0
 fi
 
-if [[ -z "$(git diff --name-only)" ]]; then
+# Only consider Rust files modified by clippy.  Other working-tree edits
+# (examples, notes, etc.) must not be pulled into the commit.
+RS_FIXES="$(git diff --name-only -- '*.rs')"
+
+if [[ -z "$RS_FIXES" ]]; then
     echo "  No fixes applied."
     exit 0
 fi
@@ -29,12 +37,11 @@ echo "» Fixes applied; verifying build..."
 
 if ! cargo build --all-features; then
     echo "  Build failed after clippy --fix; reverting."
-    git checkout -- .
+    git checkout -- '*.rs'
     exit 0
 fi
 
 echo "» Build succeeded; amending commit with fixes..."
-
-git add -u
+echo "$RS_FIXES" | xargs git add
 GIT_HOOK_NO_RECURSE=1 git commit --amend --no-edit
 echo "  Done."

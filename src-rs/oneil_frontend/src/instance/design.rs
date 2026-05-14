@@ -7,6 +7,7 @@ use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_shared::{
     InstancePath,
+    labels::{ParameterLabel, RenderName},
     paths::{DesignPath, ModelPath},
     span::Span,
     symbols::{ParameterName, TestIndex},
@@ -37,6 +38,18 @@ pub(crate) struct OverlayParameterValue {
     /// Span of the full parameter definition on the target model (falls back to
     /// `design_span` when the target parameter is absent from the resolved model).
     pub original_model_span: Span,
+    /// Design-supplied documentation note for this override, if present.
+    ///
+    /// When set, replaces the target model's existing note for this parameter
+    /// so the rendered view shows the design-specific explanation rather than
+    /// the base-model boilerplate.
+    pub note: Option<ir::Note>,
+    /// Design-supplied human-readable label override, if present.
+    ///
+    /// When `Some`, replaces the target parameter's label in the rendered view.
+    pub label: Option<ParameterLabel>,
+    /// Design-supplied LaTeX render-name override, if present.
+    pub render_name: Option<RenderName>,
 }
 
 /// Resolved content of a `.one` design file.
@@ -50,6 +63,14 @@ pub(crate) struct OverlayParameterValue {
 pub struct Design {
     /// Model this design parameterizes (`design <name>`), when set.
     pub(crate) target_model: Option<ModelPath>,
+    /// Model-level documentation note from the design file itself, if present.
+    ///
+    /// When a design is evaluated as the entry point (e.g. `oneil eval mars.one`
+    /// or `submodel planet as p [mars.one]`), this note is applied to the
+    /// composed target node so it surfaces in the rendered view as the model
+    /// note for that instance, rather than showing nothing (or the bare target
+    /// model's own note, which the design is meant to contextualise).
+    pub(crate) note: Option<ir::Note>,
     /// Overrides of parameters that already exist on the target model.
     pub(crate) parameter_overrides: IndexMap<ParameterName, OverlayParameterValue>,
     /// Overrides scoped under one or more reference segments from the target
