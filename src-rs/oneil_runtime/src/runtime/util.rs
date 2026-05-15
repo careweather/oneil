@@ -1,18 +1,21 @@
 //! Utility methods for the runtime.
 
+use std::path::PathBuf;
+
 use indexmap::{IndexMap, IndexSet};
 use oneil_builtins::BuiltinRef;
 use oneil_frontend::instance::graph::UnitGraphCache;
 use oneil_shared::paths::{ModelPath, PythonPath, SourcePath};
 
 use super::Runtime;
-use crate::cache::PythonImportCache;
-use crate::cache::{AstCache, EvalCache, SourceCache};
+use crate::cache::{AstCache, EvalCache, PythonCallCache, PythonImportCache, SourceCache};
 
 impl Runtime {
     /// Creates a new runtime instance with empty caches.
     #[must_use]
     pub fn new() -> Self {
+        let cache_dir = PathBuf::from("__oncache__");
+
         Self {
             source_cache: SourceCache::new(),
             ast_cache: AstCache::new(),
@@ -21,6 +24,7 @@ impl Runtime {
             eval_cache: EvalCache::new(),
             composed_graph: None,
             python_import_cache: PythonImportCache::new(),
+            python_call_cache: PythonCallCache::new(cache_dir),
             builtins: BuiltinRef::new(),
         }
     }

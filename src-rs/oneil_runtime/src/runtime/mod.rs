@@ -18,12 +18,13 @@ mod python;
 mod source;
 mod util;
 
-use crate::cache::PythonImportCache;
-use crate::cache::{AstCache, EvalCache, SourceCache};
+use crate::cache::{AstCache, EvalCache, PythonCallCache, PythonImportCache, SourceCache};
 use indexmap::IndexMap;
 use oneil_builtins::BuiltinRef;
-use oneil_frontend::instance::graph::{ModelDesignInfo, UnitGraphCache};
-use oneil_frontend::{BuiltinLookup, InstanceGraph};
+use oneil_frontend::{
+    BuiltinLookup, InstanceGraph,
+    instance::graph::{ModelDesignInfo, UnitGraphCache},
+};
 use oneil_shared::paths::ModelPath;
 
 /// Adapter wiring the runtime's builtin table into the frontend's
@@ -79,5 +80,6 @@ pub struct Runtime {
     /// which `get_model_diagnostics` treats as "no graph-time errors yet".
     composed_graph: Option<InstanceGraph>,
     python_import_cache: PythonImportCache,
+    python_call_cache: PythonCallCache,
     builtins: BuiltinRef,
 }

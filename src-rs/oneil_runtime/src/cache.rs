@@ -1,9 +1,13 @@
 //! Generic path-keyed cache using [`LoadResult`], and a source cache for raw file contents.
 
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    path::{Component, PathBuf},
+};
 
 use indexmap::IndexMap;
 use oneil_parser::error::ParserError;
+use oneil_py_call_cache::{FileCache, ReadCacheError, WriteCacheError};
 use oneil_shared::{
     EvalInstanceKey,
     load_result::LoadResult,
@@ -278,4 +282,100 @@ impl PythonImportCache {
     pub fn remove(&mut self, path: &PythonPath) {
         self.entries.swap_remove(path);
     }
+}
+
+/// Cache for Python function calls keyed by path.
+#[derive(Debug, Clone)]
+pub struct PythonCallCache {
+    cache_dir: PathBuf,
+    entries: IndexMap<PythonPath, FileCache>,
+}
+
+impl PythonCallCache {
+    /// Creates a new Python call cache in the given directory.
+    pub fn new(cache_dir: PathBuf) -> Self {
+        Self {
+            cache_dir,
+            entries: IndexMap::new(),
+        }
+    }
+
+    /// Loads a cache entry from disk.
+    ///
+    /// If the cache entry already exists, this does nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReadCacheError`] if the cache file cannot be read.
+    fn load(&mut self, python_path: &PythonPath) -> Result<(), ReadCacheError> {
+        if self.entries.contains_key(python_path) {
+            return Ok(());
+        }
+
+        let cache_relative_path = get_cache_relative_path(python_path);
+        let cache_path = self.cache_dir.join(cache_relative_path);
+        let cache = FileCache::read_from_path(cache_path)?;
+        self.entries.insert(python_path.clone(), cache);
+        Ok(())
+    }
+
+    /// Saves all cache entries to disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns a vector of [`WriteCacheError`] if the cache files cannot be written.
+    pub fn save_all(&self) -> Result<(), Vec<WriteCacheError>> {
+        let mut errors = Vec::new();
+        for (model_path, cache) in &self.entries {
+            let cache_relative_path = get_cache_relative_path(model_path);
+            let cache_path = self.cache_dir.join(cache_relative_path);
+            match cache.write_to_path(cache_path) {
+                Ok(()) => (),
+                Err(e) => errors.push(e),
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+fn get_cache_relative_path(module_path: &PythonPath) -> PathBuf {
+    module_path
+        .as_path()
+        .with_extension("json")
+        .components()
+        // convert to a path that can be used in the cache directory
+        .fold(PathBuf::new(), append_normalized_component)
+}
+
+fn append_normalized_component(mut path: PathBuf, component: Component<'_>) -> PathBuf {
+    match component {
+        Component::Prefix(_) => {
+            path.push("__prefix__");
+        }
+        Component::RootDir => {
+            path.push("__root__");
+        }
+        Component::CurDir => {}
+        // in order to avoid overwriting files outside of the cache directory,
+        // we convert ".." to "__parent__"
+        Component::ParentDir => {
+            if let Some(parent) = path.parent()
+                && !parent.ends_with("__parent__")
+            {
+                path = parent.to_path_buf();
+            } else {
+                path.push("__parent__");
+            }
+        }
+        Component::Normal(os_str) => {
+            path.push(os_str);
+        }
+    }
+
+    path
 }

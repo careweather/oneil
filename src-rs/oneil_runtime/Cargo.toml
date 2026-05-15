@@ -21,6 +21,7 @@ oneil_ir = { path = "../oneil_ir" }
 oneil_output = { path = "../oneil_output" }
 oneil_parser = { path = "../oneil_parser" }
 oneil_python = { path = "../oneil_python", features = ["rust-lib"] }
+oneil_py_call_cache = { path = "../oneil_py_call_cache" }
 oneil_shared = { path = "../oneil_shared" }
 indexmap = { workspace = true }
 
