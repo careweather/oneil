@@ -100,6 +100,7 @@ impl Runtime {
         function_call_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Option<Result<output::Value, Box<EvalError>>> {
+        // get the Python module and function
         let python_module = self
             .python_import_cache
             .get_entry(python_path)?
@@ -108,11 +109,25 @@ impl Runtime {
 
         let function = python_module.get_function(identifier)?;
 
+        // remove the spans from the arguments (for caching)
         let arg_values: Vec<_> = args.iter().map(|(value, _span)| value.clone()).collect();
 
-        let py_result = oneil_python::evaluate_python_function(function, args);
+        // check the cache for a cached result
+        let cached_result = self.python_call_cache.get(
+            python_path,
+            identifier,
+            &arg_values,
+            python_module.get_hash(),
+        );
+
+        // unwrap the cached result or evaluate the function
+        let py_result =
+            cached_result.unwrap_or_else(|| oneil_python::evaluate_python_function(function, args));
 
         // insert the function call result into the cache
+        //
+        // this happens regardless of whether the result was cached or not
+        // since the root model needs to be added to the cache entry
         self.python_call_cache.insert(
             python_path,
             identifier,

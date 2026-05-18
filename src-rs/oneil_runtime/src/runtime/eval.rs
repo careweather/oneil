@@ -251,13 +251,11 @@ impl Runtime {
             || !graph.contribution_errors.is_empty();
 
         if !has_blocking_errors {
-            #[cfg(feature = "python")]
             self.python_call_cache.begin_evaluation();
 
             // Evaluate the model and its dependencies
             let eval_result = eval::eval_model_from_graph(&graph, self);
 
-            #[cfg(feature = "python")]
             // panic on error for now, we'll handle it in the future
             self.python_call_cache
                 .end_evaluation()
@@ -361,9 +359,7 @@ impl Runtime {
     ) -> Result<Value, Vec<EvalError>> {
         eval::eval_expr_in_model(expr_ir, model_path, self)
     }
-}
 
-impl Runtime {
     /// Builds a `templates` map from the unit graph cache for passing to
     /// [`compose`]. Because all reachable units are eagerly cached by
     /// [`super::ir::Runtime::load_and_lower_internal`], this map is only
