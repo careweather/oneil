@@ -1,17 +1,22 @@
 //! Generic path-keyed cache using [`LoadResult`], and a source cache for raw file contents.
 
 use std::{
+    collections::BTreeSet,
     hash::{DefaultHasher, Hash, Hasher},
     path::{Component, PathBuf},
 };
 
 use indexmap::IndexMap;
 use oneil_parser::error::ParserError;
-use oneil_py_call_cache::{FileCache, ReadCacheError, WriteCacheError};
+use oneil_py_call_cache::{
+    FileCache, FunctionCall, FunctionCallResult, ImportHash, ReadCacheError, WriteCacheError,
+};
+use oneil_python::{PythonEvalError, function::PythonModule};
 use oneil_shared::{
     EvalInstanceKey,
     load_result::LoadResult,
     paths::{ModelPath, PythonPath, SourcePath},
+    symbols::PyFunctionName,
 };
 
 use crate::{
@@ -300,6 +305,96 @@ impl PythonCallCache {
         }
     }
 
+    /// Begins a new evaluation.
+    pub const fn begin_evaluation(&self) {
+        // nothing to do here yet
+    }
+
+    /// Ends the current evaluation.
+    pub fn end_evaluation(&self) -> Result<(), Vec<WriteCacheError>> {
+        self.save_all()
+    }
+
+    /// Inserts a result for a function call.
+    pub fn insert(
+        &mut self,
+        python_path: &PythonPath,
+        identifier: &PyFunctionName,
+        args: &[output::Value],
+        result: &Result<output::Value, PythonEvalError>,
+        root_model: &ModelPath,
+        python_module: &PythonModule,
+    ) {
+        let module_hash = python_module.get_hash();
+        let module_dependencies: BTreeSet<_> =
+            python_module.get_imports().iter().cloned().collect();
+
+        // Try to load the cache entry for the python path. If it fails,
+        // create a new cache entry.
+        //
+        // NOTE: currently, if the cache entry exists but the JSON entry
+        // fails to parse (e.g. because the version is incompatible), this
+        // will **overwrite** the existing cache with a new one. It would
+        // make more sense to handle an invalid cache entry with a warning
+        // or something like that. However, to avoid getting too far into
+        // the weeds on the first draft, we simply overwrite the existing
+        // cache with a new one.
+        let _ = self.load(python_path);
+
+        let cache = self
+            .entries
+            .entry(python_path.clone())
+            .and_modify(|cache| {
+                // if the cache entry exists but the hash does not match, we need
+                // to clear the cache entry
+                if cache.hash != module_hash {
+                    *cache = FileCache::new(
+                        python_path.clone(),
+                        ImportHash::from(module_hash),
+                        module_dependencies.clone(),
+                    );
+                }
+            })
+            .or_insert_with(|| {
+                // if the cache entry does not exist, create a new one
+                FileCache::new(
+                    python_path.clone(),
+                    ImportHash::from(module_hash),
+                    module_dependencies.clone(),
+                )
+            });
+
+        // Find the matching function call for the given identifier and
+        // arguments (if it exists)
+        let cached_function_calls = cache.function_calls.entry(identifier.clone()).or_default();
+        let matching_function_call = cached_function_calls
+            .iter_mut()
+            .find(|call| call.inputs == args);
+
+        let result = FunctionCallResult::from(result.clone());
+
+        // If the function call exists, update it. Otherwise, create a new one.
+        if let Some(matching_function_call) = matching_function_call {
+            // If the result has changed, update the output and clear the root models.
+            if matching_function_call.output != result {
+                matching_function_call.output = result;
+                matching_function_call.root_models.clear();
+            }
+
+            // Add the root model to the function call.
+            matching_function_call
+                .root_models
+                .insert(root_model.clone());
+        } else {
+            // If the function call does not exist, create a new one.
+            cached_function_calls.push(FunctionCall {
+                root_models: BTreeSet::from_iter([root_model.clone()]),
+                inputs: args.to_vec(),
+                output: result,
+            });
+        }
+    }
+
     /// Loads a cache entry from disk.
     ///
     /// If the cache entry already exists, this does nothing.
@@ -324,7 +419,7 @@ impl PythonCallCache {
     /// # Errors
     ///
     /// Returns a vector of [`WriteCacheError`] if the cache files cannot be written.
-    pub fn save_all(&self) -> Result<(), Vec<WriteCacheError>> {
+    fn save_all(&self) -> Result<(), Vec<WriteCacheError>> {
         let mut errors = Vec::new();
         for (model_path, cache) in &self.entries {
             let cache_relative_path = get_cache_relative_path(model_path);

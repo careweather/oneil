@@ -6,5 +6,5 @@ mod file;
 mod function_call;
 
 pub use error::{ReadCacheError, WriteCacheError};
-pub use file::FileCache;
+pub use file::{FileCache, ImportHash};
 pub use function_call::{FunctionCall, FunctionCallResult};

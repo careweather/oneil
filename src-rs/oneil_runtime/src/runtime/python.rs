@@ -2,9 +2,9 @@
 
 use oneil_output::EvalError;
 use oneil_python::{PythonEvalError, PythonFunction, function::PythonModule};
+use oneil_shared::{paths::ModelPath, paths::PythonPath, span::Span, symbols::PyFunctionName};
 
 use crate::error::PythonImportError;
-use oneil_shared::{paths::PythonPath, span::Span, symbols::PyFunctionName};
 
 use super::Runtime;
 use crate::output::{self, error::RuntimeErrors};
@@ -93,23 +93,36 @@ impl Runtime {
 
     /// Evaluates a Python function by path and identifier.
     pub(super) fn evaluate_python_function(
-        &self,
+        &mut self,
+        root_model: &ModelPath,
         python_path: &PythonPath,
         identifier: &PyFunctionName,
         function_call_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Option<Result<output::Value, Box<EvalError>>> {
-        let python_functions = self
+        let python_module = self
             .python_import_cache
             .get_entry(python_path)?
             .as_ref()
             .expect("should not be trying to evaluate a Python function if the import failed");
 
-        let function = python_functions.get_function(identifier)?;
+        let function = python_module.get_function(identifier)?;
 
-        let eval_result = oneil_python::evaluate_python_function(function, args);
+        let arg_values: Vec<_> = args.iter().map(|(value, _span)| value.clone()).collect();
 
-        Some(eval_result.map_err(|e| match e {
+        let py_result = oneil_python::evaluate_python_function(function, args);
+
+        // insert the function call result into the cache
+        self.python_call_cache.insert(
+            python_path,
+            identifier,
+            &arg_values,
+            &py_result,
+            root_model,
+            python_module,
+        );
+
+        let eval_result = py_result.map_err(|e| match e {
             PythonEvalError::PyErr { message, traceback } => Box::new(EvalError::PythonEvalError {
                 function_name: identifier.clone(),
                 function_call_span,
@@ -123,6 +136,8 @@ impl Runtime {
                     value_repr,
                 })
             }
-        }))
+        });
+
+        Some(eval_result)
     }
 }

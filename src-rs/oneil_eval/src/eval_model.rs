@@ -71,6 +71,10 @@ fn force_all_models<E: ExternalEvaluationContext>(
         .collect();
 
     for (key, tests) in pairs {
+        if key.instance_path.is_root() {
+            context.set_evaluation_cache_root(key.model_path.clone());
+        }
+
         context.force_all_pending_on(&key);
         if tests.is_empty() {
             continue;
