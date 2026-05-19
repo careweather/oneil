@@ -1,18 +1,21 @@
 //! On-disk cache file: [`FileCache`] and JSON load/save.
 
 use std::collections::BTreeSet;
+use std::fmt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::{collections::BTreeMap, fs::File};
 
 use oneil_shared::{paths::PythonPath, symbols::PyFunctionName};
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{FunctionCall, ReadCacheError, WriteCacheError};
 
 const ONEIL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// On-disk cache for one python module.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FileCache {
     /// The version of Oneil that created the cache.
     pub oneil_version: String,
@@ -64,6 +67,113 @@ impl FileCache {
     pub fn read_from_path(path: impl AsRef<Path>) -> Result<Self, ReadCacheError> {
         let file = File::open(path.as_ref()).map_err(ReadCacheError::Io)?;
         serde_json::from_reader(file).map_err(ReadCacheError::Serde)
+    }
+}
+
+impl<'de> Deserialize<'de> for FileCache {
+    /// Deserializes `oneil_version` first and rejects unsupported versions before other fields.
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "oneil_version",
+            "module_path",
+            "hash",
+            "dependencies",
+            "function_calls",
+        ];
+
+        deserializer.deserialize_struct("FileCache", FIELDS, FileCacheVisitor)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "snake_case")]
+enum FileCacheField {
+    OneilVersion,
+    ModulePath,
+    Hash,
+    Dependencies,
+    FunctionCalls,
+}
+
+struct FileCacheVisitor;
+
+impl<'de> Visitor<'de> for FileCacheVisitor {
+    type Value = FileCache;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("struct FileCache")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let oneil_version = match map.next_key::<FileCacheField>()? {
+            Some(FileCacheField::OneilVersion) => {
+                let version = map.next_value::<String>()?;
+                if !is_valid_version(&version) {
+                    return Err(de::Error::custom(format!(
+                        "unsupported oneil_version: {version}"
+                    )));
+                }
+                version
+            }
+            Some(_) => {
+                return Err(de::Error::custom(
+                    "oneil_version must be the first field in a cache file",
+                ));
+            }
+            None => return Err(de::Error::missing_field("oneil_version")),
+        };
+
+        let mut module_path = None;
+        let mut hash = None;
+        let mut dependencies = None;
+        let mut function_calls = None;
+
+        while let Some(key) = map.next_key::<FileCacheField>()? {
+            match key {
+                FileCacheField::OneilVersion => {
+                    return Err(de::Error::duplicate_field("oneil_version"));
+                }
+                FileCacheField::ModulePath => {
+                    if module_path.is_some() {
+                        return Err(de::Error::duplicate_field("module_path"));
+                    }
+                    module_path = Some(map.next_value()?);
+                }
+                FileCacheField::Hash => {
+                    if hash.is_some() {
+                        return Err(de::Error::duplicate_field("hash"));
+                    }
+                    hash = Some(map.next_value()?);
+                }
+                FileCacheField::Dependencies => {
+                    if dependencies.is_some() {
+                        return Err(de::Error::duplicate_field("dependencies"));
+                    }
+                    dependencies = Some(map.next_value()?);
+                }
+                FileCacheField::FunctionCalls => {
+                    if function_calls.is_some() {
+                        return Err(de::Error::duplicate_field("function_calls"));
+                    }
+                    function_calls = Some(map.next_value()?);
+                }
+            }
+        }
+
+        Ok(FileCache {
+            oneil_version,
+            module_path: module_path.ok_or_else(|| de::Error::missing_field("module_path"))?,
+            hash: hash.ok_or_else(|| de::Error::missing_field("hash"))?,
+            dependencies: dependencies.ok_or_else(|| de::Error::missing_field("dependencies"))?,
+            function_calls: function_calls
+                .ok_or_else(|| de::Error::missing_field("function_calls"))?,
+        })
     }
 }
 
@@ -120,5 +230,61 @@ impl From<u64> for ImportHash {
 impl From<ImportHash> for u64 {
     fn from(hash: ImportHash) -> Self {
         hash.0
+    }
+}
+
+const MINIMUM_ACCEPTED_VERSION: Version = Version {
+    major: 0,
+    minor: 16,
+    patch: 0,
+};
+
+#[expect(
+    clippy::absurd_extreme_comparisons,
+    reason = "the minimum accepted version is _not_ the minimum possible value"
+)]
+fn is_valid_version(version: &str) -> bool {
+    let Ok(version) = Version::from_str(version) else {
+        return false;
+    };
+
+    let major_is_greater = version.major > MINIMUM_ACCEPTED_VERSION.major;
+
+    let minor_is_greater = version.major == MINIMUM_ACCEPTED_VERSION.major
+        && version.minor > MINIMUM_ACCEPTED_VERSION.minor;
+
+    let patch_is_greater_or_equal = version.major == MINIMUM_ACCEPTED_VERSION.major
+        && version.minor == MINIMUM_ACCEPTED_VERSION.minor
+        && version.patch >= MINIMUM_ACCEPTED_VERSION.patch;
+
+    major_is_greater || minor_is_greater || patch_is_greater_or_equal
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Version {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+impl FromStr for Version {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let version_parts = s
+            .split('.')
+            .map(|part| part.parse::<u32>().ok())
+            .collect::<Option<Vec<u32>>>()
+            .ok_or(())?;
+
+        let Ok([major, minor, patch]) = <[u32; 3]>::try_from(version_parts) else {
+            return Err(());
+        };
+
+        Ok(Self {
+            major,
+            minor,
+            patch,
+        })
     }
 }
