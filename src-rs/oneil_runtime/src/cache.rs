@@ -295,15 +295,23 @@ pub struct PythonCallCache {
     cache_dir: PathBuf,
     entries: IndexMap<PythonPath, FileCache>,
     updated_root_models: IndexSet<ModelPath>,
+    cache_read_policy: CacheReadPolicy,
+    cache_write_policy: CacheWritePolicy,
 }
 
 impl PythonCallCache {
     /// Creates a new Python call cache in the given directory.
-    pub fn new(cache_dir: PathBuf) -> Self {
+    pub fn new(
+        cache_dir: PathBuf,
+        cache_read_policy: CacheReadPolicy,
+        cache_write_policy: CacheWritePolicy,
+    ) -> Self {
         Self {
             cache_dir,
             entries: IndexMap::new(),
             updated_root_models: IndexSet::new(),
+            cache_read_policy,
+            cache_write_policy,
         }
     }
 
@@ -337,6 +345,16 @@ impl PythonCallCache {
         args: &[output::Value],
         module_hash: u64,
     ) -> Option<Result<output::Value, PythonEvalError>> {
+        match self.cache_read_policy {
+            CacheReadPolicy::Never => {
+                return None;
+            }
+            CacheReadPolicy::Always => (),
+            CacheReadPolicy::Prompt => {
+                todo!()
+            }
+        }
+
         // try to load the cache entry for the python path
         //
         // for now, we simply ignore the error
@@ -363,6 +381,12 @@ impl PythonCallCache {
         root_model: &ModelPath,
         python_module: &PythonModule,
     ) {
+        match self.cache_write_policy {
+            CacheWritePolicy::Always => (),
+            CacheWritePolicy::Never => return,
+            CacheWritePolicy::Prompt => todo!(),
+        }
+
         let module_hash = python_module.get_hash();
         let module_dependencies: BTreeSet<_> =
             python_module.get_imports().iter().cloned().collect();
@@ -454,6 +478,12 @@ impl PythonCallCache {
     ///
     /// Returns [`ReadCacheError`] if the cache file cannot be read.
     fn load(&mut self, python_path: &PythonPath) -> Result<(), ReadCacheError> {
+        match self.cache_read_policy {
+            CacheReadPolicy::Always => (),
+            CacheReadPolicy::Never => return Ok(()),
+            CacheReadPolicy::Prompt => todo!(),
+        }
+
         if self.entries.contains_key(python_path) {
             return Ok(());
         }
@@ -470,6 +500,12 @@ impl PythonCallCache {
     ///
     /// Returns a vector of [`WriteCacheError`] if the cache files cannot be written.
     fn save_all(&self) -> Result<(), Vec<WriteCacheError>> {
+        match self.cache_write_policy {
+            CacheWritePolicy::Always => (),
+            CacheWritePolicy::Never => return Ok(()),
+            CacheWritePolicy::Prompt => todo!(),
+        }
+
         let mut errors = Vec::new();
         for (model_path, cache) in &self.entries {
             let cache_path = self.get_cache_path(model_path);
@@ -556,4 +592,26 @@ fn append_normalized_component(mut path: PathBuf, component: Component<'_>) -> P
         }
     }
     path
+}
+
+/// When the Python call cache may read from the cache.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CacheReadPolicy {
+    /// Always read from the cache.
+    Always,
+    /// Never read from the cache.
+    Never,
+    /// Ask before reading from the cache.
+    Prompt,
+}
+
+/// When the Python call cache may write to the cache.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CacheWritePolicy {
+    /// Always write to the cache.
+    Always,
+    /// Never write to the cache.
+    Never,
+    /// Ask before writing to the cache.
+    Prompt,
 }
