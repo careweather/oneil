@@ -9,11 +9,6 @@ use oneil_shared::{
 /// Represents an error that occurred during Python import validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PythonImportResolutionError {
-    /// Python is not supported.
-    PythonNotEnabled {
-        /// The span of the Python import declaration.
-        span: Span,
-    },
     /// A duplicate import was detected.
     DuplicateImport {
         /// The span of the original import declaration.
@@ -55,19 +50,12 @@ impl PythonImportResolutionError {
             python_path,
         }
     }
-
-    /// Creates a new import resolution error indicating that Python is not supported.
-    #[must_use]
-    pub const fn python_unsupported(span: Span) -> Self {
-        Self::PythonNotEnabled { span }
-    }
 }
 
 impl Display for PythonImportResolutionError {
     /// Converts the import resolution error to a string representation.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::PythonNotEnabled { .. } => write!(f, "python feature is not enabled"),
             Self::DuplicateImport { python_path, .. } => {
                 let path = python_path.as_path().display();
                 write!(f, "duplicate import of `{path}`")
@@ -91,10 +79,6 @@ impl AsOneilDiagnostic for PythonImportResolutionError {
 
     fn diagnostic_location(&self, _source: &str) -> Option<ErrorLocation> {
         match self {
-            Self::PythonNotEnabled { span, .. } => {
-                let location = ErrorLocation::from_span(span);
-                Some(location)
-            }
             Self::DuplicateImport { duplicate_span, .. } => {
                 let location = ErrorLocation::from_span(duplicate_span);
                 Some(location)
@@ -108,9 +92,6 @@ impl AsOneilDiagnostic for PythonImportResolutionError {
 
     fn context(&self) -> Vec<Context> {
         match self {
-            Self::PythonNotEnabled { .. } => vec![Context::Help(
-                "rebuild Oneil with the `python` feature enabled".to_string(),
-            )],
             Self::DuplicateImport { .. } | Self::FailedValidation { .. } => vec![],
         }
     }
@@ -124,7 +105,7 @@ impl AsOneilDiagnostic for PythonImportResolutionError {
                     Some(location),
                 )]
             }
-            Self::PythonNotEnabled { .. } | Self::FailedValidation { .. } => vec![],
+            Self::FailedValidation { .. } => vec![],
         }
     }
 }

@@ -15,20 +15,14 @@ readme = "README.md"
 oneil_analysis = { path = "../oneil_analysis" }
 oneil_ast = { path = "../oneil_ast" }
 oneil_builtins = { path = "../oneil_builtins" }
-oneil_eval = { path = "../oneil_eval", default-features = false }
+oneil_eval = { path = "../oneil_eval" }
+oneil_frontend = { path = "../oneil_frontend" }
 oneil_ir = { path = "../oneil_ir" }
-oneil_frontend = { path = "../oneil_frontend", default-features = false }
 oneil_output = { path = "../oneil_output" }
 oneil_parser = { path = "../oneil_parser" }
-oneil_python = { path = "../oneil_python", features = [
-	"rust-lib",
-], optional = true }
+oneil_python = { path = "../oneil_python", features = ["rust-lib"] }
 oneil_shared = { path = "../oneil_shared" }
 indexmap = { workspace = true }
-
-[features]
-default = ["python"]
-python = ["oneil_python", "oneil_frontend/python", "oneil_eval/python"]
 
 [lints]
 workspace = true

@@ -1,16 +1,13 @@
 //! Utility methods for the runtime.
 
 use indexmap::{IndexMap, IndexSet};
-#[cfg(feature = "python")]
-use oneil_shared::paths::PythonPath;
-use oneil_shared::paths::{ModelPath, SourcePath};
-
-use super::Runtime;
-#[cfg(feature = "python")]
-use crate::cache::PythonImportCache;
-use crate::cache::{AstCache, EvalCache, SourceCache};
 use oneil_builtins::BuiltinRef;
 use oneil_frontend::instance::graph::UnitGraphCache;
+use oneil_shared::paths::{ModelPath, PythonPath, SourcePath};
+
+use super::Runtime;
+use crate::cache::PythonImportCache;
+use crate::cache::{AstCache, EvalCache, SourceCache};
 
 impl Runtime {
     /// Creates a new runtime instance with empty caches.
@@ -23,7 +20,6 @@ impl Runtime {
             design_info: IndexMap::new(),
             eval_cache: EvalCache::new(),
             composed_graph: None,
-            #[cfg(feature = "python")]
             python_import_cache: PythonImportCache::new(),
             builtins: BuiltinRef::new(),
         }
@@ -49,7 +45,6 @@ impl Runtime {
         // users until the next eval re-composes.
         self.composed_graph = None;
 
-        #[cfg(feature = "python")]
         if let Ok(python_path) = PythonPath::try_from(path.clone()) {
             self.python_import_cache.remove(&python_path);
         }

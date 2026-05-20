@@ -19,27 +19,21 @@ name = "oneil"
 crate-type = ["lib", "cdylib"]
 
 [features]
-default = ["rust-lib", "python-imports", "python-lib"]
+default = ["rust-lib", "python-lib"]
 rust-lib = [
 	"oneil_analysis",
 	"oneil_ast",
 	"oneil_builtins",
 	"oneil_cli",
 	"oneil_eval",
+	"oneil_frontend",
 	"oneil_ir",
 	"oneil_lsp",
 	"oneil_output",
 	"oneil_parser",
-	"oneil_frontend",
+	"oneil_python/rust-lib",
 	"oneil_runtime",
 	"oneil_shared",
-]
-python-imports = [
-	"oneil_cli/python",
-	"oneil_eval/python",
-	"oneil_python/rust-lib",
-	"oneil_frontend/python",
-	"oneil_runtime/python",
 ]
 python-lib = ["oneil_python/python-lib", "pyo3"]
 
@@ -47,16 +41,16 @@ python-lib = ["oneil_python/python-lib", "pyo3"]
 oneil_analysis = { path = "../oneil_analysis", optional = true }
 oneil_ast = { path = "../oneil_ast", optional = true }
 oneil_builtins = { path = "../oneil_builtins", optional = true }
-oneil_cli = { path = "../oneil_cli", default-features = false, optional = true }
-oneil_eval = { path = "../oneil_eval", default-features = false, optional = true }
+oneil_cli = { path = "../oneil_cli", optional = true }
+oneil_eval = { path = "../oneil_eval", optional = true }
 oneil_ir = { path = "../oneil_ir", optional = true }
 oneil_lsp = { path = "../oneil_lsp", optional = true }
 oneil_output = { path = "../oneil_output", optional = true }
 oneil_parser = { path = "../oneil_parser", optional = true }
 oneil_python = { path = "../oneil_python", default-features = false, optional = true }
-oneil_frontend = { path = "../oneil_frontend", default-features = false, optional = true }
-oneil_runtime = { path = "../oneil_runtime", default-features = false, optional = true }
-oneil_shared = { path = "../oneil_shared", default-features = false, optional = true }
+oneil_frontend = { path = "../oneil_frontend", optional = true }
+oneil_runtime = { path = "../oneil_runtime", optional = true }
+oneil_shared = { path = "../oneil_shared", optional = true }
 pyo3 = { workspace = true, optional = true }
 
 [lints]

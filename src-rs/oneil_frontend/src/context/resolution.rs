@@ -384,7 +384,6 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
     }
 
     /// Loads a Python import and records either the import or an error on the active model.
-    #[cfg(feature = "python")]
     pub fn load_python_import_to_active_model(
         &mut self,
         python_path: &PythonPath,
@@ -418,7 +417,6 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
 
     /// Gets a Python import from the active model.
     #[must_use]
-    #[cfg(feature = "python")]
     pub fn get_python_import_from_active_model(
         &self,
         python_path: &PythonPath,

@@ -14,13 +14,10 @@ mod builtin;
 mod error;
 mod eval;
 mod ir;
+mod python;
 mod source;
 mod util;
 
-#[cfg(feature = "python")]
-mod python;
-
-#[cfg(feature = "python")]
 use crate::cache::PythonImportCache;
 use crate::cache::{AstCache, EvalCache, SourceCache};
 use indexmap::IndexMap;
@@ -81,7 +78,6 @@ pub struct Runtime {
     /// source. `None` before the first eval (or after a cache clear),
     /// which `get_model_diagnostics` treats as "no graph-time errors yet".
     composed_graph: Option<InstanceGraph>,
-    #[cfg(feature = "python")]
     python_import_cache: PythonImportCache,
     builtins: BuiltinRef,
 }

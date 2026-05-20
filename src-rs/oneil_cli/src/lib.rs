@@ -12,19 +12,16 @@ use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use indexmap::{IndexMap, IndexSet};
 use notify::Watcher;
-#[cfg(feature = "python")]
-use oneil_runtime::output::PythonModule;
 use oneil_runtime::{
     Runtime,
+    output::PythonModule,
     output::{
         error::RuntimeErrors,
         tree::{DependencyTreeValue, ReferenceTreeValue, Tree},
     },
 };
-#[cfg(feature = "python")]
-use oneil_shared::paths::PythonPath;
 use oneil_shared::{
-    paths::{ModelPath, SourcePath},
+    paths::{ModelPath, PythonPath, SourcePath},
     symbols::ParameterName,
 };
 
@@ -42,6 +39,7 @@ use crate::{
 };
 
 mod command;
+mod load_python_venv;
 mod panic_handler;
 mod print_builtins;
 mod print_debug_ast;
@@ -53,9 +51,6 @@ mod print_model_result;
 mod print_tree;
 mod print_utils;
 mod stylesheet;
-
-#[cfg(feature = "python")]
-mod load_python_venv;
 
 /// Main entry point for the Oneil CLI application.
 pub fn main() {
@@ -129,7 +124,6 @@ fn handle_dev_command(command: DevCommand) {
                 common.dev_show_internal_errors,
             );
         }
-        #[cfg(feature = "python")]
         DevCommand::PrintPythonImports { files, common } => {
             handle_print_python_imports(&files, common.dev_show_internal_errors);
         }
@@ -139,12 +133,10 @@ fn handle_dev_command(command: DevCommand) {
 fn apply_common_side_effects(common_args: &CommonArgs) {
     set_color_choice(common_args.no_colors);
 
-    #[cfg(feature = "python")]
     load_python_venv::try_load_venv(common_args.venv_path.as_deref());
 }
 
 /// Handles the `dev print-python-imports` command.
-#[cfg(feature = "python")]
 fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool) {
     let mut runtime = Runtime::new();
 

@@ -11,13 +11,9 @@ keywords.workspace = true
 categories.workspace = true
 readme.workspace = true
 
-[features]
-default = ["python"]
-python = ["oneil_runtime/python"]
-
 [dependencies]
 indexmap = { workspace = true }
-oneil_runtime = { path = "../oneil_runtime", default-features = false }
+oneil_runtime = { path = "../oneil_runtime" }
 oneil_shared = { path = "../oneil_shared" }
 tokio = { version = "1", features = ["full"] }
 tower-lsp-server = "0.23.0"

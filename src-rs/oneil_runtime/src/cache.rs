@@ -4,17 +4,14 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use indexmap::IndexMap;
 use oneil_parser::error::ParserError;
-#[cfg(feature = "python")]
-use oneil_shared::paths::PythonPath;
 use oneil_shared::{
     EvalInstanceKey,
     load_result::LoadResult,
-    paths::{ModelPath, SourcePath},
+    paths::{ModelPath, PythonPath, SourcePath},
 };
 
 use crate::{error::SourceError, output};
 
-#[cfg(feature = "python")]
 use crate::error::PythonImportError;
 
 /// Content hash for cached source, used to detect when file contents change.
@@ -197,13 +194,11 @@ impl EvalCache {
 ///
 /// Stores a [`Result`] per path: either the loaded [`PythonFunctionMap`] or a
 /// [`PythonImportError`](crate::error::PythonImportError) when loading failed.
-#[cfg(feature = "python")]
 #[derive(Debug)]
 pub struct PythonImportCache {
     entries: IndexMap<PythonPath, Result<oneil_python::function::PythonModule, PythonImportError>>,
 }
 
-#[cfg(feature = "python")]
 impl Default for PythonImportCache {
     fn default() -> Self {
         Self {
@@ -212,7 +207,6 @@ impl Default for PythonImportCache {
     }
 }
 
-#[cfg(feature = "python")]
 impl PythonImportCache {
     /// Creates an empty Python import cache.
     #[must_use]

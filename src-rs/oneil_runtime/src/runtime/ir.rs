@@ -204,7 +204,6 @@ impl frontend::ExternalResolutionContext for Runtime {
             .map_err(|_e| frontend::AstLoadingFailedError)
     }
 
-    #[cfg(feature = "python")]
     fn load_python_import<'context>(
         &'context mut self,
         python_path: &PythonPath,
@@ -214,14 +213,6 @@ impl frontend::ExternalResolutionContext for Runtime {
             .ok()
             .map(|functions| functions.get_function_names().collect())
             .ok_or(frontend::PythonImportLoadingFailedError)
-    }
-
-    #[cfg(not(feature = "python"))]
-    fn load_python_import<'context>(
-        &'context mut self,
-        _python_path: &PythonPath,
-    ) -> Result<IndexSet<&'context PyFunctionName>, frontend::PythonImportLoadingFailedError> {
-        Err(frontend::PythonImportLoadingFailedError)
     }
 
     fn get_preloaded_models(

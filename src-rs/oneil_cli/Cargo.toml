@@ -11,14 +11,10 @@ repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
-[features]
-default = ["python"]
-python = ["oneil_runtime/python"]
-
 [dependencies]
 oneil_lsp = { path = "../oneil_lsp" }
 oneil_output = { path = "../oneil_output" }
-oneil_runtime = { path = "../oneil_runtime", default-features = false }
+oneil_runtime = { path = "../oneil_runtime" }
 oneil_shared = { path = "../oneil_shared" }
 anstream = "1.0.0"
 clap = { version = "4.5.1", features = ["derive"] }

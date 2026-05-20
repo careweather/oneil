@@ -8,10 +8,7 @@ This section describes how to install the Oneil CLI (Rust implementation) on Lin
 - **gcc**
   - Install on Fedora/RHEL: `sudo dnf install gcc`
   - Install on Debian/Ubuntu: `sudo apt install build-essential`
-
-Optional, for full functionality:
-
-- **Python 3.10+ with `pip`** (for Python functions and optional runtime features). The CLI can run without it; Python is only needed when your models import Python-defined functions.
+- **Python 3.10+ with `pip`** (for importing Python functions in models and for the `oneil` Python package). Install Python development libraries when building from source (see below).
 - **Python development libraries**
   - Install on Fedora/RHEL: `sudo dnf install python3-devel`
   - Install on Debian/Ubuntu: `sudo apt install python3-dev`
@@ -93,11 +90,7 @@ Use this if you want the latest development version or need to customize the bui
 
    This places the `oneil` executable in `~/.cargo/bin` (or `%USERPROFILE%\.cargo\bin` on Windows). Ensure that directory is on your `PATH`.
 
-   _Optional: build without Python support (avoids Python/pyo3 dependencies, makes smaller binary):_
-
-   ```sh
-   cargo install --path src-rs/oneil --no-default-features --features rust-lib
-   ```
+   Building from source requires Python 3.10+ development headers (see Prerequisites).
 
 3. Confirm:
 
@@ -158,7 +151,7 @@ virtual environment that it was installed in.
   Ensure the directory containing the `oneil` binary is on your `PATH`.
 
 - **Python-related build errors** (from source)  
-  Either install Python 3.10+ and development headers, or install with `--no-default-features --features rust-lib` to disable Python support.
+  Install Python 3.10+ and development headers (see Prerequisites).
 
 - **Permission denied** (Linux/macOS)  
   After moving the binary, run `chmod +x /path/to/oneil` (or the path you used).

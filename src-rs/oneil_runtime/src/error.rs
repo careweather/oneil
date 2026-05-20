@@ -39,7 +39,6 @@ impl AsOneilDiagnostic for SourceError {
 /// Distinguishes failure to load the source (e.g. file not found) from
 /// Python/loader errors. The source error is not stored; use the source cache
 /// or path for details.
-#[cfg(feature = "python")]
 #[derive(Debug)]
 pub enum PythonImportError {
     /// Source could not be loaded (e.g. file not found); the error is not stored here.

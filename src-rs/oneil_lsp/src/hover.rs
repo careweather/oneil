@@ -1,6 +1,5 @@
 //! Hover content for [`crate::symbol_lookup::SymbolAtPosition`].
 
-#[cfg(feature = "python")]
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -164,40 +163,34 @@ fn format_python_import_hover(
     path: &PythonPath,
     workspace_roots: &[PathBuf],
 ) -> HoverContents {
-    #[cfg(not(feature = "python"))]
-    let _ = runtime;
-
     let path_string = path_as_marked_string(path.as_path(), workspace_roots);
 
-    #[cfg(feature = "python")]
-    {
-        let doc_string = runtime
-            .lookup_python_import_docs(path)
-            .map(|docs| MarkedString::from_markdown(docs.to_string()));
+    let doc_string = runtime
+        .lookup_python_import_docs(path)
+        .map(|docs| MarkedString::from_markdown(docs.to_string()));
 
-        let functions = runtime
-            .load_python_import(path)
-            .ok()
-            .map(|module| module.get_function_names().collect::<Vec<_>>())
-            .filter(|functions| !functions.is_empty())
-            .map(|functions| {
-                let mut function_list = "**Functions:**\n".to_string();
-                for function in functions {
-                    writeln!(function_list, "- `{}`", function.as_str())
-                        .expect("writing to string should never fail");
-                }
+    let functions = runtime
+        .load_python_import(path)
+        .ok()
+        .map(|module| module.get_function_names().collect::<Vec<_>>())
+        .filter(|functions| !functions.is_empty())
+        .map(|functions| {
+            let mut function_list = "**Functions:**\n".to_string();
+            for function in functions {
+                writeln!(function_list, "- `{}`", function.as_str())
+                    .expect("writing to string should never fail");
+            }
 
-                MarkedString::from_markdown(function_list)
-            });
+            MarkedString::from_markdown(function_list)
+        });
 
-        if doc_string.is_some() || functions.is_some() {
-            return HoverContents::Array(
-                std::iter::once(path_string)
-                    .chain(doc_string)
-                    .chain(functions)
-                    .collect(),
-            );
-        }
+    if doc_string.is_some() || functions.is_some() {
+        return HoverContents::Array(
+            std::iter::once(path_string)
+                .chain(doc_string)
+                .chain(functions)
+                .collect(),
+        );
     }
 
     HoverContents::Scalar(path_string)

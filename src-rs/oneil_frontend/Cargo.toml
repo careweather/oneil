@@ -18,10 +18,6 @@ oneil_ir = { path = "../oneil_ir" }
 oneil_output = { path = "../oneil_output" }
 indexmap = { workspace = true }
 
-[features]
-default = ["python"]
-python = []
-
 [dev-dependencies]
 oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
 

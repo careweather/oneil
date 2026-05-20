@@ -18,7 +18,6 @@ use oneil_shared::{
     span::Span,
     symbols::{BuiltinFunctionName, BuiltinValueName, UnitBaseName, UnitPrefix},
 };
-#[cfg(feature = "python")]
 use oneil_shared::{paths::PythonPath, symbols::PyFunctionName};
 
 use super::{Runtime, RuntimeBuiltinLookup};
@@ -431,7 +430,6 @@ impl eval::ExternalEvaluationContext for Runtime {
         Some(builtin.call(name_span, args))
     }
 
-    #[cfg(feature = "python")]
     fn evaluate_imported_function(
         &self,
         python_path: &PythonPath,
