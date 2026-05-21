@@ -3,22 +3,31 @@
 use std::collections::BTreeSet;
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::{collections::BTreeMap, fs::File};
 
 use oneil_shared::{paths::PythonPath, symbols::PyFunctionName};
+use semver::{BuildMetadata, Prerelease, Version};
 use serde::de::{self, MapAccess, Visitor};
+use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{FunctionCall, ReadCacheError, WriteCacheError};
 
 const ONEIL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const MINIMUM_ACCEPTED_VERSION: Version = Version {
+    major: 0,
+    minor: 16,
+    patch: 0,
+    pre: Prerelease::EMPTY,
+    build: BuildMetadata::EMPTY,
+};
+
 /// On-disk cache for one python module.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FileCache {
     /// The version of Oneil that created the cache.
-    pub oneil_version: String,
+    pub oneil_version: Version,
     /// The path of the python module that was cached.
     pub module_path: PythonPath,
     /// The hash of the python module and its dependencies.
@@ -31,10 +40,14 @@ pub struct FileCache {
 
 impl FileCache {
     /// Creates a new empty file cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `CARGO_PKG_VERSION` is not a valid semver string.
     #[must_use]
     pub fn new(module_path: PythonPath, hash: ImportHash, dependencies: BTreeSet<PathBuf>) -> Self {
         Self {
-            oneil_version: ONEIL_VERSION.to_owned(),
+            oneil_version: Version::parse(ONEIL_VERSION).expect("version should be valid"),
             module_path,
             hash,
             dependencies,
@@ -67,6 +80,23 @@ impl FileCache {
     pub fn read_from_path(path: impl AsRef<Path>) -> Result<Self, ReadCacheError> {
         let file = File::open(path.as_ref()).map_err(ReadCacheError::Io)?;
         serde_json::from_reader(file).map_err(ReadCacheError::Serde)
+    }
+}
+
+impl Serialize for FileCache {
+    /// Serializes `oneil_version` first as a string, matching the on-disk field order.
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        const FIELD_COUNT: usize = 5;
+        let mut state = serializer.serialize_struct("FileCache", FIELD_COUNT)?;
+        state.serialize_field("oneil_version", &self.oneil_version.to_string())?;
+        state.serialize_field("module_path", &self.module_path)?;
+        state.serialize_field("hash", &self.hash)?;
+        state.serialize_field("dependencies", &self.dependencies)?;
+        state.serialize_field("function_calls", &self.function_calls)?;
+        state.end()
     }
 }
 
@@ -114,7 +144,9 @@ impl<'de> Visitor<'de> for FileCacheVisitor {
         let oneil_version = match map.next_key::<FileCacheField>()? {
             Some(FileCacheField::OneilVersion) => {
                 let version = map.next_value::<String>()?;
-                if !is_valid_version(&version) {
+                let version = Version::parse(&version).map_err(de::Error::custom)?;
+
+                if version < MINIMUM_ACCEPTED_VERSION {
                     return Err(de::Error::custom(format!(
                         "unsupported oneil_version: {version}"
                     )));
@@ -237,61 +269,5 @@ impl From<u64> for ImportHash {
 impl From<ImportHash> for u64 {
     fn from(hash: ImportHash) -> Self {
         hash.0
-    }
-}
-
-const MINIMUM_ACCEPTED_VERSION: Version = Version {
-    major: 0,
-    minor: 16,
-    patch: 0,
-};
-
-#[expect(
-    clippy::absurd_extreme_comparisons,
-    reason = "the minimum accepted version is _not_ the minimum possible value"
-)]
-fn is_valid_version(version: &str) -> bool {
-    let Ok(version) = Version::from_str(version) else {
-        return false;
-    };
-
-    let major_is_greater = version.major > MINIMUM_ACCEPTED_VERSION.major;
-
-    let minor_is_greater = version.major == MINIMUM_ACCEPTED_VERSION.major
-        && version.minor > MINIMUM_ACCEPTED_VERSION.minor;
-
-    let patch_is_greater_or_equal = version.major == MINIMUM_ACCEPTED_VERSION.major
-        && version.minor == MINIMUM_ACCEPTED_VERSION.minor
-        && version.patch >= MINIMUM_ACCEPTED_VERSION.patch;
-
-    major_is_greater || minor_is_greater || patch_is_greater_or_equal
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Version {
-    pub major: u32,
-    pub minor: u32,
-    pub patch: u32,
-}
-
-impl FromStr for Version {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let version_parts = s
-            .split('.')
-            .map(|part| part.parse::<u32>().ok())
-            .collect::<Option<Vec<u32>>>()
-            .ok_or(())?;
-
-        let Ok([major, minor, patch]) = <[u32; 3]>::try_from(version_parts) else {
-            return Err(());
-        };
-
-        Ok(Self {
-            major,
-            minor,
-            patch,
-        })
     }
 }
