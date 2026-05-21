@@ -16,6 +16,7 @@ use oneil_py_call_cache::{
 use oneil_python::{PythonEvalError, function::PythonModule};
 use oneil_shared::{
     EvalInstanceKey,
+    error::{AsOneilDiagnostic, Context, DiagnosticKind, OneilDiagnostic},
     load_result::LoadResult,
     paths::{ModelPath, PythonPath, SourcePath},
     symbols::PyFunctionName,
@@ -299,6 +300,7 @@ pub struct PythonCallCache {
     updated_root_models: IndexSet<ModelPath>,
     cache_read_policy: CacheReadPolicy,
     cache_write_policy: CacheWritePolicy,
+    warnings: IndexMap<PythonPath, IndexSet<CacheWarning>>,
 
     /// Whether to overwrite outdated caches.
     overwrite_outdated_caches: IndexMap<PythonPath, bool>,
@@ -330,6 +332,7 @@ impl PythonCallCache {
             cache_read_policy,
             cache_write_policy,
             overwrite_outdated_caches: IndexMap::new(),
+            warnings: IndexMap::new(),
         }
     }
 
@@ -337,6 +340,21 @@ impl PythonCallCache {
     pub fn begin_evaluation(&mut self) {
         self.updated_root_models.clear();
         self.overwrite_outdated_caches.clear();
+        self.warnings.clear();
+    }
+
+    /// Returns cache warnings as diagnostics keyed by the on-disk cache file path.
+    #[must_use]
+    pub fn warning_diagnostics(&self) -> Vec<OneilDiagnostic> {
+        self.warnings
+            .iter()
+            .flat_map(|(python_path, warnings)| {
+                let cache_path = self.get_cache_path(python_path);
+                warnings
+                    .iter()
+                    .map(move |warning| OneilDiagnostic::from_error(warning, cache_path.clone()))
+            })
+            .collect()
     }
 
     /// Ends the current evaluation.
@@ -371,18 +389,28 @@ impl PythonCallCache {
         let current_hash = ImportHash::from(module_hash);
 
         // try to load the cache entry for the python path
-        //
-        // for now, we simply ignore the error
-        let _ = self.load(python_path, ImportHash::from(module_hash));
+        self.load(python_path, current_hash);
+        let cached_hash = self.entries.get(python_path)?.hash;
+        let hash_matches = cached_hash == current_hash;
 
-        let cache = self.entries.get(python_path)?;
-        let hash_matches = cache.hash == current_hash;
+        if !hash_matches {
+            if !self.allow_cache_read_on_hash_mismatch(python_path) {
+                return None;
+            }
 
-        if !hash_matches && !self.allow_cache_read_on_hash_mismatch(python_path) {
-            return None;
+            self.record_warning(
+                python_path,
+                CacheWarningKind::StaleCacheOnRead {
+                    function_name: identifier.clone(),
+                },
+            );
         }
 
-        let function_calls = cache.function_calls.get(identifier)?;
+        let function_calls = self
+            .entries
+            .get(python_path)?
+            .function_calls
+            .get(identifier)?;
         let function_call = function_calls.iter().find(|call| call.inputs == args)?;
 
         Some(function_call.output.clone().into())
@@ -409,23 +437,19 @@ impl PythonCallCache {
 
         // Try to load the cache entry for the python path. If it fails,
         // create a new cache entry.
-        //
-        // NOTE: currently, if the cache entry exists but the JSON entry
-        // fails to parse (e.g. because the version is incompatible), this
-        // will **overwrite** the existing cache with a new one. It would
-        // make more sense to handle an invalid cache entry with a warning
-        // or something like that. However, to avoid getting too far into
-        // the weeds on the first draft, we simply overwrite the existing
-        // cache with a new one.
-        let _ = self.load(python_path, current_hash);
+        self.load(python_path, current_hash);
 
         // check if the cached hash differs from the current hash
         let cached_hash = self.entries.get(python_path).map(|cache| cache.hash);
         let hash_mismatch = cached_hash.is_some_and(|hash| hash != current_hash);
 
         // if the hash mismatch and the user does not allow it, return
-        if hash_mismatch && !self.allow_cache_write_on_hash_mismatch(python_path) {
-            return;
+        if hash_mismatch {
+            if !self.allow_cache_write_on_hash_mismatch(python_path) {
+                return;
+            }
+
+            self.record_warning(python_path, CacheWarningKind::OverwriteCacheOnHashMismatch);
         }
 
         // If the root model is not in the updated root models set, remove
@@ -481,6 +505,25 @@ impl PythonCallCache {
         let allow_output_update = !output_mismatch
             || self.allow_cache_write_on_entry_output_mismatch(python_path, identifier);
 
+        if output_mismatch && !allow_output_update {
+            self.record_warning(
+                python_path,
+                CacheWarningKind::StaleCacheEntryNotUpdated {
+                    function_name: identifier.clone(),
+                },
+            );
+        }
+
+        let will_overwrite_output = output_mismatch && allow_output_update;
+        if will_overwrite_output {
+            self.record_warning(
+                python_path,
+                CacheWarningKind::OverwriteCacheEntryOnOutputMismatch {
+                    function_name: identifier.clone(),
+                },
+            );
+        }
+
         // get mutable reference to the cache entry
         let cache = self
             .entries
@@ -518,37 +561,41 @@ impl PythonCallCache {
 
     /// Loads a cache entry from disk.
     ///
-    /// If the cache entry already exists, this does nothing.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ReadCacheError`] if the cache file cannot be read.
-    fn load(
-        &mut self,
-        python_path: &PythonPath,
-        module_hash: ImportHash,
-    ) -> Result<(), ReadCacheError> {
+    /// If the cache entry already exists in memory, this does nothing. I/O failures
+    /// (e.g. missing file) are ignored. Invalid JSON records a [`CacheWarningKind::InvalidCacheJson`].
+    fn load(&mut self, python_path: &PythonPath, module_hash: ImportHash) {
         match self.cache_read_policy {
-            CacheReadPolicy::Never => return Ok(()),
+            CacheReadPolicy::Never => return,
             CacheReadPolicy::Always | CacheReadPolicy::Prompt(_) => (),
         }
 
         if self.entries.contains_key(python_path) {
-            return Ok(());
+            return;
         }
 
         let cache_path = self.get_cache_path(python_path);
-        let cache = FileCache::read_from_path(cache_path)?;
-
-        // if the hashes are equal or if we allow overwriting the cache, insert the cache entry
-        //
-        // if overwriting is allowed, the cache entry will be overwritten with a new entry during
-        // the next call to `insert`
-        if cache.hash == module_hash || !self.allow_cache_write_on_hash_mismatch(python_path) {
-            self.entries.insert(python_path.clone(), cache);
+        match FileCache::read_from_path(cache_path) {
+            Ok(cache) => {
+                // if the hashes are equal or if we allow overwriting the cache, insert the cache entry
+                //
+                // if overwriting is allowed, the cache entry will be overwritten with a new entry during
+                // the next call to `insert`
+                if cache.hash == module_hash
+                    || !self.allow_cache_write_on_hash_mismatch(python_path)
+                {
+                    self.entries.insert(python_path.clone(), cache);
+                }
+            }
+            Err(ReadCacheError::Serde(err)) => {
+                self.record_warning(
+                    python_path,
+                    CacheWarningKind::InvalidCacheJson {
+                        detail: err.to_string(),
+                    },
+                );
+            }
+            Err(ReadCacheError::Io(_)) => (),
         }
-
-        Ok(())
     }
 
     /// Saves all cache entries to disk.
@@ -556,19 +603,32 @@ impl PythonCallCache {
     /// # Errors
     ///
     /// Returns a vector of [`WriteCacheError`] if the cache files cannot be written.
-    fn save_all(&self) -> Result<(), Vec<WriteCacheError>> {
+    fn save_all(&mut self) -> Result<(), Vec<WriteCacheError>> {
         match self.cache_write_policy {
             CacheWritePolicy::Never => return Ok(()),
             CacheWritePolicy::Always | CacheWritePolicy::Prompt(_) => (),
         }
 
         let mut errors = Vec::new();
-        for (model_path, cache) in &self.entries {
-            let cache_path = self.get_cache_path(model_path);
-            match cache.write_to_path(cache_path) {
-                Ok(()) => (),
-                Err(e) => errors.push(e),
+        let mut stale_caches = Vec::new();
+        for (python_path, cache) in &self.entries {
+            if self
+                .overwrite_outdated_caches
+                .get(python_path)
+                .is_none_or(|overwrite| *overwrite)
+            {
+                let cache_path = self.get_cache_path(python_path);
+                match cache.write_to_path(cache_path) {
+                    Ok(()) => (),
+                    Err(e) => errors.push(e),
+                }
+            } else {
+                stale_caches.push(python_path.clone());
             }
+        }
+
+        for python_path in stale_caches {
+            self.record_warning(&python_path, CacheWarningKind::StaleCacheNotUpdated);
         }
 
         if errors.is_empty() {
@@ -685,6 +745,17 @@ impl PythonCallCache {
 
         self.cache_dir.join(cache_relative_path)
     }
+
+    /// Records a cache warning for the given Python module path.
+    fn record_warning(&mut self, python_path: &PythonPath, kind: CacheWarningKind) {
+        self.warnings
+            .entry(python_path.clone())
+            .or_default()
+            .insert(CacheWarning {
+                python_path: python_path.clone(),
+                kind,
+            });
+    }
 }
 
 fn append_normalized_component(mut path: PathBuf, component: Component<'_>) -> PathBuf {
@@ -785,6 +856,84 @@ pub trait CachePrompter: Send + Sync {
 /// Shared handle to a [`CachePrompter`].
 pub type CachePrompterRef = Arc<dyn CachePrompter>;
 
+/// A non-fatal issue detected while reading or writing the Python call cache.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CacheWarning {
+    /// Python module path this warning applies to.
+    pub python_path: PythonPath,
+    /// Specific cache warning kind.
+    pub kind: CacheWarningKind,
+}
+
+/// Kind of non-fatal issue detected while reading or writing the Python call cache.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CacheWarningKind {
+    /// A stale cached result was used because the module hash differs.
+    StaleCacheOnRead { function_name: PyFunctionName },
+    /// The on-disk cache is out of date and was not updated (write denied or blocked).
+    StaleCacheNotUpdated,
+    /// A cached function output is out of date and was not updated.
+    StaleCacheEntryNotUpdated { function_name: PyFunctionName },
+    /// The cache file will be replaced because the module hash differs.
+    OverwriteCacheOnHashMismatch,
+    /// A cached function output will be replaced.
+    OverwriteCacheEntryOnOutputMismatch { function_name: PyFunctionName },
+    /// The cache file was read but JSON deserialization failed; it will be replaced.
+    InvalidCacheJson { detail: String },
+}
+
+impl AsOneilDiagnostic for CacheWarning {
+    fn kind(&self) -> DiagnosticKind {
+        DiagnosticKind::Warning
+    }
+
+    fn message(&self) -> String {
+        match &self.kind {
+            CacheWarningKind::StaleCacheOnRead { function_name } => format!(
+                "using outdated cached result for `{}`",
+                function_name.as_str()
+            ),
+            CacheWarningKind::StaleCacheNotUpdated => {
+                "Oneil cache is out of date and was not updated".to_string()
+            }
+            CacheWarningKind::StaleCacheEntryNotUpdated { function_name } => format!(
+                "outdated cached result for `{}` was not updated",
+                function_name.as_str()
+            ),
+            CacheWarningKind::OverwriteCacheOnHashMismatch => {
+                "overwriting outdated Oneil cache".to_string()
+            }
+            CacheWarningKind::OverwriteCacheEntryOnOutputMismatch { function_name } => {
+                format!(
+                    "updating outdated cached result for `{}`",
+                    function_name.as_str()
+                )
+            }
+            CacheWarningKind::InvalidCacheJson { detail: _ } => {
+                "replacing invalid Oneil cache".to_string()
+            }
+        }
+    }
+
+    fn context(&self) -> Vec<Context> {
+        let module_note = Context::Note(format!(
+            "cache for python module `{}`",
+            self.python_path.as_path().display()
+        ));
+
+        match &self.kind {
+            CacheWarningKind::StaleCacheOnRead { .. }
+            | CacheWarningKind::StaleCacheNotUpdated
+            | CacheWarningKind::StaleCacheEntryNotUpdated { .. }
+            | CacheWarningKind::OverwriteCacheOnHashMismatch
+            | CacheWarningKind::OverwriteCacheEntryOnOutputMismatch { .. } => vec![module_note],
+            CacheWarningKind::InvalidCacheJson { detail } => {
+                vec![Context::Note(detail.clone()), module_note]
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod python_call_cache_tests {
     use std::sync::{Arc, Mutex};
@@ -794,6 +943,7 @@ mod python_call_cache_tests {
     use oneil_py_call_cache::FunctionCallResult;
     use oneil_python::function::PythonModule;
     use oneil_shared::{
+        error::DiagnosticKind,
         paths::{ModelPath, PythonPath},
         symbols::PyFunctionName,
     };
@@ -982,5 +1132,147 @@ mod python_call_cache_tests {
             test_prompter.kinds(),
             vec![CachePromptKind::OverwriteCacheOnOutputMismatch]
         );
+        let diags = cache.warning_diagnostics();
+        assert_eq!(diags.len(), 1);
+        assert!(
+            diags[0]
+                .message()
+                .contains("outdated cached result for `f` was not updated")
+        );
+    }
+
+    #[test]
+    fn get_always_on_hash_mismatch_emits_stale_warning_on_cache_path() {
+        let cache_dir = PathBuf::from("/tmp/oneil-cache-test-stale-read");
+        let mut cache = PythonCallCache::new(
+            cache_dir.clone(),
+            CacheReadPolicy::Always,
+            CacheWritePolicy::Never,
+        );
+        let cached_output = Value::Number(oneil_output::Number::Scalar(2.0));
+        cache
+            .entries
+            .insert(python_path(), file_cache(1, cached_output.clone()));
+
+        let result = cache.get(
+            &python_path(),
+            &function_name(),
+            &[Value::Number(oneil_output::Number::Scalar(1.0))],
+            2,
+        );
+
+        assert_eq!(result, Some(Ok(cached_output)));
+        let diags = cache.warning_diagnostics();
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].kind(), DiagnosticKind::Warning);
+        assert!(
+            diags[0]
+                .message()
+                .contains("using outdated cached result for `f`")
+        );
+        assert!(diags[0].path().starts_with(&cache_dir));
+        assert!(diags[0].path().ends_with("module.json"));
+    }
+
+    #[test]
+    fn insert_always_on_hash_mismatch_emits_overwrite_warning_on_cache_path() {
+        let cache_dir = PathBuf::from("/tmp/oneil-cache-test-hash-overwrite");
+        let mut cache = PythonCallCache::new(
+            cache_dir.clone(),
+            CacheReadPolicy::Never,
+            CacheWritePolicy::Always,
+        );
+        cache.entries.insert(
+            python_path(),
+            file_cache(1, Value::Number(oneil_output::Number::Scalar(2.0))),
+        );
+
+        cache.insert(
+            &python_path(),
+            &function_name(),
+            &[Value::Number(oneil_output::Number::Scalar(1.0))],
+            &Ok(Value::Number(oneil_output::Number::Scalar(3.0))),
+            &root_model(),
+            &python_module(2),
+        );
+
+        let diags = cache.warning_diagnostics();
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].kind(), DiagnosticKind::Warning);
+        assert!(
+            diags[0]
+                .message()
+                .contains("overwriting outdated Oneil cache")
+        );
+        assert!(diags[0].path().starts_with(&cache_dir));
+        assert!(diags[0].path().ends_with("module.json"));
+    }
+
+    #[test]
+    fn insert_invalid_cache_json_emits_warning() {
+        let cache_dir = PathBuf::from("/tmp/oneil-cache-test-invalid-json");
+        let _ = std::fs::remove_dir_all(&cache_dir);
+        std::fs::create_dir_all(&cache_dir).expect("create cache dir");
+
+        let cache_file = cache_dir.join("module.json");
+        std::fs::write(&cache_file, "{not valid json").expect("write invalid cache file");
+
+        let mut cache =
+            PythonCallCache::new(cache_dir, CacheReadPolicy::Always, CacheWritePolicy::Always);
+
+        cache.insert(
+            &python_path(),
+            &function_name(),
+            &[Value::Number(oneil_output::Number::Scalar(1.0))],
+            &Ok(Value::Number(oneil_output::Number::Scalar(3.0))),
+            &root_model(),
+            &python_module(1),
+        );
+
+        let diags = cache.warning_diagnostics();
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].kind(), DiagnosticKind::Warning);
+        assert!(diags[0].message().contains("replacing invalid Oneil cache"));
+        assert_eq!(diags[0].path(), &cache_file);
+        let context_notes: Vec<_> = diags[0]
+            .context()
+            .iter()
+            .filter_map(|context| match context {
+                Context::Note(note) => Some(note.as_str()),
+                Context::Help(_) => None,
+            })
+            .collect();
+        assert_eq!(context_notes.len(), 2);
+        assert!(
+            context_notes
+                .iter()
+                .any(|note| note.contains("cache for python module"))
+        );
+        assert!(
+            context_notes
+                .iter()
+                .any(|note| !note.contains("cache for python module"))
+        );
+    }
+
+    #[test]
+    fn insert_missing_cache_file_does_not_emit_invalid_json_warning() {
+        let cache_dir = PathBuf::from("/tmp/oneil-cache-test-missing-json");
+        let _ = std::fs::remove_dir_all(&cache_dir);
+        std::fs::create_dir_all(&cache_dir).expect("create cache dir");
+
+        let mut cache =
+            PythonCallCache::new(cache_dir, CacheReadPolicy::Always, CacheWritePolicy::Always);
+
+        cache.insert(
+            &python_path(),
+            &function_name(),
+            &[Value::Number(oneil_output::Number::Scalar(1.0))],
+            &Ok(Value::Number(oneil_output::Number::Scalar(3.0))),
+            &root_model(),
+            &python_module(1),
+        );
+
+        assert!(cache.warning_diagnostics().is_empty());
     }
 }

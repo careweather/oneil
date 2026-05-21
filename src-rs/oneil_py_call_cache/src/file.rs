@@ -178,7 +178,7 @@ impl<'de> Visitor<'de> for FileCacheVisitor {
 }
 
 /// Fingerprint for a python module's sources (stored as raw `u64`, serialized as hex).
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct ImportHash(u64);
 
 impl fmt::Display for ImportHash {
