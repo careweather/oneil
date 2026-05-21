@@ -1,7 +1,6 @@
 //! Command-line interface definitions for the Oneil CLI
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use oneil_runtime::{CacheReadPolicy, CacheWritePolicy};
 use oneil_shared::{
     paths::{ModelPath, PythonPath},
     symbols::{BuiltinFunctionName, BuiltinValueName, ParameterName, UnitBaseName, UnitPrefix},
@@ -723,28 +722,6 @@ pub enum CachePolicy {
     Never,
     /// Ask before using the cache.
     Prompt,
-}
-
-/// Converts a CLI cache flag into a runtime read policy.
-impl From<CachePolicy> for CacheReadPolicy {
-    fn from(policy: CachePolicy) -> Self {
-        match policy {
-            CachePolicy::Always => Self::Always,
-            CachePolicy::Never => Self::Never,
-            CachePolicy::Prompt => Self::Prompt,
-        }
-    }
-}
-
-/// Converts a CLI cache flag into a runtime write policy.
-impl From<CachePolicy> for CacheWritePolicy {
-    fn from(policy: CachePolicy) -> Self {
-        match policy {
-            CachePolicy::Always => Self::Always,
-            CachePolicy::Never => Self::Never,
-            CachePolicy::Prompt => Self::Prompt,
-        }
-    }
 }
 
 /// Parses a CLI argument into a [`ModelPath`].

@@ -6,16 +6,19 @@
     reason = "this isn't causing problems, and it's going to take time to fix"
 )]
 
-use std::{io::Write, sync::mpsc};
+use std::{
+    io::Write,
+    sync::{Arc, mpsc},
+};
 
 use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use indexmap::{IndexMap, IndexSet};
 use notify::Watcher;
 use oneil_runtime::{
-    Runtime,
-    output::PythonModule,
+    CachePrompterRef, Runtime,
     output::{
+        PythonModule,
         error::RuntimeErrors,
         tree::{DependencyTreeValue, ReferenceTreeValue, Tree},
     },
@@ -26,9 +29,11 @@ use oneil_shared::{
 };
 
 use crate::{
+    cache_prompt::CliCachePrompter,
     command::{
-        BuiltinsCommand, CheckArgs, CliCommand, Commands, CommonArgs, DevCommand, EvalArgs,
-        IndependentArgs, IrIncludeSection, LspArgs, ModelResultIncludeSection, TestArgs, TreeArgs,
+        BuiltinsCommand, CachePolicy, CheckArgs, CliCommand, Commands, CommonArgs, DevCommand,
+        EvalArgs, IndependentArgs, IrIncludeSection, LspArgs, ModelResultIncludeSection, TestArgs,
+        TreeArgs,
     },
     print_debug_ast::AstPrintConfig,
     print_debug_ir::IrPrintConfig,
@@ -38,6 +43,7 @@ use crate::{
     print_utils::PrintUtilsConfig,
 };
 
+mod cache_prompt;
 mod command;
 mod load_python_venv;
 mod panic_handler;
@@ -138,7 +144,34 @@ fn apply_common_side_effects(common_args: &CommonArgs) {
 
 /// Builds a [`Runtime`] using cache policies from [`CommonArgs`].
 fn runtime_from_common_args(common: &CommonArgs) -> Runtime {
-    Runtime::new(common.cache_read.into(), common.cache_overwrite.into())
+    let cache_prompter: CachePrompterRef = Arc::new(CliCachePrompter);
+
+    Runtime::new(
+        cache_read_policy(common.cache_read, &cache_prompter),
+        cache_write_policy(common.cache_overwrite, &cache_prompter),
+    )
+}
+
+fn cache_read_policy(
+    policy: CachePolicy,
+    prompter: &oneil_runtime::CachePrompterRef,
+) -> oneil_runtime::CacheReadPolicy {
+    match policy {
+        CachePolicy::Always => oneil_runtime::CacheReadPolicy::Always,
+        CachePolicy::Never => oneil_runtime::CacheReadPolicy::Never,
+        CachePolicy::Prompt => oneil_runtime::CacheReadPolicy::Prompt(Arc::clone(prompter)),
+    }
+}
+
+fn cache_write_policy(
+    policy: CachePolicy,
+    prompter: &oneil_runtime::CachePrompterRef,
+) -> oneil_runtime::CacheWritePolicy {
+    match policy {
+        CachePolicy::Always => oneil_runtime::CacheWritePolicy::Always,
+        CachePolicy::Never => oneil_runtime::CacheWritePolicy::Never,
+        CachePolicy::Prompt => oneil_runtime::CacheWritePolicy::Prompt(Arc::clone(prompter)),
+    }
 }
 
 /// Handles the `dev print-python-imports` command.

@@ -19,7 +19,9 @@ mod symbol_lookup;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use oneil_runtime::{CacheReadPolicy, CacheWritePolicy, Runtime as OneilRuntime};
+use oneil_runtime::{
+    CacheReadPolicy, CacheWritePolicy, Runtime as OneilRuntime,
+};
 use oneil_shared::paths::{ModelPath, SourcePath};
 use tower_lsp_server::ls_types::OneOf;
 use tower_lsp_server::{

@@ -181,6 +181,13 @@ impl<'de> Visitor<'de> for FileCacheVisitor {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ImportHash(u64);
 
+impl fmt::Display for ImportHash {
+    /// Formats an [`ImportHash`] as a 16-digit lowercase hex string.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:016x}", self.0)
+    }
+}
+
 impl Serialize for ImportHash {
     /// Writes this hash as a 16-digit lowercase hexadecimal string (JSON string).
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
