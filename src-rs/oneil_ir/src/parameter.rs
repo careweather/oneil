@@ -281,6 +281,27 @@ impl Parameter {
     pub fn set_render_name(&mut self, render_name: RenderName) {
         self.render_name = Some(render_name);
     }
+
+    /// Replaces the section label.
+    ///
+    /// Called by the instance-graph build pass when a design line declares
+    /// the parameter under a section header.
+    pub fn set_section_label(&mut self, section_label: Option<SectionLabel>) {
+        self.section_label = section_label;
+    }
+
+    /// Replaces the parameter limits.
+    ///
+    /// Called by the instance-graph build pass when a design override
+    /// adjusts the target parameter's limits.
+    pub fn set_limits(&mut self, limits: Limits) {
+        self.limits = limits;
+    }
+
+    /// Mutable view of the dependency map.
+    pub const fn dependencies_mut(&mut self) -> &mut Dependencies {
+        &mut self.dependencies
+    }
 }
 
 /// Names a parameter's RHS depends on, partitioned by binding kind.

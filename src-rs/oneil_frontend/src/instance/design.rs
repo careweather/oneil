@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_shared::{
     InstancePath,
-    labels::{ParameterLabel, RenderName},
+    labels::{ParameterLabel, RenderName, SectionLabel},
     paths::{DesignPath, ModelPath},
     span::Span,
     symbols::{ParameterName, TestIndex},
@@ -50,6 +50,10 @@ pub(crate) struct OverlayParameterValue {
     pub label: Option<ParameterLabel>,
     /// Design-supplied LaTeX render-name override, if present.
     pub render_name: Option<RenderName>,
+    /// Optional limits override from the design file's full form.
+    pub limits_override: Option<ir::Limits>,
+    /// Section placement from the design file (`None` = top-level / retain base section).
+    pub section: Option<(SectionLabel, Option<ir::Note>)>,
 }
 
 /// Resolved content of a `.one` design file.
@@ -79,6 +83,9 @@ pub struct Design {
         IndexMap<InstancePath, IndexMap<ParameterName, OverlayParameterValue>>,
     /// Parameters defined in the design that don't exist on the target model.
     pub(crate) parameter_additions: IndexMap<ParameterName, ir::Parameter>,
+    /// Section placement for each parameter addition (parallel to `parameter_additions`).
+    pub(crate) parameter_section_placements:
+        IndexMap<ParameterName, (SectionLabel, Option<ir::Note>)>,
     /// Tests defined in the design that are added to the target model.
     /// Test expressions are evaluated in the target's scope.
     pub(crate) test_additions: IndexMap<TestIndex, ir::Test>,

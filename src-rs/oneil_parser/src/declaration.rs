@@ -17,7 +17,10 @@ use oneil_shared::{labels::RenderName, span::Span};
 use crate::{
     error::{ParserError, parser_trait::ErrorHandlingParser, reason::SubmodelKeyword},
     note::parse as parse_note,
-    parameter::{parse as parse_parameter, parse_parameter_value, performance_marker, trace_level},
+    parameter::{
+        parse as parse_parameter, parse_limits, parse_parameter_value, performance_marker,
+        trace_level,
+    },
     test::parse as parse_test,
     token::{
         keyword::{apply, as_, design, import, reference, submodel, to},
@@ -285,8 +288,11 @@ fn nested_apply_item(input: InputSpan<'_>) -> Result<'_, ApplyDesignNode, Parser
 /// Parses a parameter line in a design file (after `design`).
 ///
 /// Handles two forms:
-/// - Shorthand: `[$] [*[*]] id[.segment] = value` — no label, `instance_path` allowed.
-/// - Full:      `[$] [*[*]] Label text: id = value` — explicit label, no instance path.
+/// - Shorthand: `[$] [*[*]] id[.segment] [[Limits]] = value` — no label, `instance_path` allowed,
+///   optional limits.
+/// - Full: `[$] [*[*]] Label [Limits]: [{RenderName}] id = value` — explicit label, optional
+///   limits and render name; no instance path. Limits set bounds on new parameter additions,
+///   or adjust limits on overrides.
 ///
 /// The `$` performance marker and trace-level prefix only take effect when the
 /// parameter is a new addition (not an override of an existing parameter).
@@ -298,17 +304,23 @@ fn design_parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserErr
     let (rest, performance_marker_node) = opt(performance_marker).parse(input)?;
     let (rest, trace_level_node) = opt(trace_level).parse(rest)?;
 
-    // Try to parse an optional `Label text:` prefix. This distinguishes the full
+    // Try to parse an optional `Label [limits]:` prefix. This distinguishes the full
     // parameter form (`Label: id = value`) from the shorthand form (`id = value`).
     // The label parser is greedy but backtracking is safe: if `label` matches but
     // the following `:` is absent (e.g. input is `id = expr`), `opt` resets.
-    let (rest, label_node) = opt(|input| {
+    let (rest, full_form_prefix) = opt(|input| {
         let (rest, label_token) = label.convert_errors().parse(input)?;
         let label_node = ParameterLabelNode::from(label_token);
+        let (rest, limits_node) = opt(parse_limits).parse(rest)?;
         let (rest, _) = colon.convert_errors().parse(rest)?;
-        Ok((rest, label_node))
+        Ok((rest, (label_node, limits_node)))
     })
     .parse(rest)?;
+
+    let (label_node, limits_node) = match full_form_prefix {
+        Some((label, limits)) => (Some(label), limits),
+        None => (None, None),
+    };
 
     // Optional LaTeX render-name (`{...}`) only valid in the full form (when a label
     // is present). In shorthand form it is skipped entirely so that piecewise `{` is
@@ -342,6 +354,14 @@ fn design_parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserErr
         .parse(rest)?
     } else {
         (rest, None)
+    };
+
+    // Shorthand form also supports optional limits between the identifier/path and `=`.
+    // Full-form limits were already captured in `full_form_prefix` above.
+    let (rest, limits_node) = if label_node.is_none() {
+        opt(parse_limits).parse(rest)?
+    } else {
+        (rest, limits_node)
     };
 
     let (rest, equals_token) = equals.convert_errors().parse(rest)?;
@@ -386,6 +406,7 @@ fn design_parameter_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserErr
         trace_level_node,
         note_node,
         label_node,
+        limits_node,
         render_name_node,
     );
     let inner_node = Node::new(inner, param_span.clone(), param_whitespace_span.clone());
@@ -1371,8 +1392,88 @@ mod tests {
                 panic!("Expected design parameter");
             };
             assert!(param_node.label().is_none());
+            assert!(param_node.limits().is_none());
             assert!(param_node.render_name().is_none());
             assert_eq!(param_node.ident().as_str(), "mass");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn design_parameter_full_with_continuous_limits() {
+            use oneil_ast::Limits;
+            use std::ops::Deref;
+
+            let config = Config {
+                allow_design_shorthand: true,
+                ..Config::default()
+            };
+            let input = InputSpan::new_extra("Temperature (0, 100): T = 300\n", config);
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::DesignParameter(ref param_node) = *decl else {
+                panic!("Expected design parameter");
+            };
+            assert_eq!(
+                param_node.label().expect("should have label").as_str(),
+                "Temperature"
+            );
+            let Some(Limits::Continuous { min, max }) = param_node.limits().map(Deref::deref)
+            else {
+                panic!("Expected continuous limits");
+            };
+            assert!(matches!(&**min, oneil_ast::Expr::Literal { .. }));
+            assert!(matches!(&**max, oneil_ast::Expr::Literal { .. }));
+            assert_eq!(param_node.ident().as_str(), "T");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn design_parameter_shorthand_with_discrete_limits() {
+            use oneil_ast::Limits;
+            use std::ops::Deref;
+
+            let config = Config {
+                allow_design_shorthand: true,
+                ..Config::default()
+            };
+            let input = InputSpan::new_extra("T [250, 300, 350] = 300\n", config);
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::DesignParameter(ref param_node) = *decl else {
+                panic!("Expected design parameter");
+            };
+            assert!(param_node.label().is_none(), "shorthand has no label");
+            let Some(Limits::Discrete { values }) = param_node.limits().map(Deref::deref) else {
+                panic!("Expected discrete limits");
+            };
+            assert_eq!(values.len(), 3);
+            assert_eq!(param_node.ident().as_str(), "T");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn design_parameter_shorthand_with_continuous_limits() {
+            use oneil_ast::Limits;
+            use std::ops::Deref;
+
+            let config = Config {
+                allow_design_shorthand: true,
+                ..Config::default()
+            };
+            let input = InputSpan::new_extra("T (0, 500) = 300\n", config);
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::DesignParameter(ref param_node) = *decl else {
+                panic!("Expected design parameter");
+            };
+            assert!(param_node.label().is_none(), "shorthand has no label");
+            let Some(Limits::Continuous { min, max }) = param_node.limits().map(Deref::deref)
+            else {
+                panic!("Expected continuous limits");
+            };
+            assert!(matches!(&**min, oneil_ast::Expr::Literal { .. }));
+            assert!(matches!(&**max, oneil_ast::Expr::Literal { .. }));
+            assert_eq!(param_node.ident().as_str(), "T");
             assert_eq!(rest.fragment(), &"");
         }
     }

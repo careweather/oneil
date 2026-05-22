@@ -48,4 +48,9 @@ impl Section {
     pub fn items(&self) -> &[SectionItem] {
         &self.items
     }
+
+    /// Mutable view of the ordered item list.
+    pub const fn items_mut(&mut self) -> &mut Vec<SectionItem> {
+        &mut self.items
+    }
 }

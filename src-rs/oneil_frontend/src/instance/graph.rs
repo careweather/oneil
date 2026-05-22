@@ -45,6 +45,7 @@ use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_shared::{
     InstancePath, RelativePath,
+    labels::SectionLabel,
     load_result::LoadResult,
     paths::{DesignPath, ModelPath},
     search::search,
@@ -704,6 +705,7 @@ fn apply_design_at_host(
             host,
             &design.parameter_overrides,
             &design.parameter_additions,
+            &design.parameter_section_placements,
             &host_loc.absolute_path.host_path(),
             &RelativePath::self_path(),
             design_file,
@@ -797,6 +799,7 @@ fn apply_scoped_overlay(
         host,
         overrides,
         additions,
+        &IndexMap::new(),
         &host_loc.absolute_path.host_path(),
         &anchor_relative,
         design_file,
@@ -813,6 +816,7 @@ fn apply_overlay_at_host(
     host: &mut InstancedModel,
     overrides: &IndexMap<ParameterName, OverlayParameterValue>,
     additions: &IndexMap<ParameterName, ir::Parameter>,
+    addition_placements: &IndexMap<ParameterName, (SectionLabel, Option<ir::Note>)>,
     host_path: &InstancePath,
     anchor_path: &RelativePath,
     design_file: &ModelPath,
@@ -834,6 +838,9 @@ fn apply_overlay_at_host(
             name.clone(),
             parameter.clone().with_design_provenance(provenance),
         );
+        if let Some((label, note)) = addition_placements.get(name) {
+            host.place_parameter_in_section(name, label, note.clone());
+        }
     }
 
     // Apply overrides.
@@ -884,6 +891,15 @@ fn apply_overlay_at_host(
         }
         if let Some(render_name) = &overlay.render_name {
             parameter.set_render_name(render_name.clone());
+        }
+        if let Some(limits) = &overlay.limits_override {
+            parameter.set_limits(limits.clone());
+            parameter
+                .dependencies_mut()
+                .extend(crate::resolver::get_limits_dependencies(limits));
+        }
+        if let Some((label, note)) = &overlay.section {
+            host.place_parameter_in_section(name, label, note.clone());
         }
     }
 }

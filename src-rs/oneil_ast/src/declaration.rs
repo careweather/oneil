@@ -10,7 +10,7 @@ use crate::{
     naming::{DirectoryNode, IdentifierNode, ParameterLabelNode, RenderNameNode},
     node::Node,
     note::NoteNode,
-    parameter::{ParameterNode, ParameterValueNode, PerformanceMarkerNode},
+    parameter::{LimitsNode, ParameterNode, ParameterValueNode, PerformanceMarkerNode},
     test::TestNode,
 };
 
@@ -491,6 +491,9 @@ impl ApplyDesign {
 /// `performance_marker` and `trace_level` only take effect when this line
 /// introduces a brand-new parameter (i.e. it is not present on the design
 /// target); they are ignored for plain overrides.
+///
+/// `limits` in the full form set limits for new parameters, or adjust existing
+/// limits on overrides.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DesignParameter {
     ident: IdentifierNode,
@@ -503,6 +506,10 @@ pub struct DesignParameter {
     note: Option<NoteNode>,
     /// Optional human-readable label (`None` for shorthand additions without a label prefix).
     label: Option<ParameterLabelNode>,
+    /// Optional value limits. For additions, sets the parameter limits. For overrides, replaces
+    /// the target limits when set. Present in both full form (`Label [Limits]: id = value`) and
+    /// shorthand form (`id [Limits] = value`).
+    limits: Option<LimitsNode>,
     /// Optional LaTeX render-name written as `{...}` after the `:` (only valid when label is present).
     render_name: Option<RenderNameNode>,
 }
@@ -525,6 +532,7 @@ impl DesignParameter {
         trace_level: Option<TraceLevelNode>,
         note: Option<NoteNode>,
         label: Option<ParameterLabelNode>,
+        limits: Option<LimitsNode>,
         render_name: Option<RenderNameNode>,
     ) -> Self {
         Self {
@@ -535,6 +543,7 @@ impl DesignParameter {
             trace_level,
             note,
             label,
+            limits,
             render_name,
         }
     }
@@ -579,6 +588,13 @@ impl DesignParameter {
     #[must_use]
     pub const fn label(&self) -> Option<&ParameterLabelNode> {
         self.label.as_ref()
+    }
+
+    /// Optional value limits. For additions, sets
+    /// the parameter limits. For overrides, replaces the target limits when set.
+    #[must_use]
+    pub const fn limits(&self) -> Option<&LimitsNode> {
+        self.limits.as_ref()
     }
 
     /// Optional LaTeX render-name written as `{...}` after the `:` (only valid when label is present).

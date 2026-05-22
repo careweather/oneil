@@ -59,7 +59,7 @@ fn parameter_decl(input: InputSpan<'_>) -> Result<'_, ParameterNode, ParserError
         .parse(rest)?;
     let label_node = ParameterLabelNode::from(label_token.clone());
 
-    let (rest, limits_node) = opt(limits).parse(rest)?;
+    let (rest, limits_node) = opt(parse_limits).parse(rest)?;
 
     let (rest, colon_token) = colon
         .convert_error_to(|e| ParserError::expect_parameter(&e))
@@ -151,7 +151,7 @@ pub fn trace_level(input: InputSpan<'_>) -> Result<'_, TraceLevelNode, ParserErr
 }
 
 /// Parse parameter limits (either continuous or discrete).
-fn limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError> {
+pub fn parse_limits(input: InputSpan<'_>) -> Result<'_, LimitsNode, ParserError> {
     alt((continuous_limits, discrete_limits)).parse(input)
 }
 

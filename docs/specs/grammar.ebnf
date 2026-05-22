@@ -35,10 +35,11 @@ ApplyBody = [ DirectoryPath ], Identifier, "to", Identifier, { ".", Identifier }
 
 (* Parameter assignment in a design file; supports `param.instance = value` for nested scopes *)
 (* `$` and `*`/`**` only apply to new parameters (additions); they are ignored on overrides *)
-(* Shorthand form: `id[.instance] = value`; Full form: `Label: [{RenderName}] id = value` *)
-DesignBodyParameterDecl = [ Performance ], [ Trace ], ( DesignParamShorthand | DesignParamFull ), EndOfLine, [ Note ] ;
-DesignParamShorthand = Identifier, [ ".", Identifier ], "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
-DesignParamFull = Label, ":", [ RenderName ], Identifier, "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
+(* `[Limits]` on overrides replaces the target parameter's limits when present *)
+(* Shorthand form: `id[.instance] = value`; Full form: `Label [Limits]: [{RenderName}] id = value` *)
+DesignBodyParameterDecl = [ Performance ], [ Trace ], ( DesignParamShorthand | ParameterDeclBody ), EndOfLine, [ Note ] ;
+DesignParamTarget = Identifier, [ ".", Identifier ] ;
+DesignParamShorthand = DesignParamTarget, [ Limits ], AssignmentTail ;
 
 (* Notes *)
 Note = SingleLineNote | MultiLineNote ;
@@ -70,7 +71,8 @@ SubmodelList = ModelInfo | "[", [ SubmodelListInner ], OptEndOfLine, "]" ;
 SubmodelListInner = OptEndOfLine, ModelInfo, { ",", OptEndOfLine, ModelInfo }, [ "," ] ;
 
 (* Parameters *)
-ParameterDecl = [ Performance ], [ Trace ], Name, [ Limits ], ":", [ RenderName ], Assignment, EndOfLine, [ Note ] ;
+ParameterDecl = [ Performance ], [ Trace ], ParameterDeclBody, EndOfLine, [ Note ] ;
+ParameterDeclBody = Name, [ Limits ], ":", [ RenderName ], Assignment ;
 Performance = "$" ;
 Trace = "*" | "**" ;
 Name = Label ;
@@ -80,7 +82,8 @@ DiscreteLimits = "[", Expr, { ",", Expr }, "]" ;
 (* Optional LaTeX render-name for the parameter symbol, e.g. `{\hat{v}}` *)
 RenderName = "{", { Any character except "}" or "{" | "{", RenderNameInner, "}" }, "}" ;
 RenderNameInner = { Any character except "}" or "{" | "{", RenderNameInner, "}" } ;
-Assignment = Identifier, "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
+AssignmentTail = "=", ( Expr [ ":", UnitExpr ] | PiecewiseExpr ) ;
+Assignment = Identifier, AssignmentTail ;
 
 (* Tests *)
 TestDecl = [ Trace ], "test", ":", Expr, EndOfLine ;

@@ -100,7 +100,9 @@ hljs.registerLanguage("oneil", function (hljs) {
     // markdown italic *…* (not part of ** or ***)
     { scope: "emphasis", match: /(?<!\*)\*(?!\*)[^*\n]+\*(?!\*)/ },
     // markdown strikethrough ~~…~~ (double tilde, not triple)
-    { scope: "deletion", match: /~~(?!~)[^~\n]+~~/ },
+    // Use a dedicated scope — `deletion` is for diff removed lines and themes
+    // typically render it as red text.
+    { scope: "strike", match: /~~(?!~)[^~\n]+~~/ },
     // ATX heading # ... ######
     { scope: "section", begin: /^\s*#{1,6}\s+/, end: /$/m },
     // blockquote > ...

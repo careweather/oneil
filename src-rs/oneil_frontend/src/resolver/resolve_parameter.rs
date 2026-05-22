@@ -316,7 +316,7 @@ where
 }
 
 /// Resolves parameter limits.
-fn resolve_limits<E>(
+pub(super) fn resolve_limits<E>(
     limits: Option<&ast::LimitsNode>,
     resolution_context: &ResolutionContext<'_, E>,
 ) -> Result<ir::Limits, Vec<ParameterResolutionError>>
@@ -393,6 +393,20 @@ pub fn get_parameter_dependencies(
     }
 
     dependencies
+}
+
+/// Returns dependencies introduced only by limit expressions.
+pub fn get_limits_dependencies(limits: &ir::Limits) -> ir::Dependencies {
+    get_parameter_dependencies(
+        &ir::ParameterValue::simple(
+            ir::Expr::literal(
+                oneil_shared::span::Span::synthetic(),
+                ir::Literal::number(0.0),
+            ),
+            None,
+        ),
+        limits,
+    )
 }
 
 #[cfg(test)]
