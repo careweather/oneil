@@ -17,7 +17,7 @@
 //! `InstancedModel`s, so the per-file template stays a clean content
 //! carrier in both states.
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, map::Entry};
 use oneil_ir as ir;
 use oneil_shared::{
     InstancePath,
@@ -259,6 +259,45 @@ impl InstancedModel {
     /// Called by the resolver after parameters and tests have been resolved.
     pub fn set_sections(&mut self, sections: IndexMap<SectionLabel, ir::Section>) {
         self.sections = sections;
+    }
+
+    /// Moves `name` into `label`'s section, removing it from any prior section
+    /// and updating the parameter's own `section_label` field.
+    ///
+    /// If `label` does not yet exist on this model it is created with `note`.
+    /// Already-existing sections keep their existing note.
+    pub(crate) fn place_parameter_in_section(
+        &mut self,
+        name: &ParameterName,
+        label: &SectionLabel,
+        note: Option<ir::Note>,
+    ) {
+        if let Some(parameter) = self.parameters.get_mut(name) {
+            parameter.set_section_label(Some(label.clone()));
+        }
+        for section in self.sections.values_mut() {
+            section.items_mut().retain(|item| match item {
+                ir::SectionItem::Parameter(n) => n != name,
+                ir::SectionItem::Test(_) => true,
+            });
+        }
+        match self.sections.entry(label.clone()) {
+            Entry::Occupied(mut entry) => {
+                let items = entry.get_mut().items_mut();
+                if !items
+                    .iter()
+                    .any(|item| matches!(item, ir::SectionItem::Parameter(n) if n == name))
+                {
+                    items.push(ir::SectionItem::Parameter(name.clone()));
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(ir::Section::new(
+                    note,
+                    vec![ir::SectionItem::Parameter(name.clone())],
+                ));
+            }
+        }
     }
 
     /// Returns the model-level documentation note, if any.

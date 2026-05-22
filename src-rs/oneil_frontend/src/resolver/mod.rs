@@ -41,6 +41,7 @@ mod resolve_variable;
 mod util;
 
 pub use resolve_expr::resolve_expr;
+pub use resolve_parameter::get_limits_dependencies;
 pub use util::{ParameterWithSection, TestWithSection};
 
 /// Loads a model and all its dependencies, building a complete model collection.

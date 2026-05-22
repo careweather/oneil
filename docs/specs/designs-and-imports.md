@@ -16,7 +16,8 @@ design sensors/radar
 ```
 
 - The rest of the file is interpreted relative to that **target model** (resolves like a normal model path, relative to this file's location).
-- Parameter lines use the **shorthand** form `id = expr` (optional `: unit`), without the full preamble (`Label:` …) used in ordinary model files. Metadata (limits, display name, etc.) comes from the target model's definition.
+- Parameter lines use the **shorthand** form `id = expr` (optional `: unit`) for overrides and simple additions. For **new parameters** (additions), the full form `Label [Limits]: [{RenderName}] id = expr` is also supported — same syntax as in ordinary model files. On overrides, the full or shorthand form may optionally include `[Limits]` to **adjust** the target parameter's bounds; label and render-name overrides use the same full form. Other metadata on overrides (performance marker, trace level, etc.) still comes from the target model.
+- **Sections:** parameters declared inside a `section` block in the design file are grouped under that section in the composed view. Overrides moved into a design section are removed from their original section; unsectioned overrides keep the target model's section membership.
 - **Scoped overrides:** use `param.ref = value` to override a parameter on a nested reference instance (e.g., `thrust.main_engine = 500 :N` overrides `thrust` on the instance bound to `main_engine`).
 - Parameters set in a design file that don't exist on the target model are introduced as new parameters on the target at evaluation time (see [parameter additions](#parameter-additions)).
 
@@ -72,6 +73,9 @@ design cylinder
 radius = 3 :m
 diameter = 2 * radius       # new — not on cylinder.on
 circumference = pi * diameter
+
+# Full form with limits (additions only):
+Temperature (0, 100): T = 300
 ```
 
 These parameters are added to the target instance at evaluation time and are accessible from an enclosing model via `new_param.ref` syntax.

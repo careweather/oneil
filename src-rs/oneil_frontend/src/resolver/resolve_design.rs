@@ -12,7 +12,7 @@ use oneil_ast as ast;
 use oneil_ir as ir;
 use oneil_shared::{
     InstancePath,
-    labels::ParameterLabel,
+    labels::{ParameterLabel, SectionLabel},
     paths::{DesignPath, ModelPath},
     span::Span,
     symbols::{ParameterName, ReferenceName},
@@ -110,12 +110,24 @@ pub fn collect_apply_design_paths(
     out
 }
 
+/// Section header context for a design parameter line declared inside a `section` block.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DesignSectionContext {
+    /// Section label from the design file.
+    pub label: SectionLabel,
+    /// Optional section note from the design file.
+    pub note: Option<ir::Note>,
+}
+
 /// A single design-related declaration in source order.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum DesignSurfaceItem<'a> {
     Target(&'a ast::DesignTargetNode),
     Apply(&'a ast::ApplyDesignNode),
-    Parameter(&'a ast::DesignParameterNode),
+    Parameter {
+        node: &'a ast::DesignParameterNode,
+        section: Option<DesignSectionContext>,
+    },
 }
 
 /// Walks all declarations (top-level and within sections) producing a
@@ -123,24 +135,38 @@ pub enum DesignSurfaceItem<'a> {
 pub fn collect_design_surface(model_ast: &ast::Model) -> Vec<DesignSurfaceItem<'_>> {
     let mut items = Vec::new();
 
-    let all_decls = model_ast
-        .decls()
-        .iter()
-        .chain(model_ast.sections().iter().flat_map(|s| s.decls().iter()));
-
-    for decl in all_decls {
-        match &**decl {
-            ast::Decl::DesignTarget(n) => items.push(DesignSurfaceItem::Target(n)),
-            ast::Decl::ApplyDesign(n) => items.push(DesignSurfaceItem::Apply(n)),
-            ast::Decl::DesignParameter(n) => items.push(DesignSurfaceItem::Parameter(n)),
-            ast::Decl::Import(_)
-            | ast::Decl::Submodel(_)
-            | ast::Decl::Parameter(_)
-            | ast::Decl::Test(_) => {}
+    for decl in model_ast.decls() {
+        push_design_decl(decl, None, &mut items);
+    }
+    for section in model_ast.sections() {
+        let ctx = DesignSectionContext {
+            label: section.header().label().deref().clone(),
+            note: section.note().map(|n| ir::Note::new(n.value().to_string())),
+        };
+        for decl in section.decls() {
+            push_design_decl(decl, Some(ctx.clone()), &mut items);
         }
     }
 
     items
+}
+
+fn push_design_decl<'a>(
+    decl: &'a ast::DeclNode,
+    section: Option<DesignSectionContext>,
+    items: &mut Vec<DesignSurfaceItem<'a>>,
+) {
+    match &**decl {
+        ast::Decl::DesignTarget(n) => items.push(DesignSurfaceItem::Target(n)),
+        ast::Decl::ApplyDesign(n) => items.push(DesignSurfaceItem::Apply(n)),
+        ast::Decl::DesignParameter(n) => {
+            items.push(DesignSurfaceItem::Parameter { node: n, section });
+        }
+        ast::Decl::Import(_)
+        | ast::Decl::Submodel(_)
+        | ast::Decl::Parameter(_)
+        | ast::Decl::Test(_) => {}
+    }
 }
 
 /// Returns the span of the parameter definition on `model_path`, or `fallback` when absent.
@@ -156,6 +182,75 @@ fn span_of_parameter_on_model<E: ExternalResolutionContext>(
             .map_or(fallback, |p| p.span().clone()),
         ModelResult::HasError | ModelResult::NotFound => fallback,
     }
+}
+
+/// Returns the resolved limits from a design parameter line, when present.
+///
+/// Returns `Ok(None)` when the line has no limits. Returns `Err(())` after
+/// recording resolution errors.
+fn resolve_optional_design_limits<E: ExternalResolutionContext>(
+    p: &ast::DesignParameterNode,
+    name: &ParameterName,
+    resolution_context: &mut ResolutionContext<'_, E>,
+) -> Result<Option<ir::Limits>, ()> {
+    let Some(limits_node) = p.limits() else {
+        return Ok(None);
+    };
+    match resolve_parameter::resolve_limits(Some(limits_node), resolution_context) {
+        Ok(limits) => Ok(Some(limits)),
+        Err(errs) => {
+            for e in errs {
+                resolution_context.add_parameter_error_to_active_model(name.clone(), e);
+            }
+            Err(())
+        }
+    }
+}
+
+fn handle_design_parameter_addition<E: ExternalResolutionContext>(
+    p: &ast::DesignParameterNode,
+    value: ir::ParameterValue,
+    section_placement: Option<(SectionLabel, Option<ir::Note>)>,
+    running: &mut Design,
+    resolution_context: &mut ResolutionContext<'_, E>,
+) {
+    let name = ParameterName::from(p.ident().as_str());
+    let design_span = p.ident().span();
+    let section_label = section_placement.as_ref().map(|(l, _)| l.clone());
+    let limits = match resolve_optional_design_limits(p, &name, resolution_context) {
+        Ok(Some(limits)) => limits,
+        Ok(None) => ir::Limits::default(),
+        Err(()) => return,
+    };
+    let dependencies = resolve_parameter::get_parameter_dependencies(&value, &limits);
+    let label = p.label().map_or_else(
+        || ParameterLabel::from(p.ident().as_str()),
+        |l| ParameterLabel::from(l.as_str()),
+    );
+    let render_name = p.render_name().map(|r| r.deref().clone());
+    let is_performance = p.performance_marker().is_some();
+    let trace_level = resolve_trace_level(p.trace_level());
+    let note = p.note().map(|n| ir::Note::new(n.value().to_string()));
+    let local_param = ir::Parameter::new(
+        dependencies,
+        name.clone(),
+        design_span.clone(),
+        design_span.clone(),
+        label,
+        render_name,
+        section_label,
+        value,
+        limits,
+        is_performance,
+        trace_level,
+        note,
+    );
+    if let Some(placement) = section_placement {
+        running
+            .parameter_section_placements
+            .insert(name.clone(), placement);
+    }
+    running.parameter_additions.insert(name, local_param);
 }
 
 fn iter_apply_designs(model_ast: &ast::Model) -> Vec<&ast::ApplyDesignNode> {
@@ -234,8 +329,9 @@ pub fn resolve_design_surface<E: ExternalResolutionContext>(
             DesignSurfaceItem::Target(node) => {
                 handle_design_target(node, model_path, &mut explicit_target, &mut running);
             }
-            DesignSurfaceItem::Parameter(p) => handle_design_parameter(
+            DesignSurfaceItem::Parameter { node: p, section } => handle_design_parameter(
                 p,
+                section.clone(),
                 explicit_target.as_ref(),
                 &design_local_param_names,
                 &mut running,
@@ -272,10 +368,10 @@ fn scan_design_locals<E: ExternalResolutionContext>(
                 let relative_path = node.get_target_relative_path();
                 explicit_target = Some(model_path.get_sibling_model_path(relative_path));
             }
-            DesignSurfaceItem::Parameter(p) if p.instance_path().is_none() => {
+            DesignSurfaceItem::Parameter { node: p, .. } if p.instance_path().is_none() => {
                 design_param_names.insert(ParameterName::from(p.ident().as_str()));
             }
-            DesignSurfaceItem::Parameter(_) | DesignSurfaceItem::Apply(_) => {}
+            DesignSurfaceItem::Parameter { .. } | DesignSurfaceItem::Apply(_) => {}
         }
     }
 
@@ -315,6 +411,7 @@ fn handle_design_target(
 
 fn handle_design_parameter<E: ExternalResolutionContext>(
     p: &ast::DesignParameterNode,
+    section: Option<DesignSectionContext>,
     explicit_target: Option<&ModelPath>,
     design_local_param_names: &IndexSet<ParameterName>,
     running: &mut Design,
@@ -358,40 +455,22 @@ fn handle_design_parameter<E: ExternalResolutionContext>(
         }
     };
 
-    let design_span = p.ident().span();
     let is_local_param = instance_path.is_none() && design_local_param_names.contains(&name);
+    let section_placement = section.map(|ctx| (ctx.label, ctx.note));
 
     if is_local_param {
-        let dependencies =
-            resolve_parameter::get_parameter_dependencies(&value, &ir::Limits::default());
-        let label = p.label().map_or_else(
-            || ParameterLabel::from(p.ident().as_str()),
-            |l| ParameterLabel::from(l.as_str()),
-        );
-        let render_name = p.render_name().map(|r| r.deref().clone());
-        let is_performance = p.performance_marker().is_some();
-        let trace_level = resolve_trace_level(p.trace_level());
-        let note = p.note().map(|n| ir::Note::new(n.value().to_string()));
-        let local_param = ir::Parameter::new(
-            dependencies,
-            name.clone(),
-            design_span.clone(),
-            design_span.clone(),
-            label,
-            render_name,
-            None,
-            value,
-            ir::Limits::default(),
-            is_performance,
-            trace_level,
-            note,
-        );
-        running.parameter_additions.insert(name, local_param);
+        handle_design_parameter_addition(p, value, section_placement, running, resolution_context);
         return;
     }
 
+    let design_span = p.ident().span();
+
     let original_model_span =
         span_of_parameter_on_model(resolution_context, &tgt, &name, design_span.clone());
+    let Ok(limits_override) = resolve_optional_design_limits(p, &name, resolution_context) else {
+        return;
+    };
+
     let overlay_value = OverlayParameterValue {
         value,
         design_span: design_span.clone(),
@@ -399,6 +478,8 @@ fn handle_design_parameter<E: ExternalResolutionContext>(
         note: p.note().map(|n| ir::Note::new(n.value().to_string())),
         label: p.label().map(|l| ParameterLabel::from(l.as_str())),
         render_name: p.render_name().map(|r| r.deref().clone()),
+        limits_override,
+        section: section_placement,
     };
     match instance_path {
         Some(ip) => {
@@ -425,7 +506,7 @@ fn store_design_export<E: ExternalResolutionContext>(
     let has_design_content = explicit_target.is_some()
         || surface
             .iter()
-            .any(|i| matches!(i, DesignSurfaceItem::Parameter(_)));
+            .any(|i| matches!(i, DesignSurfaceItem::Parameter { .. }));
 
     if has_design_content {
         running.target_model = explicit_target;
