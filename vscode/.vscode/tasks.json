@@ -1,0 +1,69 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        // ── One-shot builds (used as preLaunchTask) ───────────────────────────
+        {
+            "label": "Build Extension",
+            "type": "npm",
+            "script": "compile",
+            "problemMatcher": "$tsc",
+            "presentation": {
+                "reveal": "silent",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build Webview",
+            "type": "npm",
+            "script": "build:webview",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "group": "build"
+            }
+        },
+        {
+            "label": "Build All",
+            "dependsOn": ["Build Extension", "Build Webview"],
+            "dependsOrder": "parallel",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        // ── Long-running watchers (start once manually via "Run Task") ────────
+        {
+            "label": "Watch Extension",
+            "type": "npm",
+            "script": "watch",
+            "problemMatcher": "$tsc-watch",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "never",
+                "group": "watchers"
+            }
+        },
+        {
+            "label": "Watch Webview",
+            "type": "npm",
+            "script": "watch:webview",
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "never",
+                "group": "watchers"
+            }
+        },
+        {
+            "label": "Watch All",
+            "dependsOn": ["Watch Extension", "Watch Webview"],
+            "dependsOrder": "parallel",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "never"
+            }
+        }
+    ]
+}
