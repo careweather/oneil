@@ -1,0 +1,11 @@
+# Exercises dB-on-compound-unit parsing and display.
+#
+# Each parameter is declared in a different unit but should reduce to
+# the same base-unit dictionary {kg: 1, m: 2, s: -2} (the dimension of W/Hz
+# under this codebase's Hz = 2*pi/s convention).
+#
+# 0 dBW/Hz == 30 dBmW/Hz == 1 W/Hz, by construction.
+
+PSD as dBW/Hz: psd_dbw_hz = 0 :dBW/Hz
+PSD as dBmW/Hz: psd_dbmw_hz = 30 :dBmW/Hz
+PSD as W/Hz: psd_w_hz = 1 :W/Hz

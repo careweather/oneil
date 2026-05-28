@@ -233,7 +233,7 @@ def print_all():
     for k, v in (LEGACY_UNITS | DIMENSIONLESS_UNITS).items():
         print(f"   - {k}, aka {v[2]['alt']}")
     print("-"*30 + "\nNONLINEAR UNITS\n" + "-"*30)
-    print("Any linear unit can be prepended by dB to produce a nonlinear logarithmic unit.")
+    print("Any linear unit (simple or compound, e.g. W/Hz) can be prepended by dB to produce a nonlinear logarithmic unit.")
 
 
 #################################################
@@ -243,18 +243,30 @@ def print_all():
 def parse(unit_str):
     if unit_str in BASE_UNITS:
         units = {unit_str: 1}
-        unit_fx = lambda x:x
+        unit_fx = lambda x: x
     elif unit_str in LINEAR_UNITS:
         units = LINEAR_UNITS[unit_str][0]
-        unit_fx = lambda x:x*LINEAR_UNITS[unit_str][1]
-    elif unit_str.strip("dB") in LINEAR_UNITS:
-        units = LINEAR_UNITS[unit_str.strip("dB")][0]
-        unit_fx = lambda x:10**(x/10)*LINEAR_UNITS[unit_str.strip("dB")][1]
+        multiplier = LINEAR_UNITS[unit_str][1]
+        unit_fx = lambda x: x * multiplier
+    elif unit_str.startswith("dB"):
+        units, multiplier = _parse_linear_unit(unit_str[2:])
+        unit_fx = lambda x: 10 ** (x / 10) * multiplier
     else:
         units, multiplier = _parse_compound_units(unit_str)
-        unit_fx = lambda x:x*multiplier
+        unit_fx = lambda x: x * multiplier
 
     return units, unit_fx
+
+
+def _parse_linear_unit(unit_str):
+    """Parse a linear unit string (simple or compound) into (base_units, multiplier).
+
+    The multiplier converts from the given unit to base units, i.e.
+    base_value = displayed_value * multiplier.
+    """
+    if unit_str in LINEAR_UNITS:
+        return LINEAR_UNITS[unit_str][0], LINEAR_UNITS[unit_str][1]
+    return _parse_compound_units(unit_str)
 
 
 def _validate_compound_unit_format(unit_str):
@@ -415,89 +427,24 @@ def _find_derived_unit(base_units, value, pref=None):
                 return value / LINEAR_UNITS[pref][1], pref
             else:
                 raise ValueError("Requested units do not match parameter units.")
-        elif pref.strip("dB") in LINEAR_UNITS:
-            if LINEAR_UNITS[pref.strip("dB")][0] == base_units:
+        elif pref.startswith("dB"):
+            inner_units, inner_multiplier = _parse_linear_unit(pref[2:])
+            if inner_units == base_units:
                 # Use errstate to allow log10(0) to return -inf (mathematically correct for dB)
                 with np.errstate(divide='ignore'):
-                    return 10*np.log10(value / LINEAR_UNITS[pref.strip("dB")][1]), pref
+                    return 10 * np.log10(value / inner_multiplier), pref
             else:
-                raise ValueError("Requested units do not match parameter units.")
+                raise ValueError(
+                    f"Requested units '{pref}' do not match parameter units {base_units}."
+                )
         else:
-            # Handle compound units for display
-            # Validate unit string format
-            _validate_compound_unit_format(pref)
-            
-            pref = pref
-            
-            # Break down the preferred unit string
-            unit_list = [
-                x for x in re.findall("[A-Za-z$%'\"°]+", pref) if x not in UNIT_OPERATORS
-            ]
-            
-            # Find the indices of the units in the string
-            unit_indices = [m.span() for m in re.finditer("[A-Za-z$%'\"°]+", pref)]
-            
-            # Find indices of all numeric values (for exponents)
-            value_list = [x for x in re.findall("[0-9.]+", pref) if x not in UNIT_OPERATORS]
-            value_indices = [m.span() for m in re.finditer("[0-9.]+", pref)]
-            
-            # Helper function to get exponent value after the caret symbol
-            def get_exponent(start_pos):
-                for v_idx, v_span in enumerate(value_indices):
-                    if v_span[0] == start_pos:
-                        return float(value_list[v_idx])
-                return 1.0  # Default exponent if none found
-            
-            # Initialize calculation variables
-            compound_multiplier = 1.0
-            computed_units = {unit: 0 for unit in BASE_UNITS}
-            
-            # Iterate through the indices and unit_list together
-            for index, unit in zip(unit_indices, unit_list):
-                if unit in BASE_UNITS:
-                    if index[0] == 0 or pref[index[0] - 1] == "*":
-                        if index[1] < len(pref) and pref[index[1]] == "^":
-                            computed_units[unit] += get_exponent(index[1] + 1)
-                        else:
-                            computed_units[unit] += 1
-
-                    elif pref[index[0] - 1] == "/":
-                        if index[1] < len(pref) and pref[index[1]] == "^":
-                            computed_units[unit] -= get_exponent(index[1] + 1)
-                        else:
-                            computed_units[unit] -= 1
-                elif unit in LINEAR_UNITS:
-                    if index[0] == 0 or pref[index[0] - 1] == "*":
-                        if index[1] < len(pref) and pref[index[1]] == "^":
-                            exponent = get_exponent(index[1] + 1)
-                            for k, v in LINEAR_UNITS[unit][0].items():
-                                computed_units[k] += v * exponent
-                            compound_multiplier /= LINEAR_UNITS[unit][1] ** (exponent)
-                        else:
-                            for k, v in LINEAR_UNITS[unit][0].items():
-                                computed_units[k] += v
-                            compound_multiplier /= LINEAR_UNITS[unit][1]
-                    elif pref[index[0] - 1] == "/":
-                        if index[1] < len(pref) and pref[index[1]] == "^":
-                            exponent = get_exponent(index[1] + 1)
-                            for k, v in LINEAR_UNITS[unit][0].items():
-                                computed_units[k] -= v * exponent
-                            compound_multiplier *= LINEAR_UNITS[unit][1] ** exponent
-                        else:
-                            for k, v in LINEAR_UNITS[unit][0].items():
-                                computed_units[k] -= v
-                            compound_multiplier *= LINEAR_UNITS[unit][1]
-                else:
-                    raise ValueError("Invalid unit: " + unit)
-
-            # Strip zero units
-            computed_units = {k: v for k, v in computed_units.items() if v != 0}
-            
-            # Verify the computed units match the base units
+            computed_units, compound_multiplier = _parse_compound_units(pref)
             if computed_units == base_units:
-                return value * compound_multiplier, pref
+                return value / compound_multiplier, pref
             else:
-                raise ValueError(f"Requested compound units '{pref}' do not match parameter units {base_units}.")
+                raise ValueError(
+                    f"Requested compound units '{pref}' do not match parameter units {base_units}."
+                )
 
     hrval = ""
     hrunit = ""
