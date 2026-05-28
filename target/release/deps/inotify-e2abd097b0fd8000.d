@@ -1,0 +1,12 @@
+/home/patrick/careweather/oneil/target/release/deps/inotify-e2abd097b0fd8000.d: /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/lib.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/events.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/fd_guard.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/inotify.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/util.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/watches.rs
+
+/home/patrick/careweather/oneil/target/release/deps/libinotify-e2abd097b0fd8000.rlib: /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/lib.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/events.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/fd_guard.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/inotify.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/util.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/watches.rs
+
+/home/patrick/careweather/oneil/target/release/deps/libinotify-e2abd097b0fd8000.rmeta: /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/lib.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/events.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/fd_guard.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/inotify.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/util.rs /home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/watches.rs
+
+/home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/lib.rs:
+/home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/events.rs:
+/home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/fd_guard.rs:
+/home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/inotify.rs:
+/home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/util.rs:
+/home/patrick/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inotify-0.11.1/src/watches.rs:

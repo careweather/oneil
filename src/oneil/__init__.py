@@ -2337,11 +2337,11 @@ class Model:
         users = [param for ID, param in self.parameters.items() if parameter_ID in param.args]
         for p in users: print(p.id)
 
-    def all(self):
+    def all(self, sigfigs=4):
         # Sort the parameter keys alphabetically and wrap in a list
         parameter_keys = list(self.parameters.keys())
         parameter_keys.sort()
-        self.tree(parameter_keys, levels=0, verbose=True, turtles=False)
+        self.tree(parameter_keys, sigfigs=sigfigs, levels=0, verbose=True, turtles=False)
 
     def independent(self, indent=0):
         print(f"{' ' * indent}{self.name}:")
@@ -2746,14 +2746,32 @@ def handler(model: Model, inpt: str) -> Model:
         if flag in args:
             args.remove(flag)
             opts[flag] = True
-    
+
+    # Options that must be integers (numeric opts are parsed as float above)
+    int_opts = ["sigfigs", "levels", "indent"]
+    for k in int_opts:
+        if k in opts:
+            try:
+                opts[k] = int(opts[k])
+            except (TypeError, ValueError):
+                print(f"Invalid value for {k}: {opts[k]}. Must be an integer.")
+                return model
+
+    # Rebuild the input string without options so bare parameter/expression
+    # branches (e.g. "P:W sigfigs=6", "2*x sigfigs=6") can still match.
+    cleaned_inpt = " ".join([cmd] + args).strip()
+
+    # Print precision for parameter/expression branches below.
+    sigfigs = opts.get("sigfigs", 4)
+
     try:
         if cmd == "tree":
             model.tree(args, **opts)
         elif cmd == "summarize":
-            model.summarize()
+            summarize_opts = {k: v for k, v in opts.items() if k in ("sigfigs", "verbose")}
+            model.summarize(**summarize_opts)
         elif cmd == "all":
-            model.all()
+            model.all(sigfigs=sigfigs)
         elif cmd == "dependents":
             model.dependents(args)
         elif cmd == "independent":
@@ -2818,13 +2836,13 @@ def handler(model: Model, inpt: str) -> Model:
             sys.exit()
         elif cmd == "exit":
             sys.exit()
-        elif ":" in inpt:
-            param_expr = inpt.split(":")[0].strip()
-            requested_units = inpt.split(":")[1].strip()
+        elif ":" in cleaned_inpt:
+            param_expr = cleaned_inpt.split(":")[0].strip()
+            requested_units = cleaned_inpt.split(":")[1].strip()
             
             if param_expr in model.parameters.keys():
                 try:
-                    model.parameters[param_expr].hprint(pref=requested_units)
+                    model.parameters[param_expr].hprint(sigfigs=sigfigs, pref=requested_units)
                 except ValueError:
                     print(f"Requested units ({requested_units}) do not match parameter base units ({un._build_compound_unit_str(model.parameters[param_expr].units)}).")
             else:
@@ -2833,28 +2851,32 @@ def handler(model: Model, inpt: str) -> Model:
                     result = model.eval(param_expr)
                     if isinstance(result, Parameter):
                         try:
-                            result.hprint(pref=requested_units)
+                            result.hprint(sigfigs=sigfigs, pref=requested_units)
                         except ValueError:
                             print(f"Requested units ({requested_units}) do not match calculated expression units ({un._build_compound_unit_str(result.units)}).")
                     else:
                         print(f"Result: {result} (unitless, cannot convert to {requested_units})")
                 except Exception as e:
                     print(f"Could not evaluate expression '{param_expr}': {str(e)}") 
-        elif any([op in inpt for op in OPERATORS]):
+        elif any([op in cleaned_inpt for op in OPERATORS]):
             try:
-                print(model.eval(inpt))
+                result = model.eval(cleaned_inpt)
+                if isinstance(result, Parameter):
+                    print(result.human_readable(sigfigs=sigfigs))
+                else:
+                    print(result)
             except Exception as e:
-                print(f"Could not evaluate expression '{inpt}': {str(e)}")
-        elif inpt in model.parameters:
-            model.parameters[inpt].hprint()
-        elif "." in inpt:
-            result, _ = model.retrieve_parameter_from_submodel(inpt)
+                print(f"Could not evaluate expression '{cleaned_inpt}': {str(e)}")
+        elif cleaned_inpt in model.parameters:
+            model.parameters[cleaned_inpt].hprint(sigfigs=sigfigs)
+        elif "." in cleaned_inpt:
+            result, _ = model.retrieve_parameter_from_submodel(cleaned_inpt)
             if isinstance(result, Parameter):
-                result.hprint()
+                result.hprint(sigfigs=sigfigs)
             else:
                 raise TypeError("Invalid result type: " + str(type(result)))
         else:
-            print(f"Command {inpt} not found. Type 'help' for a list of commands.")
+            print(f"Command {cleaned_inpt} not found. Type 'help' for a list of commands.")
             return model
     except OneilError as err:
         console.print_error(err)
@@ -2870,12 +2892,27 @@ Commands:
         Options:
             verbose     Show parameter names (e.g., U: 0.2 -- "Uptime")
             levels=N    Limit tree depth to N levels (default: 3)
+            sigfigs=N   Significant figures for printed values (default: 4)
 
-    summarize
+    summarize [options]
         Print a summary of the model.
+        Options:
+            verbose     Include all parameters, not just performance parameters
+            sigfigs=N   Significant figures for printed values (default: 4)
 
-    all
+    all [options]
         Print all parameters.
+        Options:
+            sigfigs=N   Significant figures for printed values (default: 4)
+
+    [param]
+    [param.submodel]
+    [param]:[units]
+    [expression] [options]
+        Print a parameter, submodel parameter, or evaluated expression.
+        Use 'param:units' to display in alternative units (e.g., 'P:W').
+        Options:
+            sigfigs=N   Significant figures for printed values (default: 4)
 
     dependents [param 1] [param 2] ... [param n]
         Print all parameters that depend on the specified parameters.
