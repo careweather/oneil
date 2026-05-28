@@ -1462,7 +1462,8 @@ class Parameter:
     @err.add_trace
     def __rmul__(self, other):
         if isinstance(other, (int, float)):
-            return Parameter((self.min * other, self.max * other), self.units, "({})({})".format(str(other), self.id))
+            results = [self.min * other, self.max * other]
+            return Parameter((min(results), max(results)), self.units, "({})({})".format(str(other), self.id))
         else:
             raise TypeError("Multiplication must be between a Parameter and a number.")
 
