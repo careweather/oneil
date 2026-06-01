@@ -650,18 +650,19 @@ impl PythonCallCache {
     }
 
     /// Clear all entries that are no longer referenced by any root models.
+    #[expect(clippy::len_zero, reason = "`retain` + negation is harder to read")]
     fn clear_stale_entries(&mut self) -> IndexSet<PythonPath> {
         for cache in self.entries.values_mut() {
             // clear all cached function calls that are no longer
             // referenced by any root models
             for function_calls in cache.function_calls.values_mut() {
-                function_calls.retain(|call| !call.root_models.is_empty());
+                function_calls.retain(|call| call.root_models.len() > 0);
             }
 
             // clear all functions that have no cached function calls
             cache
                 .function_calls
-                .retain(|_function_name, function_calls| !function_calls.is_empty());
+                .retain(|_function_name, function_calls| function_calls.len() > 0);
         }
 
         // clear all the caches that have no function calls
