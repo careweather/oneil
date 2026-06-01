@@ -792,7 +792,6 @@ dependencies = [
  "oneil_output",
  "oneil_python",
  "oneil_shared",
- "semver",
  "serde",
  "serde_json",
 ]

@@ -16,7 +16,6 @@ indexmap = { workspace = true }
 oneil_output = { path = "../oneil_output" }
 oneil_python = { path = "../oneil_python" }
 oneil_shared = { path = "../oneil_shared" }
-semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

@@ -390,7 +390,7 @@ impl PythonCallCache {
 
         // try to load the cache entry for the python path
         self.load(python_path, current_hash);
-        let cached_hash = self.entries.get(python_path)?.hash;
+        let cached_hash = self.entries.get(python_path)?.hash();
         let hash_matches = cached_hash == current_hash;
 
         if !hash_matches {
@@ -409,7 +409,7 @@ impl PythonCallCache {
         let function_calls = self
             .entries
             .get(python_path)?
-            .function_calls
+            .function_calls()
             .get(identifier)?;
         let function_call = function_calls.iter().find(|call| call.inputs == args)?;
 
@@ -440,7 +440,7 @@ impl PythonCallCache {
         self.load(python_path, current_hash);
 
         // check if the cached hash differs from the current hash
-        let cached_hash = self.entries.get(python_path).map(|cache| cache.hash);
+        let cached_hash = self.entries.get(python_path).map(FileCache::hash);
         let hash_mismatch = cached_hash.is_some_and(|hash| hash != current_hash);
 
         // if the hash mismatch and the user does not allow it, return
@@ -470,7 +470,7 @@ impl PythonCallCache {
             .and_modify(|cache| {
                 // if the cache entry exists but the hash does not match, we need
                 // to clear the cache entry
-                if cache.hash != module_hash {
+                if cache.hash() != module_hash {
                     *cache = FileCache::new(
                         python_path.clone(),
                         current_hash,
@@ -497,7 +497,7 @@ impl PythonCallCache {
 
         let output_mismatch = !hash_mismatch
             && cache
-                .function_calls
+                .function_calls()
                 .get(identifier)
                 .and_then(|calls| calls.iter().find(|call| call.inputs == args))
                 .is_some_and(|call| call.output != call_result);
@@ -532,7 +532,10 @@ impl PythonCallCache {
 
         // Find the matching function call for the given identifier and
         // arguments (if it exists)
-        let cached_function_calls = cache.function_calls.entry(identifier.clone()).or_default();
+        let cached_function_calls = cache
+            .function_calls_mut()
+            .entry(identifier.clone())
+            .or_default();
         let matching_function_call = cached_function_calls
             .iter_mut()
             .find(|call| call.inputs == args);
@@ -580,7 +583,7 @@ impl PythonCallCache {
                 //
                 // if overwriting is allowed, the cache entry will be overwritten with a new entry during
                 // the next call to `insert`
-                if cache.hash == module_hash
+                if cache.hash() == module_hash
                     || !self.allow_cache_write_on_hash_mismatch(python_path)
                 {
                     self.entries.insert(python_path.clone(), cache);
@@ -641,7 +644,7 @@ impl PythonCallCache {
     /// Removes all references to a root model from all cached function calls.
     fn clear_root_model(&mut self, root_model: &ModelPath) {
         for cache in self.entries.values_mut() {
-            for function_calls in cache.function_calls.values_mut() {
+            for function_calls in cache.function_calls_mut().values_mut() {
                 for function_call in function_calls.iter_mut() {
                     function_call.root_models.remove(root_model);
                 }
@@ -655,19 +658,19 @@ impl PythonCallCache {
         for cache in self.entries.values_mut() {
             // clear all cached function calls that are no longer
             // referenced by any root models
-            for function_calls in cache.function_calls.values_mut() {
+            for function_calls in cache.function_calls_mut().values_mut() {
                 function_calls.retain(|call| call.root_models.len() > 0);
             }
 
             // clear all functions that have no cached function calls
             cache
-                .function_calls
+                .function_calls_mut()
                 .retain(|_function_name, function_calls| function_calls.len() > 0);
         }
 
         // clear all the caches that have no function calls
         self.entries
-            .extract_if(.., |_python_path, cache| cache.function_calls.is_empty())
+            .extract_if(.., |_python_path, cache| cache.function_calls().is_empty())
             .map(|(python_path, _cache)| python_path)
             .collect()
     }
@@ -1000,7 +1003,7 @@ mod python_call_cache_tests {
 
     fn file_cache(hash: u64, output: Value) -> FileCache {
         let mut cache = FileCache::new(python_path(), ImportHash::from(hash), BTreeSet::new());
-        cache.function_calls.insert(
+        cache.function_calls_mut().insert(
             function_name(),
             vec![FunctionCall {
                 root_models: BTreeSet::new(),
@@ -1121,7 +1124,7 @@ mod python_call_cache_tests {
         let cached_call = cache
             .entries
             .get(&python_path())
-            .and_then(|entry| entry.function_calls.get(&function_name()))
+            .and_then(|entry| entry.function_calls().get(&function_name()))
             .and_then(|calls| calls.first())
             .expect("cached call");
         assert_eq!(
