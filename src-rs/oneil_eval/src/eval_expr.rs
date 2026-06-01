@@ -27,6 +27,7 @@ pub fn eval_expr_in_model<E: ExternalEvaluationContext>(
     context: &mut E,
 ) -> Result<Value, Vec<EvalError>> {
     let mut eval_context = EvalContext::with_preloaded_models(context);
+    eval_context.set_evaluation_cache_root(model_path.clone());
     eval_context.push_active_model(EvalInstanceKey::root(model_path.clone()));
 
     eval_expr(expr, &mut eval_context).map(|(value, _span)| value)
@@ -427,7 +428,7 @@ fn eval_function_call<E: ExternalEvaluationContext>(
     name: &ir::FunctionName,
     function_call_span: Span,
     args: Vec<(Value, Span)>,
-    context: &EvalContext<'_, E>,
+    context: &mut EvalContext<'_, E>,
 ) -> Result<Value, Vec<EvalError>> {
     match name {
         ir::FunctionName::Builtin(fn_identifier, fn_identifier_span) => {

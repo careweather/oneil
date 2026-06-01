@@ -1,15 +1,21 @@
 //! Row types inside a cache document: imports, parameter/test buckets, and individual calls.
 
+use std::collections::BTreeSet;
+
 use oneil_output::Value;
 use oneil_python::PythonEvalError;
-use oneil_shared::symbols::PyFunctionName;
+use oneil_shared::paths::ModelPath;
 use serde::{Deserialize, Serialize};
 
 /// One cached call: function name, inputs, and output value.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FunctionCall {
-    /// Name of the Python function.
-    pub function: PyFunctionName,
+    /// The root models that use this function
+    /// when evaluating themselves or their submodels.
+    ///
+    /// When this is empty, this function call should
+    /// be deleted from the cache.
+    pub root_models: BTreeSet<ModelPath>,
     /// Argument values passed to the function.
     pub inputs: Vec<Value>,
     /// Return value of the function.

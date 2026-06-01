@@ -98,8 +98,19 @@ function buildOptions(): { serverOptions: ServerOptions; clientOptions: Language
     const configuredPath = config.get<string | null>("serverPath", null)
     const command = configuredPath ?? process.env.ONEIL_PATH ?? "oneil"
 
+    const cacheReadPolicy = config.get<string>("cacheReadPolicy", "always")
+    const cacheWritePolicy = config.get<string>("cacheWritePolicy", "always")
+
+    const args = [
+        "lsp",
+        "--cache-read",
+        cacheReadPolicy,
+        "--cache-overwrite",
+        cacheWritePolicy,
+    ]
+
     return {
-        serverOptions: { command, args: ["lsp"] },
+        serverOptions: { command, args },
         clientOptions: {
             documentSelector: [
                 { scheme: "file", language: "oneil" },

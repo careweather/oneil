@@ -251,8 +251,15 @@ impl Runtime {
             || !graph.contribution_errors.is_empty();
 
         if !has_blocking_errors {
+            self.python_call_cache.begin_evaluation();
+
             // Evaluate the model and its dependencies
             let eval_result = eval::eval_model_from_graph(&graph, self);
+
+            // panic on error for now, we'll handle it in the future
+            self.python_call_cache
+                .end_evaluation()
+                .expect("failed to save Python call cache");
 
             for (instance_key, maybe_partial) in eval_result {
                 match maybe_partial.into_result() {
@@ -352,9 +359,7 @@ impl Runtime {
     ) -> Result<Value, Vec<EvalError>> {
         eval::eval_expr_in_model(expr_ir, model_path, self)
     }
-}
 
-impl Runtime {
     /// Builds a `templates` map from the unit graph cache for passing to
     /// [`compose`]. Because all reachable units are eagerly cached by
     /// [`super::ir::Runtime::load_and_lower_internal`], this map is only
@@ -431,13 +436,20 @@ impl eval::ExternalEvaluationContext for Runtime {
     }
 
     fn evaluate_imported_function(
-        &self,
+        &mut self,
+        root_model: &ModelPath,
         python_path: &PythonPath,
         identifier: &PyFunctionName,
         function_call_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Option<Result<output::Value, Box<EvalError>>> {
-        self.evaluate_python_function(python_path, identifier, function_call_span, args)
+        self.evaluate_python_function(
+            root_model,
+            python_path,
+            identifier,
+            function_call_span,
+            args,
+        )
     }
 
     fn lookup_unit(&self, name: &UnitBaseName) -> Option<&Unit> {

@@ -7,4 +7,8 @@ mod runtime;
 
 pub mod output;
 
+pub use cache::{
+    CachePromptContext, CachePromptKind, CachePrompter, CachePrompterRef, CacheReadPolicy,
+    CacheWritePolicy,
+};
 pub use runtime::Runtime;

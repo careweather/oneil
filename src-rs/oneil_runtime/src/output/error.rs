@@ -20,6 +20,9 @@ pub struct RuntimeErrors {
 
     /// Map from Python import path to errors for that import.
     python_import_errors: Box<IndexMap<PythonPath, OneilDiagnostic>>,
+
+    /// Map from Python call cache file path to warnings for that file.
+    cache_warnings: Box<IndexMap<PathBuf, Vec<OneilDiagnostic>>>,
 }
 
 impl RuntimeErrors {
@@ -29,6 +32,27 @@ impl RuntimeErrors {
         Self {
             errors: Box::new(IndexMap::new()),
             python_import_errors: Box::new(IndexMap::new()),
+            cache_warnings: Box::new(IndexMap::new()),
+        }
+    }
+
+    /// Adds a cache warning for the given cache file path.
+    pub fn add_cache_warning(&mut self, path: PathBuf, diagnostic: OneilDiagnostic) {
+        self.cache_warnings
+            .entry(path)
+            .or_default()
+            .push(diagnostic);
+    }
+
+    /// Merges cache warnings from an iterator of diagnostics.
+    ///
+    /// Each diagnostic's path is used as the cache file key.
+    pub fn extend_cache_warnings(
+        &mut self,
+        diagnostics: impl IntoIterator<Item = OneilDiagnostic>,
+    ) {
+        for diagnostic in diagnostics {
+            self.add_cache_warning(diagnostic.path().clone(), diagnostic);
         }
     }
 
@@ -57,6 +81,12 @@ impl RuntimeErrors {
         for (path, error) in *other.python_import_errors {
             self.add_python_import_error(path, error);
         }
+
+        for (path, warnings) in *other.cache_warnings {
+            for warning in warnings {
+                self.add_cache_warning(path.clone(), warning);
+            }
+        }
     }
 
     /// Converts the errors to a vector of Oneil errors.
@@ -81,6 +111,7 @@ impl RuntimeErrors {
                     .collect(),
             })
             .chain(self.python_import_errors.values())
+            .chain(self.cache_warnings.values().flatten())
             .collect()
     }
 
@@ -99,6 +130,11 @@ impl RuntimeErrors {
                 self.python_import_errors
                     .iter()
                     .map(|(path, error)| (path.clone().into_path_buf(), vec![error.clone()])),
+            )
+            .chain(
+                self.cache_warnings
+                    .iter()
+                    .map(|(path, warnings)| (path.clone(), warnings.clone())),
             )
             .collect()
     }
