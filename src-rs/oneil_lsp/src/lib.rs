@@ -42,15 +42,12 @@ use hover::hover_markdown;
 use location::span_to_range;
 
 #[tokio::main]
-pub async fn run() {
+pub async fn run(cache_read_policy: CacheReadPolicy, cache_write_policy: CacheWritePolicy) {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
     let docs = Arc::new(DocumentStore::new());
-    let runtime = Mutex::new(OneilRuntime::new(
-        CacheReadPolicy::Always,
-        CacheWritePolicy::Never,
-    ));
+    let runtime = Mutex::new(OneilRuntime::new(cache_read_policy, cache_write_policy));
 
     let (service, socket) = LspService::new(|client| Backend {
         client,

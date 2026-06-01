@@ -82,9 +82,8 @@ pub fn main() {
 
 fn handle_lsp_command(args: LspArgs) {
     let LspArgs { common } = args;
-    // TODO: figure out how to handle common args for the LSP
-    let _ = common;
-    oneil_lsp::run();
+    let (cache_read_policy, cache_write_policy) = cache_policies_from_common(&common);
+    oneil_lsp::run(cache_read_policy, cache_write_policy);
 }
 
 fn handle_dev_command(command: DevCommand) {
@@ -142,14 +141,26 @@ fn apply_common_side_effects(common_args: &CommonArgs) {
     load_python_venv::try_load_venv(common_args.venv_path.as_deref());
 }
 
-/// Builds a [`Runtime`] using cache policies from [`CommonArgs`].
-fn runtime_from_common_args(common: &CommonArgs) -> Runtime {
+/// Resolves cache read/write policies from [`CommonArgs`].
+fn cache_policies_from_common(
+    common: &CommonArgs,
+) -> (
+    oneil_runtime::CacheReadPolicy,
+    oneil_runtime::CacheWritePolicy,
+) {
     let cache_prompter: CachePrompterRef = Arc::new(CliCachePrompter);
 
-    Runtime::new(
+    (
         cache_read_policy(common.cache_read, &cache_prompter),
         cache_write_policy(common.cache_overwrite, &cache_prompter),
     )
+}
+
+/// Builds a [`Runtime`] using cache policies from [`CommonArgs`].
+fn runtime_from_common_args(common: &CommonArgs) -> Runtime {
+    let (cache_read_policy, cache_write_policy) = cache_policies_from_common(common);
+
+    Runtime::new(cache_read_policy, cache_write_policy)
 }
 
 fn cache_read_policy(
