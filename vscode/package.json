@@ -72,6 +72,26 @@
           "default": null,
           "description": "Path to the Oneil language server executable. Use this when the server is not on PATH. Leave empty to use ONEIL_PATH env var or \"oneil\"."
         },
+        "oneil.cacheReadPolicy": {
+          "type": "string",
+          "default": "always",
+          "description": "When to read from the Python call cache.",
+          "enum": [
+            "always",
+            "prompt",
+            "never"
+          ]
+        },
+        "oneil.cacheWritePolicy": {
+          "type": "string",
+          "default": "always",
+          "description": "When to write to the Python call cache.",
+          "enum": [
+            "always",
+            "prompt",
+            "never"
+          ]
+        },
         "oneil.pdf.cacheDir": {
           "type": "string",
           "default": "",
@@ -97,7 +117,8 @@
           "oneil"
         ],
         "extensions": [
-          ".on",".one"
+          ".on",
+          ".one"
         ],
         "configuration": "./language-configuration.json",
         "icon": {
