@@ -12,7 +12,7 @@ mod util {
     use std::{fmt::Write, path::Path};
 
     use oneil_runtime::{
-        Runtime,
+        CacheReadPolicy, CacheWritePolicy, Runtime,
         output::{self, OneilDiagnostic},
     };
     use oneil_shared::paths::ModelPath;
@@ -40,7 +40,7 @@ mod util {
     pub fn run_model_and_format(path: &Path, path_prefix: Option<&Path>) -> String {
         let path = ModelPath::from_path_with_ext(path);
 
-        let mut runtime = Runtime::new();
+        let mut runtime = Runtime::new(CacheReadPolicy::Never, CacheWritePolicy::Never);
         let (model_opt, errors) = runtime.eval_model(&path);
 
         let mut out = String::new();

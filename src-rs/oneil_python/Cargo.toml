@@ -18,6 +18,7 @@ oneil_output = { path = "../oneil_output" }
 oneil_shared = { path = "../oneil_shared" }
 pyo3 = { workspace = true }
 serde = { workspace = true }
+xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
 
 [features]
 default = ["python-lib", "rust-lib"]

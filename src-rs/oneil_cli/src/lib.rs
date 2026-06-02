@@ -6,16 +6,19 @@
     reason = "this isn't causing problems, and it's going to take time to fix"
 )]
 
-use std::{io::Write, sync::mpsc};
+use std::{
+    io::Write,
+    sync::{Arc, mpsc},
+};
 
 use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use indexmap::{IndexMap, IndexSet};
 use notify::Watcher;
 use oneil_runtime::{
-    Runtime,
-    output::PythonModule,
+    CachePrompterRef, Runtime,
     output::{
+        PythonModule,
         error::RuntimeErrors,
         tree::{DependencyTreeValue, ReferenceTreeValue, Tree},
     },
@@ -26,9 +29,11 @@ use oneil_shared::{
 };
 
 use crate::{
+    cache_prompt::CliCachePrompter,
     command::{
-        BuiltinsCommand, CheckArgs, CliCommand, Commands, CommonArgs, DevCommand, EvalArgs,
-        IndependentArgs, IrIncludeSection, LspArgs, ModelResultIncludeSection, TestArgs, TreeArgs,
+        BuiltinsCommand, CachePolicy, CheckArgs, CliCommand, Commands, CommonArgs, DevCommand,
+        EvalArgs, IndependentArgs, IrIncludeSection, LspArgs, ModelResultIncludeSection, TestArgs,
+        TreeArgs,
     },
     print_debug_ast::AstPrintConfig,
     print_debug_ir::IrPrintConfig,
@@ -38,6 +43,7 @@ use crate::{
     print_utils::PrintUtilsConfig,
 };
 
+mod cache_prompt;
 mod command;
 mod load_python_venv;
 mod panic_handler;
@@ -76,9 +82,8 @@ pub fn main() {
 
 fn handle_lsp_command(args: LspArgs) {
     let LspArgs { common } = args;
-    // TODO: figure out how to handle common args for the LSP
-    let _ = common;
-    oneil_lsp::run();
+    let (cache_read_policy, cache_write_policy) = cache_policies_from_common(&common);
+    oneil_lsp::run(cache_read_policy, cache_write_policy);
 }
 
 fn handle_dev_command(command: DevCommand) {
@@ -87,7 +92,7 @@ fn handle_dev_command(command: DevCommand) {
             files,
             debug: display_partial,
             common,
-        } => handle_print_ast(&files, display_partial, common.dev_show_internal_errors),
+        } => handle_print_ast(&files, display_partial, &common),
         DevCommand::PrintIr {
             file,
             debug: display_partial,
@@ -103,7 +108,7 @@ fn handle_dev_command(command: DevCommand) {
                 recursive,
                 &sections,
                 no_values,
-                common.dev_show_internal_errors,
+                &common,
             );
         }
         DevCommand::PrintModelResult {
@@ -121,11 +126,11 @@ fn handle_dev_command(command: DevCommand) {
                 recursive,
                 &sections,
                 no_values,
-                common.dev_show_internal_errors,
+                &common,
             );
         }
         DevCommand::PrintPythonImports { files, common } => {
-            handle_print_python_imports(&files, common.dev_show_internal_errors);
+            handle_print_python_imports(&files, &common);
         }
     }
 }
@@ -136,9 +141,54 @@ fn apply_common_side_effects(common_args: &CommonArgs) {
     load_python_venv::try_load_venv(common_args.venv_path.as_deref());
 }
 
+/// Resolves cache read/write policies from [`CommonArgs`].
+fn cache_policies_from_common(
+    common: &CommonArgs,
+) -> (
+    oneil_runtime::CacheReadPolicy,
+    oneil_runtime::CacheWritePolicy,
+) {
+    let cache_prompter: CachePrompterRef = Arc::new(CliCachePrompter);
+
+    (
+        cache_read_policy(common.cache_read, &cache_prompter),
+        cache_write_policy(common.cache_overwrite, &cache_prompter),
+    )
+}
+
+/// Builds a [`Runtime`] using cache policies from [`CommonArgs`].
+fn runtime_from_common_args(common: &CommonArgs) -> Runtime {
+    let (cache_read_policy, cache_write_policy) = cache_policies_from_common(common);
+
+    Runtime::new(cache_read_policy, cache_write_policy)
+}
+
+fn cache_read_policy(
+    policy: CachePolicy,
+    prompter: &oneil_runtime::CachePrompterRef,
+) -> oneil_runtime::CacheReadPolicy {
+    match policy {
+        CachePolicy::Always => oneil_runtime::CacheReadPolicy::Always,
+        CachePolicy::Never => oneil_runtime::CacheReadPolicy::Never,
+        CachePolicy::Prompt => oneil_runtime::CacheReadPolicy::Prompt(Arc::clone(prompter)),
+    }
+}
+
+fn cache_write_policy(
+    policy: CachePolicy,
+    prompter: &oneil_runtime::CachePrompterRef,
+) -> oneil_runtime::CacheWritePolicy {
+    match policy {
+        CachePolicy::Always => oneil_runtime::CacheWritePolicy::Always,
+        CachePolicy::Never => oneil_runtime::CacheWritePolicy::Never,
+        CachePolicy::Prompt => oneil_runtime::CacheWritePolicy::Prompt(Arc::clone(prompter)),
+    }
+}
+
 /// Handles the `dev print-python-imports` command.
-fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool) {
-    let mut runtime = Runtime::new();
+fn handle_print_python_imports(files: &[PythonPath], common: &CommonArgs) {
+    let mut runtime = runtime_from_common_args(common);
+    let show_internal_errors = common.dev_show_internal_errors;
 
     let mut imports: IndexMap<PythonPath, PythonModule> = IndexMap::new();
     let mut errors = Vec::new();
@@ -169,14 +219,21 @@ fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool)
             println!("===== {} =====", file.as_path().display());
         }
 
-        let doc_string = module.get_docs();
+        // print the hash
+        let header = stylesheet::PYTHON_MODULE_SECTION_HEADER.style("Hash:");
+        let hash = module.get_hash();
+        let styled_hash = stylesheet::PYTHON_MODULE_SECTION_ITEM.style(format!("{hash:016x}"));
+        println!("{header} {styled_hash}");
+        println!();
 
-        if let Some(doc_string) = doc_string {
+        // print the doc string if it exists
+        if let Some(doc_string) = module.get_docs() {
             let styled_doc_string = stylesheet::PYTHON_MODULE_DOC_STRING.style(doc_string);
             println!("{styled_doc_string}");
             println!();
         }
 
+        // print the functions
         let header = stylesheet::PYTHON_MODULE_SECTION_HEADER.style("Functions:");
         println!("{header}");
 
@@ -194,6 +251,7 @@ fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool)
             }
         }
 
+        // print the imports
         let imports = module.get_imports();
         if !imports.is_empty() {
             println!();
@@ -210,10 +268,11 @@ fn handle_print_python_imports(files: &[PythonPath], show_internal_errors: bool)
 }
 
 /// Handles the `dev print-ast` command.
-fn handle_print_ast(files: &[ModelPath], display_partial: bool, show_internal_errors: bool) {
+fn handle_print_ast(files: &[ModelPath], display_partial: bool, common: &CommonArgs) {
     let ast_print_config = AstPrintConfig {};
+    let show_internal_errors = common.dev_show_internal_errors;
 
-    let mut runtime = Runtime::new();
+    let mut runtime = runtime_from_common_args(common);
 
     let mut asts = IndexMap::new();
     let mut errors = RuntimeErrors::new();
@@ -278,25 +337,22 @@ fn ir_sections_from_include(include: Option<&[IrIncludeSection]>) -> print_debug
 }
 
 /// Handles the `dev print-ir` command.
-#[expect(
-    clippy::fn_params_excessive_bools,
-    reason = "this is just passing in all the arguments from the CLI"
-)]
 fn handle_print_ir(
     file: &ModelPath,
     display_partial: bool,
     recursive: bool,
     sections: &print_debug_ir::IrSections,
     no_values: bool,
-    show_internal_errors: bool,
+    common: &CommonArgs,
 ) {
     let ir_print_config = IrPrintConfig {
         recursive,
         sections: sections.clone(),
         print_values: !no_values,
     };
+    let show_internal_errors = common.dev_show_internal_errors;
 
-    let mut runtime = Runtime::new();
+    let mut runtime = runtime_from_common_args(common);
 
     let (ir_result, errors) = runtime.load_and_lower(file);
 
@@ -343,25 +399,22 @@ fn model_result_sections_from_include(
 }
 
 /// Handles the `dev print-model-result` command.
-#[expect(
-    clippy::fn_params_excessive_bools,
-    reason = "this is just passing in all the arguments from the CLI"
-)]
 fn handle_print_model_result(
     file: &ModelPath,
     display_partial_results: bool,
     recursive: bool,
     sections: &print_debug_model_result::ModelResultSections,
     no_values: bool,
-    show_internal_errors: bool,
+    common: &CommonArgs,
 ) {
     let config = print_debug_model_result::DebugModelResultPrintConfig {
         recursive,
         sections: sections.clone(),
         print_values: !no_values,
     };
+    let show_internal_errors = common.dev_show_internal_errors;
 
-    let mut runtime = Runtime::new();
+    let mut runtime = runtime_from_common_args(common);
     let (model_opt, errors) = runtime.eval_model(file);
 
     let print_result = print_error::print_all(errors.to_vec(), show_internal_errors);
@@ -414,14 +467,14 @@ fn handle_eval_command(args: EvalArgs) {
         watch_model(
             &file,
             &eval_expressions,
-            common.dev_show_internal_errors,
+            &common,
             display_partial_results,
             &model_print_config,
         );
         return;
     }
 
-    let mut runtime = Runtime::new();
+    let mut runtime = runtime_from_common_args(&common);
     eval_and_print_model(
         &file,
         &eval_expressions,
@@ -461,11 +514,12 @@ fn eval_and_print_model(
 fn watch_model(
     file: &ModelPath,
     eval_expressions: &[String],
-    show_internal_errors: bool,
+    common: &CommonArgs,
     display_partial_results: bool,
     model_print_config: &ModelPrintConfig,
 ) {
-    let mut runtime = Runtime::new();
+    let show_internal_errors = common.dev_show_internal_errors;
+    let mut runtime = runtime_from_common_args(common);
 
     let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();
 
@@ -618,7 +672,7 @@ fn handle_test_command(args: TestArgs) {
         print_utils_config,
     };
 
-    let mut runtime = Runtime::new();
+    let mut runtime = runtime_from_common_args(&common);
     let (model_opt, errors) = runtime.eval_model(&file);
 
     let print_result = print_error::print_all(errors.to_vec(), common.dev_show_internal_errors);
@@ -658,7 +712,7 @@ fn handle_tree_command(args: TreeArgs) {
         print_utils_config,
     };
 
-    let mut runtime = Runtime::new();
+    let mut runtime = runtime_from_common_args(&common);
 
     let (trees, errors) = if up {
         let mut trees = Vec::new();
@@ -740,7 +794,8 @@ fn print_param_not_found(param: &ParameterName) {
 }
 
 fn handle_builtins_command(command: BuiltinsCommand) {
-    let runtime = Runtime::new();
+    let common = command.get_common_args();
+    let runtime = runtime_from_common_args(common);
     match command {
         BuiltinsCommand::All { common } => {
             let print_utils_config = PrintUtilsConfig {
@@ -810,7 +865,7 @@ fn handle_builtins_command(command: BuiltinsCommand) {
 fn handle_check_command(args: CheckArgs) {
     let CheckArgs { file, common } = args;
 
-    let mut runtime = Runtime::new();
+    let mut runtime = runtime_from_common_args(&common);
     let (_visited_paths, errors) = runtime.check_model(&file);
 
     for error in errors.to_vec() {
@@ -839,7 +894,7 @@ fn handle_independent_command(args: IndependentArgs) {
         print_utils_config,
     };
 
-    let mut runtime = Runtime::new();
+    let mut runtime = runtime_from_common_args(&common);
     let (independents, errors) = runtime.get_independents(&file);
 
     let print_result = print_error::print_all(errors.to_vec(), common.dev_show_internal_errors);

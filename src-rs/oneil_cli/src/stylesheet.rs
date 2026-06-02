@@ -1,5 +1,9 @@
 use owo_colors::Style;
 
+// Cache prompt styles
+pub const CACHE_PROMPT_MESSAGE: Style = Style::new().bold();
+pub const CACHE_PROMPT_YN: Style = Style::new().bold().dimmed();
+
 // Error styles
 pub const ERROR_COLOR: Style = Style::new().red();
 pub const WARNING_COLOR: Style = Style::new().yellow();

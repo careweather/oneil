@@ -78,7 +78,13 @@ impl Runtime {
     ) -> RuntimeErrors {
         let mut visited = IndexSet::new();
         let eval_instance_key = EvalInstanceKey::root(model_path.clone());
-        self.get_model_diagnostics_inner(&eval_instance_key, include_indirect_errors, &mut visited)
+        let mut errors = self.get_model_diagnostics_inner(
+            &eval_instance_key,
+            include_indirect_errors,
+            &mut visited,
+        );
+        errors.extend_cache_warnings(self.python_call_cache.warning_diagnostics());
+        errors
     }
 
     /// Recursive worker for [`get_model_diagnostics`].

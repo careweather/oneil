@@ -22,7 +22,7 @@ fn is_oneil_model_path_extension(ext: Option<&std::ffi::OsStr>) -> bool {
 const PYTHON_EXTENSION: &str = "py";
 
 /// A path to an Oneil model or design source file (`.on` or `.one`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ModelPath(PathBuf);
 
 impl ModelPath {

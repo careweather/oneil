@@ -48,7 +48,8 @@ pub trait ExternalEvaluationContext {
     ///
     /// Returns an error if there was an error evaluating the imported function.
     fn evaluate_imported_function(
-        &self,
+        &mut self,
+        root_model: &ModelPath,
         python_path: &PythonPath,
         identifier: &PyFunctionName,
         function_call_span: Span,
@@ -280,6 +281,13 @@ pub struct EvalContext<'external, E: ExternalEvaluationContext> {
     eval_scope: Vec<EvalInstanceKey>,
     external_context: &'external mut E,
 
+    /// Root model path for the evaluation tree currently being walked.
+    ///
+    /// NOTE FOR REVIEW: Tim, I'd like to hear your thoughts on this method of
+    /// tracking the evaluation cache root. I'm not sure if there is a better
+    /// way to do this.
+    evaluation_cache_root: Option<ModelPath>,
+
     /// Warnings for the parameter or test expression currently being evaluated.
     expression_eval_warnings: Vec<output::EvalWarning>,
 }
@@ -298,6 +306,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             models: IndexMap::new(),
             eval_scope: Vec::new(),
             external_context,
+            evaluation_cache_root: None,
             expression_eval_warnings: Vec::new(),
         }
     }
@@ -339,8 +348,14 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             models,
             eval_scope: Vec::new(),
             external_context,
+            evaluation_cache_root: Some(graph.root.path().clone()),
             expression_eval_warnings: Vec::new(),
         }
+    }
+
+    /// Sets the root model path recorded on Python call cache entries.
+    pub fn set_evaluation_cache_root(&mut self, root_model: ModelPath) {
+        self.evaluation_cache_root = Some(root_model);
     }
 
     /// Creates a new evaluation context with the given pre-loaded models.
@@ -413,6 +428,7 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
             models,
             eval_scope: Vec::new(),
             external_context,
+            evaluation_cache_root: None,
             expression_eval_warnings: Vec::new(),
         }
     }
@@ -745,14 +761,18 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
 
     /// Evaluates an imported function with the given arguments.
     pub fn evaluate_imported_function(
-        &self,
+        &mut self,
         python_path: &PythonPath,
         name: &PyFunctionName,
         function_call_span: Span,
         args: Vec<(output::Value, Span)>,
     ) -> Result<output::Value, Box<EvalError>> {
+        let root_model = self.evaluation_cache_root.as_ref().expect(
+            "evaluation cache root must be set before evaluating imported Python functions",
+        );
+
         self.external_context
-            .evaluate_imported_function(python_path, name, function_call_span, args)
+            .evaluate_imported_function(root_model, python_path, name, function_call_span, args)
             .expect("imported function should be defined (checked during resolution)")
     }
 

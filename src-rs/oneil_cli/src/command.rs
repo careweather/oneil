@@ -1,6 +1,6 @@
 //! Command-line interface definitions for the Oneil CLI
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use oneil_shared::{
     paths::{ModelPath, PythonPath},
     symbols::{BuiltinFunctionName, BuiltinValueName, ParameterName, UnitBaseName, UnitPrefix},
@@ -53,6 +53,14 @@ pub struct CommonArgs {
     /// Number of significant figures to print
     #[arg(long, default_value_t = 4)]
     pub sig_figs: usize,
+
+    /// When to overwrite entries in the Python call cache
+    #[arg(long, value_enum, default_value_t = CachePolicy::Prompt)]
+    pub cache_overwrite: CachePolicy,
+
+    /// When to read from the Python call cache
+    #[arg(long, value_enum, default_value_t = CachePolicy::Always)]
+    pub cache_read: CachePolicy,
 
     /// Disable colors in the output
     ///
@@ -411,6 +419,18 @@ pub enum BuiltinsCommand {
     },
 }
 
+impl BuiltinsCommand {
+    pub const fn get_common_args(&self) -> &CommonArgs {
+        match self {
+            Self::All { common }
+            | Self::Units { common, .. }
+            | Self::Functions { common, .. }
+            | Self::Values { common, .. }
+            | Self::Prefixes { common, .. } => common,
+        }
+    }
+}
+
 #[derive(Args, Clone)]
 pub struct IndependentArgs {
     /// Path to the Oneil model file to print the independent parameters for
@@ -691,6 +711,17 @@ impl fmt::Display for Variable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.join("."))
     }
+}
+
+/// When the CLI may read from or write to the Python call cache.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum CachePolicy {
+    /// Always use the cache without prompting.
+    Always,
+    /// Never use the cache.
+    Never,
+    /// Ask before using the cache.
+    Prompt,
 }
 
 /// Parses a CLI argument into a [`ModelPath`].
