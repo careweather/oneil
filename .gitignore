@@ -1,3 +1,4 @@
+__oncache__/
 __pycache__/
 .vscode/
 .venv/
@@ -6,3 +7,16 @@ __pycache__/
 .netrwhist
 .justfile
 examples/real-world
+
+# used for comparing output between different versions of Oneil (pixilcode/oncmp)
+oncmp_config.toml
+
+# cargo
+/target
+
+# git worktrees
+/.worktrees
+
+# TypeScript / toolchain source maps (do not commit)
+*.js.map
+*.css.map
