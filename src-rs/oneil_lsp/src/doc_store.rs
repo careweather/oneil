@@ -154,6 +154,12 @@ impl DocumentStore {
         let docs = self.docs.read().await;
         docs.get(uri)?.position_to_offset(position)
     }
+
+    /// Returns URIs for all open text documents.
+    pub async fn open_uris(&self) -> Vec<Uri> {
+        let docs = self.docs.read().await;
+        docs.keys().cloned().collect()
+    }
 }
 
 fn compute_line_offsets(text: &str) -> Vec<usize> {
