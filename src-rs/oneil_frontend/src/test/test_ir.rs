@@ -80,7 +80,8 @@ impl ModelBuilder {
 
         let reference_name = ReferenceName::new(submodel_name.to_string());
         let source_name = SubmodelName::new(submodel_name.to_string());
-        let submodel_import = SubmodelImport::stub(source_name, span, submodel_path.clone());
+        let submodel_import =
+            SubmodelImport::stub(source_name, span, None, None, submodel_path.clone());
 
         self.submodels.insert(reference_name, submodel_import);
         self

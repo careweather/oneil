@@ -120,6 +120,10 @@ impl<'external> ResolutionContextBuilder<'external> {
         self
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "logic is naturally split up into sections"
+    )]
     pub fn build(self) -> ResolutionContext<'external, TestExternalContext> {
         let active_path = self
             .active_model_path
@@ -141,6 +145,8 @@ impl<'external> ResolutionContextBuilder<'external> {
                 ctx.add_reference_to_active_model(
                     name.clone(),
                     import.name_span.clone(),
+                    import.alias.clone(),
+                    import.alias_span.clone(),
                     import.path.clone(),
                 );
             }
@@ -149,6 +155,8 @@ impl<'external> ResolutionContextBuilder<'external> {
                     alias.clone(),
                     import.name.clone(),
                     import.name_span.clone(),
+                    import.alias.clone(),
+                    import.alias_span.clone(),
                     import.instance.path().clone(),
                 );
             }
@@ -171,6 +179,8 @@ impl<'external> ResolutionContextBuilder<'external> {
                 ctx.add_reference_to_active_model(
                     name.clone(),
                     import.name_span.clone(),
+                    import.alias.clone(),
+                    import.alias_span.clone(),
                     import.path.clone(),
                 );
             }
@@ -179,6 +189,8 @@ impl<'external> ResolutionContextBuilder<'external> {
                     alias.clone(),
                     import.name.clone(),
                     import.name_span.clone(),
+                    import.alias.clone(),
+                    import.alias_span.clone(),
                     import.instance.path().clone(),
                 );
             }
@@ -186,6 +198,8 @@ impl<'external> ResolutionContextBuilder<'external> {
             ctx.add_reference_to_active_model(
                 ref_name.clone(),
                 unimportant_span(),
+                None,
+                None,
                 ref_path.clone(),
             );
         }
