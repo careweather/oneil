@@ -440,9 +440,17 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         &mut self,
         reference_name: ReferenceName,
         reference_name_span: Span,
+        alias: Option<ReferenceName>,
+        alias_span: Option<Span>,
         reference_path: ModelPath,
     ) {
-        let import = ReferenceImport::new(reference_name_span, reference_path);
+        let import = ReferenceImport::new(
+            reference_name.clone(),
+            reference_name_span,
+            alias,
+            alias_span,
+            reference_path,
+        );
         self.active_model_mut()
             .add_reference(reference_name, import);
     }
@@ -457,9 +465,17 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         alias: ReferenceName,
         source_name: SubmodelName,
         source_name_span: Span,
+        explicit_alias: Option<ReferenceName>,
+        explicit_alias_span: Option<Span>,
         child_path: ModelPath,
     ) {
-        let import = SubmodelImport::stub(source_name, source_name_span, child_path);
+        let import = SubmodelImport::stub(
+            source_name,
+            source_name_span,
+            explicit_alias,
+            explicit_alias_span,
+            child_path,
+        );
         self.active_model_mut().add_submodel(alias, import);
     }
 
@@ -473,12 +489,20 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
         alias: ReferenceName,
         source_name: SubmodelName,
         source_name_span: Span,
+        explicit_alias: Option<ReferenceName>,
+        explicit_alias_span: Option<Span>,
         alias_segments: Vec<ReferenceName>,
     ) {
         let alias_path = alias_segments
             .into_iter()
             .fold(InstancePath::root(), |acc, seg| acc.child(seg));
-        let import = AliasImport::new(source_name, source_name_span, alias_path);
+        let import = AliasImport::new(
+            source_name,
+            source_name_span,
+            explicit_alias,
+            explicit_alias_span,
+            alias_path,
+        );
         self.active_model_mut().add_alias(alias, import);
     }
 

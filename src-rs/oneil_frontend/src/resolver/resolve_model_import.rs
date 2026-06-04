@@ -31,6 +31,8 @@ pub fn resolve_model_imports<E>(
 
         let (reference_name, reference_name_span) =
             get_reference_name_and_span(model_import.model_info());
+        let (explicit_alias, explicit_alias_span) =
+            get_optional_alias_and_span(model_import.model_info());
         // The "source name" carried on the `SubmodelImport` for diagnostics
         // is the model file name as written (`foo` in `submodel foo as bar`).
         let (source_name, source_name_span) = get_source_name_and_span(model_import.model_info());
@@ -155,12 +157,16 @@ pub fn resolve_model_imports<E>(
                 reference_name.clone(),
                 source_name,
                 source_name_span,
+                explicit_alias,
+                explicit_alias_span,
                 resolved_path.clone(),
             );
         } else {
             resolution_context.add_reference_to_active_model(
                 reference_name.clone(),
                 reference_name_span,
+                explicit_alias,
+                explicit_alias_span,
                 resolved_path.clone(),
             );
         }
@@ -200,6 +206,7 @@ fn resolve_extracted_submodels<E>(
 
         // get the reference name (alias) for the extracted submodel
         let (reference_name, reference_name_span) = get_reference_name_and_span(submodel_info);
+        let (explicit_alias, explicit_alias_span) = get_optional_alias_and_span(submodel_info);
         let (source_name, source_name_span) = get_source_name_and_span(submodel_info);
 
         // check for duplicate aliases across all three maps
@@ -246,6 +253,8 @@ fn resolve_extracted_submodels<E>(
                     reference_name,
                     source_name,
                     source_name_span,
+                    explicit_alias,
+                    explicit_alias_span,
                     alias_segments,
                 );
             }
@@ -277,6 +286,18 @@ fn get_reference_name_and_span(model_info: &ast::ModelInfo) -> (ReferenceName, S
     let name = ReferenceName::from(model_name.as_str());
     let span = model_name.span().clone();
     (name, span)
+}
+
+/// Returns the optional explicit `as` alias and its span from a model info node.
+fn get_optional_alias_and_span(
+    model_info: &ast::ModelInfo,
+) -> (Option<ReferenceName>, Option<Span>) {
+    model_info.alias().map_or((None, None), |id| {
+        (
+            Some(ReferenceName::from(id.as_str())),
+            Some(id.span().clone()),
+        )
+    })
 }
 
 fn calc_import_path(model_path: &ModelPath, model_import: &ast::SubmodelDeclNode) -> ModelPath {
