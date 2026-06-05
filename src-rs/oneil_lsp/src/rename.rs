@@ -14,10 +14,7 @@ use oneil_shared::{
 };
 use tower_lsp_server::ls_types::{PrepareRenameResponse, Range, TextEdit, Uri, WorkspaceEdit};
 
-use crate::{
-    location::span_to_range,
-    symbol_lookup::{ModelImportName, SymbolAtPosition},
-};
+use crate::{location::span_to_range, symbol_lookup::SymbolAtPosition};
 
 /// What the user is renaming.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,21 +62,18 @@ pub fn resolve_rename_target(
                 name: parameter_name.clone(),
             })
         }
-        SymbolAtPosition::ModelImportReference { reference_name, .. } => {
+        SymbolAtPosition::ModelImportAlias {
+            alias: reference_name,
+            ..
+        }
+        | SymbolAtPosition::ModelImportReference { reference_name, .. } => {
             Some(RenameTarget::ImportAlias {
                 model_path: current_model_path.clone(),
                 name: reference_name.clone(),
             })
         }
-        SymbolAtPosition::ModelImportDefinition { name, .. } => match name {
-            ModelImportName::Reference(reference_name) => Some(RenameTarget::ImportAlias {
-                model_path: current_model_path.clone(),
-                name: reference_name.clone(),
-            }),
-            // Submodel import `name_span` is the source model name (`foo`), not the alias (`bar`).
-            ModelImportName::Submodel(_) => None,
-        },
-        SymbolAtPosition::BuiltinValueReference { .. }
+        SymbolAtPosition::ModelImportDefinition { .. }
+        | SymbolAtPosition::BuiltinValueReference { .. }
         | SymbolAtPosition::BuiltinFunctionReference { .. }
         | SymbolAtPosition::PythonImport { .. }
         | SymbolAtPosition::PythonFunctionReference { .. } => None,
@@ -156,9 +150,11 @@ fn validate_new_name(
             if new_name == name.as_str() {
                 return Err("new name is the same as the old name".to_string());
             }
+
             let Some(model) = load_model(runtime, model_path) else {
                 return Err("could not load model".to_string());
             };
+
             if model
                 .parameters()
                 .contains_key(&ParameterName::from(new_name))
@@ -170,12 +166,43 @@ fn validate_new_name(
             if new_name == name.as_str() {
                 return Err("new name is the same as the old name".to_string());
             }
+
             let Some(model) = load_model(runtime, model_path) else {
                 return Err("could not load model".to_string());
             };
+
+            // check that the given reference name is an alias, not a reference
+            // or submodel name, since renaming those is a more complex operation.
+
+            let is_reference_alias = model
+                .reference_imports()
+                .get(name)
+                .and_then(|r| r.alias.as_ref())
+                .is_some_and(|alias| alias == name);
+
+            let is_submodel_alias = model
+                .submodel_imports()
+                .get(name)
+                .and_then(|s| s.alias.as_ref())
+                .is_some_and(|alias| alias == name);
+
+            let is_alias_alias = model
+                .alias_imports()
+                .get(name)
+                .and_then(|a| a.alias.as_ref())
+                .is_some_and(|alias| alias == name);
+
+            if !is_reference_alias && !is_submodel_alias && !is_alias_alias {
+                let name = name.as_str();
+                return Err(format!("reference name '{name}' is not an alias"));
+            }
+
+            // check that the new reference name is not already in use
+
             let new_reference = ReferenceName::from(new_name);
             if model.reference_imports().contains_key(&new_reference)
                 || model.submodel_imports().contains_key(&new_reference)
+                || model.alias_imports().contains_key(&new_reference)
             {
                 return Err(format!("import alias '{new_name}' already exists"));
             }
@@ -291,10 +318,22 @@ fn collect_import_alias_occurrences(
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
     let mode = VariableRenameMode::ImportAlias { name };
+    let model_path = model.path();
 
     if let Some(reference) = model.reference_imports().get(name) {
-        let model_path = model.path();
         push_occurrence(occurrences, model_path.clone(), reference.name_span.clone());
+    } else if let Some(submodel) = model.submodel_imports().get(name) {
+        let span = submodel
+            .alias_span
+            .clone()
+            .unwrap_or_else(|| submodel.name_span.clone());
+        push_occurrence(occurrences, model_path.clone(), span);
+    } else if let Some(alias_import) = model.alias_imports().get(name) {
+        let span = alias_import
+            .alias_span
+            .clone()
+            .unwrap_or_else(|| alias_import.name_span.clone());
+        push_occurrence(occurrences, model_path.clone(), span);
     }
 
     collect_model_occurrences(model, &mode, occurrences);
@@ -490,18 +529,15 @@ pub fn prepare_rename_response(symbol: &SymbolAtPosition) -> Option<PrepareRenam
             ..
         } => name.as_str().to_string(),
         SymbolAtPosition::ModelImportReference { reference_name, .. }
-        | SymbolAtPosition::ModelImportDefinition {
-            name: ModelImportName::Reference(reference_name),
+        | SymbolAtPosition::ModelImportAlias {
+            alias: reference_name,
             ..
         } => reference_name.as_str().to_string(),
-        SymbolAtPosition::BuiltinValueReference { .. }
+        SymbolAtPosition::ModelImportDefinition { .. }
+        | SymbolAtPosition::BuiltinValueReference { .. }
         | SymbolAtPosition::BuiltinFunctionReference { .. }
         | SymbolAtPosition::PythonImport { .. }
-        | SymbolAtPosition::PythonFunctionReference { .. }
-        | SymbolAtPosition::ModelImportDefinition {
-            name: ModelImportName::Submodel(_),
-            ..
-        } => return None,
+        | SymbolAtPosition::PythonFunctionReference { .. } => return None,
     };
 
     Some(PrepareRenameResponse::RangeWithPlaceholder { range, placeholder })

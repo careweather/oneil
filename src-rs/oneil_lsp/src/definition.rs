@@ -67,7 +67,11 @@ pub fn resolve_definition(
                 },
             })
         }
-        SymbolAtPosition::ModelImportReference { reference_name, .. } => {
+        SymbolAtPosition::ModelImportAlias {
+            alias: reference_name,
+            ..
+        }
+        | SymbolAtPosition::ModelImportReference { reference_name, .. } => {
             let (model, _errors) = runtime.load_and_lower(current_model_path);
             let model = model?;
 
