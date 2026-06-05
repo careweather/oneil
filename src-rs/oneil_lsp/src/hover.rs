@@ -69,7 +69,11 @@ pub fn hover_markdown(
         SymbolAtPosition::ModelImportDefinition { path, .. } => {
             format_model_hover_from_path(runtime, path, workspace_roots)
         }
-        SymbolAtPosition::ModelImportReference { reference_name, .. } => {
+        SymbolAtPosition::ModelImportAlias {
+            alias: reference_name,
+            ..
+        }
+        | SymbolAtPosition::ModelImportReference { reference_name, .. } => {
             let imported_path = {
                 let (model, _) = runtime.load_and_lower(current_model_path);
                 let model = model?;

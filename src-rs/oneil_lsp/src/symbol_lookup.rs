@@ -41,6 +41,8 @@ pub enum SymbolAtPosition {
         path: ModelPath,
         span: Span,
     },
+    /// A submodel or reference import alias name
+    ModelImportAlias { alias: ReferenceName, span: Span },
     /// A reference to a model import (e.g., `x.model_name`)
     ///
     /// This occurs when the cursor is on the model name part (e.g., `model_name`)
@@ -73,6 +75,7 @@ impl SymbolAtPosition {
             | Self::ExternalParameterReference { span, .. }
             | Self::BuiltinValueReference { span, .. }
             | Self::ModelImportDefinition { span, .. }
+            | Self::ModelImportAlias { span, .. }
             | Self::ModelImportReference { span, .. }
             | Self::PythonImport { span, .. }
             | Self::PythonFunctionReference { span, .. }
@@ -110,7 +113,20 @@ pub fn find_symbol_at_offset(
     // Check if cursor is on a submodel import name. The submodel map is keyed
     // by alias (= reference name); the underlying source-level model name
     // surfaced to the LSP comes from the `SubmodelImport.name()` field.
-    for (_alias, submodel_import) in model.submodel_models() {
+    for submodel_import in model.submodel_models().values() {
+        if let Some(span) = submodel_import.alias_span()
+            && span_contains_offset(span, offset)
+        {
+            let alias = submodel_import
+                .alias()
+                .expect("submodel import must have an alias if it has an alias span");
+
+            return Some(SymbolAtPosition::ModelImportAlias {
+                alias: alias.clone(),
+                span: span.clone(),
+            });
+        }
+
         if span_contains_offset(submodel_import.name_span(), offset) {
             let submodel_path = submodel_import.path().clone();
 
@@ -122,11 +138,51 @@ pub fn find_symbol_at_offset(
         }
     }
 
-    // Check if cursor is on a reference import name
-    for (reference_name, reference_import) in model.reference_models() {
-        if span_contains_offset(reference_import.name_span(), offset) {
+    // Check if cursor is on an extracted alias from a `[…]` block.
+    for alias_import in model.alias_imports().values() {
+        if let Some(span) = &alias_import.alias_span
+            && span_contains_offset(span, offset)
+        {
+            let alias = alias_import
+                .alias
+                .as_ref()
+                .expect("alias import must have an alias if it has an alias span");
+
+            return Some(SymbolAtPosition::ModelImportAlias {
+                alias: alias.clone(),
+                span: span.clone(),
+            });
+        }
+
+        if span_contains_offset(&alias_import.name_span, offset) {
             return Some(SymbolAtPosition::ModelImportDefinition {
-                name: ModelImportName::Reference(reference_name.clone()),
+                name: ModelImportName::Submodel(alias_import.source.clone()),
+                path: model.path().clone(),
+                span: alias_import.name_span.clone(),
+            });
+        }
+    }
+
+    // Check if cursor is on a reference import name
+    for reference_import in model.reference_models().values() {
+        if let Some(span) = reference_import.alias_span()
+            && span_contains_offset(span, offset)
+        {
+            let alias = reference_import
+                .alias()
+                .expect("reference import must have an alias if it has an alias span");
+
+            return Some(SymbolAtPosition::ModelImportAlias {
+                alias: alias.clone(),
+                span: span.clone(),
+            });
+        }
+
+        if span_contains_offset(reference_import.name_span(), offset) {
+            let reference_name = reference_import.name().clone();
+
+            return Some(SymbolAtPosition::ModelImportDefinition {
+                name: ModelImportName::Reference(reference_name),
                 path: reference_import.path().clone(),
                 span: reference_import.name_span().clone(),
             });
