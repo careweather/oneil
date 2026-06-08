@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use indexmap::{IndexMap, IndexSet};
 use oneil_builtins::BuiltinRef;
-use oneil_frontend::instance::graph::UnitGraphCache;
+use oneil_frontend::{CompilationUnit, instance::graph::UnitGraphCache};
 use oneil_shared::paths::{ModelPath, PythonPath, SourcePath};
 
 use super::Runtime;
@@ -65,5 +65,14 @@ impl Runtime {
     #[must_use]
     pub fn get_watch_paths(&self) -> IndexSet<SourcePath> {
         self.source_cache.paths().cloned().collect()
+    }
+
+    /// Gets the models that the runtime has loaded.
+    #[must_use]
+    pub fn get_loaded_models(&self) -> IndexSet<ModelPath> {
+        self.unit_graph_cache
+            .keys()
+            .map(CompilationUnit::source_path)
+            .collect()
     }
 }

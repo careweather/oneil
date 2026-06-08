@@ -484,9 +484,6 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        // get a list of all other open model paths
-        let also_scan = self.open_model_paths_except(&uri).await;
-
         // resolve the rename target
         let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
 
@@ -495,6 +492,9 @@ impl LanguageServer for Backend {
         else {
             return Ok(None);
         };
+
+        // get a list of all other open model paths
+        let also_scan = runtime.get_loaded_models();
 
         // build and return the rename edits
         let edit = rename::workspace_edit_for_rename(
