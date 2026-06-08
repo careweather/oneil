@@ -16,6 +16,7 @@ mod location;
 mod path;
 mod rename;
 mod symbol_lookup;
+mod workspace;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -147,6 +148,34 @@ impl LanguageServer for Backend {
     async fn initialized(&self, _params: InitializedParams) {
         self.client
             .log_message(MessageType::INFO, "initialized called")
+            .await;
+
+        let workspace_roots = self
+            .workspace_roots
+            .lock()
+            .expect("workspace_roots mutex poisoned")
+            .clone();
+
+        if workspace_roots.is_empty() {
+            self.client
+                .log_message(
+                    MessageType::WARNING,
+                    "no workspace roots; skipping workspace model load",
+                )
+                .await;
+            return;
+        }
+
+        let loaded_count = {
+            let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
+            workspace::load_workspace_models(&mut runtime, &workspace_roots)
+        };
+
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!("loaded {loaded_count} workspace model file(s)"),
+            )
             .await;
     }
 
