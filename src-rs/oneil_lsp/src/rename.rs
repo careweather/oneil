@@ -102,7 +102,7 @@ pub fn workspace_edit_for_rename(
     new_name: &str,
     runtime: &mut Runtime,
     trigger_model_path: &ModelPath,
-    also_scan: &[ModelPath],
+    also_scan: &IndexSet<ModelPath>,
 ) -> Result<WorkspaceEdit, String> {
     validate_new_name(target, new_name, runtime)?;
 
@@ -227,7 +227,7 @@ fn collect_rename_occurrences(
     target: &RenameTarget,
     runtime: &mut Runtime,
     trigger_model_path: &ModelPath,
-    also_scan: &[ModelPath],
+    also_scan: &IndexSet<ModelPath>,
 ) -> Vec<RenameOccurrence> {
     match target {
         RenameTarget::Parameter { model_path, name } => {
@@ -236,7 +236,7 @@ fn collect_rename_occurrences(
             paths.insert(trigger_model_path.clone());
             paths.extend(collect_composition_paths(runtime, trigger_model_path));
             paths.extend(collect_composition_paths(runtime, model_path));
-            paths.extend(also_scan.iter().cloned());
+            paths.extend(also_scan.clone());
 
             let mut occurrences = Vec::new();
             for path in paths {
