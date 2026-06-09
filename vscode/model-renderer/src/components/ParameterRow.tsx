@@ -262,12 +262,18 @@ export const ParameterRowLi = styled.li<{
     ${({ $performance }) =>
         $performance &&
         css`
-            & > ${ParamLabelExpr}::before,
-            & > ${ParamLabelNew}::before,
-            & > ${ParamLabelRendered}::before {
-                content: "★ ";
+            & > ${ParamLabelExpr},
+            & > ${ParamLabelNew},
+            & > ${ParamLabelRendered} {
                 color: var(--color-accent-yellow);
             }
+
+            // & > ${ParamLabelExpr}::before,
+            // & > ${ParamLabelNew}::before,
+            // & > ${ParamLabelRendered}::before {
+            //     content: "★ ";
+            //     color: var(--color-accent-yellow);
+            // }
 
             & > ${ParamName},
             & > ${ParamNameNew},
