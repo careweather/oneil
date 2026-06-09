@@ -81,9 +81,12 @@ pub fn main() {
 }
 
 fn handle_lsp_command(args: LspArgs) {
-    let LspArgs { common } = args;
+    let LspArgs { skip_dirs, common } = args;
     let (cache_read_policy, cache_write_policy) = cache_policies_from_common(&common);
-    oneil_lsp::run(cache_read_policy, cache_write_policy);
+    let discovery_options = oneil_lsp::WorkspaceDiscoveryOptions {
+        skip_dir_names: skip_dirs,
+    };
+    oneil_lsp::run(cache_read_policy, cache_write_policy, discovery_options);
 }
 
 fn handle_dev_command(command: DevCommand) {

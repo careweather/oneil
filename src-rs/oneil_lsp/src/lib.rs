@@ -44,9 +44,14 @@ use diagnostics::diagnostics_from_runtime_errors;
 use doc_store::DocumentStore;
 use hover::hover_markdown;
 use location::span_to_range;
+pub use workspace::WorkspaceDiscoveryOptions;
 
 #[tokio::main]
-pub async fn run(cache_read_policy: CacheReadPolicy, cache_write_policy: CacheWritePolicy) {
+pub async fn run(
+    cache_read_policy: CacheReadPolicy,
+    cache_write_policy: CacheWritePolicy,
+    discovery_options: WorkspaceDiscoveryOptions,
+) {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
@@ -57,6 +62,7 @@ pub async fn run(cache_read_policy: CacheReadPolicy, cache_write_policy: CacheWr
         client,
         docs,
         workspace_roots: Mutex::new(Vec::new()),
+        discovery_options,
         runtime,
     });
 
@@ -68,6 +74,8 @@ struct Backend {
     docs: Arc<DocumentStore>,
     /// Workspace folder paths from `initialize`, longest first (nested folders match innermost).
     workspace_roots: Mutex<Vec<PathBuf>>,
+    /// Directories skipped while discovering model files in workspace roots.
+    discovery_options: WorkspaceDiscoveryOptions,
     // TODO: figure out how to handle async runtime operations better.
     //
     //       Right now, only one thing can use the runtime at a time.
@@ -168,7 +176,11 @@ impl LanguageServer for Backend {
 
         let loaded_count = {
             let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
-            workspace::load_workspace_models(&mut runtime, &workspace_roots)
+            workspace::load_workspace_models(
+                &mut runtime,
+                &workspace_roots,
+                &self.discovery_options,
+            )
         };
 
         self.client
