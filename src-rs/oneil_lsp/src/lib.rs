@@ -164,6 +164,16 @@ impl LanguageServer for Backend {
             .expect("workspace_roots mutex poisoned")
             .clone();
 
+        if !self.discovery_options.enabled {
+            self.client
+                .log_message(
+                    MessageType::INFO,
+                    "workspace discovery disabled; skipping workspace model load",
+                )
+                .await;
+            return;
+        }
+
         if workspace_roots.is_empty() {
             self.client
                 .log_message(
