@@ -20,7 +20,8 @@ pub fn resolve_definition(
             Some(span_to_location(current_model_path, span))
         }
         SymbolAtPosition::ParameterReference { name, .. } => {
-            let (model, _errors) = runtime.load_and_lower(current_model_path);
+            // TODO: handle design info if it exists
+            let (model, _design_info_opt, _errors) = runtime.load_and_lower(current_model_path);
             let model = model?;
 
             let param = model.get_parameter(name)?;
@@ -33,7 +34,9 @@ pub fn resolve_definition(
             ..
         } => {
             // Resolve the reference name to a model path via the current model's imports.
-            let (current_model, _) = runtime.load_and_lower(current_model_path);
+            // TODO: handle design info if it exists
+            let (current_model, _design_info_opt, _errors) =
+                runtime.load_and_lower(current_model_path);
             let current_model = current_model?;
             let external_model_path = current_model
                 .reference_imports()
@@ -45,7 +48,10 @@ pub fn resolve_definition(
                         .get(reference_name)
                         .map(|s| s.instance.path().clone())
                 })?;
-            let (external_model, _errors) = runtime.load_and_lower(&external_model_path);
+
+            // TODO: handle design info if it exists
+            let (external_model, _design_info_opt, _errors) =
+                runtime.load_and_lower(&external_model_path);
             let external_model = external_model?;
 
             let param = external_model.get_parameter(parameter_name)?;
@@ -72,7 +78,8 @@ pub fn resolve_definition(
             ..
         }
         | SymbolAtPosition::ModelImportReference { reference_name, .. } => {
-            let (model, _errors) = runtime.load_and_lower(current_model_path);
+            // TODO: handle design info if it exists
+            let (model, _design_info_opt, _errors) = runtime.load_and_lower(current_model_path);
             let model = model?;
 
             let reference_imports = model.reference_imports();

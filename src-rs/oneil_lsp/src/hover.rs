@@ -30,7 +30,8 @@ pub fn hover_markdown(
     match symbol {
         SymbolAtPosition::ParameterDefinition { name, .. }
         | SymbolAtPosition::ParameterReference { name, .. } => {
-            let (model, _) = runtime.load_and_lower(current_model_path);
+            // TODO: handle design info if it exists
+            let (model, _design_info_opt, _errors) = runtime.load_and_lower(current_model_path);
             let model = model?;
             let param = model.get_parameter(name)?;
             Some(format_parameter_hover(
@@ -45,7 +46,9 @@ pub fn hover_markdown(
             ..
         } => {
             // Resolve the reference name to a model path via the current model's imports.
-            let (current_model, _) = runtime.load_and_lower(current_model_path);
+            // TODO: handle design info if it exists
+            let (current_model, _design_info_opt, _errors) =
+                runtime.load_and_lower(current_model_path);
             let current_model = current_model?;
             let external_model_path = current_model
                 .reference_imports()
@@ -57,7 +60,8 @@ pub fn hover_markdown(
                         .get(reference_name)
                         .map(|s| s.instance.path().clone())
                 })?;
-            let (model, _) = runtime.load_and_lower(&external_model_path);
+            // TODO: handle design info if it exists
+            let (model, _design_info_opt, _errors) = runtime.load_and_lower(&external_model_path);
             let model = model?;
             let param = model.get_parameter(parameter_name)?;
             Some(format_parameter_hover(
@@ -75,7 +79,8 @@ pub fn hover_markdown(
         }
         | SymbolAtPosition::ModelImportReference { reference_name, .. } => {
             let imported_path = {
-                let (model, _) = runtime.load_and_lower(current_model_path);
+                // TODO: handle design info if it exists
+                let (model, _design_info_opt, _errors) = runtime.load_and_lower(current_model_path);
                 let model = model?;
                 model
                     .reference_imports()
@@ -142,7 +147,8 @@ fn format_model_hover_from_path(
     path: &ModelPath,
     workspace_roots: &[PathBuf],
 ) -> Option<HoverContents> {
-    let (model, _) = runtime.load_and_lower(path);
+    // TODO: handle design info if it exists
+    let (model, _design_info_opt, _errors) = runtime.load_and_lower(path);
     let model = model?;
     Some(format_model_hover(&model, workspace_roots))
 }

@@ -362,7 +362,8 @@ fn handle_print_ir(
 
     let mut runtime = runtime_from_common_args(common);
 
-    let (ir_result, errors) = runtime.load_and_lower(file);
+    // TODO: print the design info if it exists
+    let (ir_result, _design_info_opt, errors) = runtime.load_and_lower(file);
 
     let print_result = print_error::print_all(errors.to_vec(), show_internal_errors);
     if print_result.saw_error_diagnostic() && !display_partial {

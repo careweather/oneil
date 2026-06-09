@@ -29,6 +29,7 @@ impl Runtime {
         path: &ModelPath,
     ) -> (
         Option<output::reference::ModelTemplateReference<'_>>,
+        Option<frontend::ModelDesignInfo>,
         RuntimeErrors,
     ) {
         self.load_and_lower_internal(path);
@@ -43,10 +44,12 @@ impl Runtime {
                 )
             });
 
+        let design_info_opt = self.design_info.get(path).cloned();
+
         let include_indirect_errors = true;
         let errors = self.get_model_diagnostics(path, include_indirect_errors);
 
-        (template_opt, errors)
+        (template_opt, design_info_opt, errors)
     }
 
     pub(super) fn load_and_lower_internal(&mut self, path: &ModelPath) {

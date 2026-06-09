@@ -316,7 +316,8 @@ impl LanguageServer for Backend {
                 .lock()
                 .expect("if the runtime has panicked elsewhere, it is not in a useful state");
 
-            let (ir_model, errors) = runtime.load_and_lower(&current_model_path);
+            // TODO: handle design info if it exists
+            let (ir_model, _design_info_opt, errors) = runtime.load_and_lower(&current_model_path);
 
             let Some(ir_model) = ir_model else {
                 let errors = errors.to_vec();
@@ -422,7 +423,8 @@ impl LanguageServer for Backend {
                 .lock()
                 .expect("if the runtime has panicked elsewhere, it is not in a useful state");
 
-            let (ir_model, errors) = runtime.load_and_lower(&current_model_path);
+            // TODO: handle design info if it exists
+            let (ir_model, _design_info_opt, errors) = runtime.load_and_lower(&current_model_path);
 
             let Some(ir_model) = ir_model else {
                 break 'complete (
@@ -550,7 +552,8 @@ impl Backend {
         let offset = self.docs.position_to_offset(uri, position).await?;
 
         let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
-        let (ir_model, _) = runtime.load_and_lower(&current_model_path);
+        // TODO: handle design info if it exists
+        let (ir_model, _design_info_opt, _errors) = runtime.load_and_lower(&current_model_path);
         let ir_model = ir_model?;
         let symbol = symbol_lookup::find_symbol_at_offset(ir_model, offset)?;
 
