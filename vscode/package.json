@@ -92,6 +92,25 @@
             "never"
           ]
         },
+        "oneil.workspaceDiscovery.skipDirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "node_modules",
+            "target",
+            "venv",
+            "__pycache__",
+            "__oncache__"
+          ],
+          "description": "Directory names to skip while discovering model files in the workspace. Hidden directories (names starting with \".\") are always skipped in addition to these names. Set to an empty array to skip only hidden directories. If a large directory does not contain any model files, adding it here may improve startup time without disabling workspace discovery entirely."
+        },
+        "oneil.workspaceDiscovery.disabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Do not scan the workspace for model files at startup. This improves LSP startup time, but may cause certain features such as renaming to work incorrectly. Open files are still checked as usual."
+        },
         "oneil.pdf.cacheDir": {
           "type": "string",
           "default": "",
