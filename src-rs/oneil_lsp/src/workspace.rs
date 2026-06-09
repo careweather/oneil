@@ -6,9 +6,11 @@ use indexmap::IndexSet;
 use oneil_runtime::Runtime;
 use oneil_shared::paths::ModelPath;
 
-/// Options controlling which paths are considered while scanning a workspace.
+/// Options controlling workspace model discovery at LSP startup.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkspaceDiscoveryOptions {
+    /// When `false`, workspace roots are not scanned for model files.
+    pub enabled: bool,
     /// Exact directory names that are not descended into during discovery.
     pub skip_dir_names: Vec<String>,
 }
@@ -23,6 +25,10 @@ pub fn discover_model_paths(
     workspace_roots: &[PathBuf],
     options: &WorkspaceDiscoveryOptions,
 ) -> IndexSet<ModelPath> {
+    if !options.enabled {
+        return IndexSet::new();
+    }
+
     let mut paths = IndexSet::new();
 
     for root in workspace_roots {

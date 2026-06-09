@@ -141,6 +141,10 @@ pub struct LspArgs {
     )]
     pub skip_dirs: Vec<String>,
 
+    /// Do not scan workspace roots for model files at startup
+    #[arg(long)]
+    pub disable_workspace_discovery: bool,
+
     #[command(flatten)]
     pub common: CommonArgs,
 }

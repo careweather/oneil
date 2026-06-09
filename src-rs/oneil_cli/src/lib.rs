@@ -81,9 +81,14 @@ pub fn main() {
 }
 
 fn handle_lsp_command(args: LspArgs) {
-    let LspArgs { skip_dirs, common } = args;
+    let LspArgs {
+        skip_dirs,
+        disable_workspace_discovery,
+        common,
+    } = args;
     let (cache_read_policy, cache_write_policy) = cache_policies_from_common(&common);
     let discovery_options = oneil_lsp::WorkspaceDiscoveryOptions {
+        enabled: !disable_workspace_discovery,
         skip_dir_names: skip_dirs,
     };
     oneil_lsp::run(cache_read_policy, cache_write_policy, discovery_options);
