@@ -6,21 +6,28 @@ use indexmap::IndexSet;
 use oneil_runtime::Runtime;
 use oneil_shared::paths::ModelPath;
 
-/// Directory names skipped while scanning a workspace for Oneil source files.
-const SKIP_DIR_NAMES: &[&str] = &[".git", "node_modules", "target", ".worktrees"];
+/// Options controlling which paths are considered while scanning a workspace.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WorkspaceDiscoveryOptions {
+    /// Exact directory names that are not descended into during discovery.
+    pub skip_dir_names: Vec<String>,
+}
 
 /// Returns every `.on` and `.one` file under `workspace_roots`.
 ///
-/// Roots are scanned independently. Hidden directories and [`SKIP_DIR_NAMES`]
-/// are not descended into. Unreadable directories are skipped without failing
-/// the whole scan.
+/// Roots are scanned independently. Hidden directories and names listed in
+/// `options.skip_dir_names` are not descended into. Unreadable directories are
+/// skipped without failing the whole scan.
 #[must_use]
-pub fn discover_model_paths(workspace_roots: &[PathBuf]) -> IndexSet<ModelPath> {
+pub fn discover_model_paths(
+    workspace_roots: &[PathBuf],
+    options: &WorkspaceDiscoveryOptions,
+) -> IndexSet<ModelPath> {
     let mut paths = IndexSet::new();
 
     for root in workspace_roots {
         if root.is_dir() {
-            collect_model_paths_under(root, &mut paths);
+            collect_model_paths_under(root, options, &mut paths);
         }
     }
 
@@ -28,8 +35,12 @@ pub fn discover_model_paths(workspace_roots: &[PathBuf]) -> IndexSet<ModelPath> 
 }
 
 /// Loads source for every model file under `workspace_roots` into `runtime`.
-pub fn load_workspace_models(runtime: &mut Runtime, workspace_roots: &[PathBuf]) -> usize {
-    discover_model_paths(workspace_roots)
+pub fn load_workspace_models(
+    runtime: &mut Runtime,
+    workspace_roots: &[PathBuf],
+    options: &WorkspaceDiscoveryOptions,
+) -> usize {
+    discover_model_paths(workspace_roots, options)
         .into_iter()
         .filter(|model_path| {
             let (_visited_paths, errors) = runtime.check_model(model_path);
@@ -39,7 +50,11 @@ pub fn load_workspace_models(runtime: &mut Runtime, workspace_roots: &[PathBuf])
 }
 
 /// Recursively collects Oneil model paths under `dir` into `paths`.
-fn collect_model_paths_under(dir: &Path, paths: &mut IndexSet<ModelPath>) {
+fn collect_model_paths_under(
+    dir: &Path,
+    options: &WorkspaceDiscoveryOptions,
+    paths: &mut IndexSet<ModelPath>,
+) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
@@ -47,11 +62,11 @@ fn collect_model_paths_under(dir: &Path, paths: &mut IndexSet<ModelPath>) {
     for entry in entries.filter_map(Result::ok) {
         let path = entry.path();
         if path.is_dir() {
-            if should_skip_dir(&path) {
+            if should_skip_dir(&path, options) {
                 continue;
             }
 
-            collect_model_paths_under(&path, paths);
+            collect_model_paths_under(&path, options, paths);
         } else if let Ok(model_path) = ModelPath::try_from(path.as_path()) {
             paths.insert(model_path);
         }
@@ -59,10 +74,10 @@ fn collect_model_paths_under(dir: &Path, paths: &mut IndexSet<ModelPath>) {
 }
 
 /// Returns `true` when `dir` should not be scanned for model files.
-fn should_skip_dir(dir: &Path) -> bool {
+fn should_skip_dir(dir: &Path, options: &WorkspaceDiscoveryOptions) -> bool {
     let Some(name) = dir.file_name().and_then(|n| n.to_str()) else {
         return true;
     };
 
-    SKIP_DIR_NAMES.contains(&name) || name.starts_with('.')
+    options.skip_dir_names.iter().any(|skip| skip == name) || name.starts_with('.')
 }
