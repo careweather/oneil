@@ -12,7 +12,7 @@ use oneil_shared::{
     span::Span,
     symbols::{ParameterName, ReferenceName},
 };
-use tower_lsp_server::ls_types::{PrepareRenameResponse, Range, TextEdit, Uri, WorkspaceEdit};
+use tower_lsp_server::ls_types::{PrepareRenameResponse, TextEdit, Uri, WorkspaceEdit};
 
 use crate::{location::span_to_range, symbol_lookup::SymbolAtPosition};
 
@@ -55,7 +55,8 @@ pub fn resolve_rename_target(
             parameter_name,
             ..
         } => {
-            let model = load_model(runtime, current_model_path)?;
+            let model = runtime.load_and_lower(current_model_path).0;
+            let model = model?;
             let model_path = resolve_reference_model_path(model, reference_name)?;
             Some(RenameTarget::Parameter {
                 model_path,
@@ -125,10 +126,6 @@ pub fn workspace_edit_for_rename(
         });
     }
 
-    for edits in changes.values_mut() {
-        sort_edits_descending(edits);
-    }
-
     Ok(WorkspaceEdit {
         changes: Some(changes),
         document_changes: None,
@@ -151,7 +148,7 @@ fn validate_new_name(
                 return Err("new name is the same as the old name".to_string());
             }
 
-            let Some(model) = load_model(runtime, model_path) else {
+            let Some(model) = runtime.load_and_lower(model_path).0 else {
                 return Err("could not load model".to_string());
             };
 
@@ -167,7 +164,7 @@ fn validate_new_name(
                 return Err("new name is the same as the old name".to_string());
             }
 
-            let Some(model) = load_model(runtime, model_path) else {
+            let Some(model) = runtime.load_and_lower(model_path).0 else {
                 return Err("could not load model".to_string());
             };
 
@@ -240,7 +237,7 @@ fn collect_rename_occurrences(
 
             let mut occurrences = Vec::new();
             for path in paths {
-                let Some(model) = load_model(runtime, &path) else {
+                let Some(model) = runtime.load_and_lower(&path).0 else {
                     continue;
                 };
                 if path == *model_path {
@@ -254,15 +251,15 @@ fn collect_rename_occurrences(
                     );
                 }
             }
-            dedupe_occurrences(occurrences)
+            occurrences
         }
         RenameTarget::ImportAlias { model_path, name } => {
-            let Some(model) = load_model(runtime, model_path) else {
+            let Some(model) = runtime.load_and_lower(model_path).0 else {
                 return Vec::new();
             };
             let mut occurrences = Vec::new();
             collect_import_alias_occurrences(model, name, &mut occurrences);
-            dedupe_occurrences(occurrences)
+            occurrences
         }
     }
 }
@@ -353,17 +350,17 @@ fn collect_model_occurrences(
             push_occurrence(occurrences, model_path.clone(), param.name_span().clone());
         }
 
-        collect_parameter_value(model_path.clone(), param.value(), mode, occurrences);
-        collect_limits(model_path.clone(), param.limits(), mode, occurrences);
+        collect_parameter_value(model_path, param.value(), mode, occurrences);
+        collect_limits(model_path, param.limits(), mode, occurrences);
     }
 
     for test in model.tests().values() {
-        collect_expr(model_path.clone(), test.expr(), mode, occurrences);
+        collect_expr(model_path, test.expr(), mode, occurrences);
     }
 }
 
 fn collect_parameter_value(
-    model_path: ModelPath,
+    model_path: &ModelPath,
     value: &ir::ParameterValue,
     mode: &VariableRenameMode<'_>,
     occurrences: &mut Vec<RenameOccurrence>,
@@ -374,15 +371,15 @@ fn collect_parameter_value(
         }
         ir::ParameterValue::Piecewise(exprs, _) => {
             for piecewise in exprs {
-                collect_expr(model_path.clone(), piecewise.expr(), mode, occurrences);
-                collect_expr(model_path.clone(), piecewise.if_expr(), mode, occurrences);
+                collect_expr(model_path, piecewise.expr(), mode, occurrences);
+                collect_expr(model_path, piecewise.if_expr(), mode, occurrences);
             }
         }
     }
 }
 
 fn collect_limits(
-    model_path: ModelPath,
+    model_path: &ModelPath,
     limits: &ir::Limits,
     mode: &VariableRenameMode<'_>,
     occurrences: &mut Vec<RenameOccurrence>,
@@ -390,53 +387,26 @@ fn collect_limits(
     match limits {
         ir::Limits::Default => {}
         ir::Limits::Continuous { min, max, .. } => {
-            collect_expr(model_path.clone(), min, mode, occurrences);
+            collect_expr(model_path, min, mode, occurrences);
             collect_expr(model_path, max, mode, occurrences);
         }
         ir::Limits::Discrete { values, .. } => {
             for value in values {
-                collect_expr(model_path.clone(), value, mode, occurrences);
+                collect_expr(model_path, value, mode, occurrences);
             }
         }
     }
 }
 
 fn collect_expr(
-    model_path: ModelPath,
+    model_path: &ModelPath,
     expr: &ir::Expr,
     mode: &VariableRenameMode<'_>,
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
-    match expr {
-        ir::Expr::Variable { variable, .. } => {
-            visit_variable(model_path, variable, mode, occurrences);
-        }
-        ir::Expr::ComparisonOp {
-            left,
-            right,
-            rest_chained,
-            ..
-        } => {
-            collect_expr(model_path.clone(), left, mode, occurrences);
-            collect_expr(model_path.clone(), right, mode, occurrences);
-            for (_, chained) in rest_chained {
-                collect_expr(model_path.clone(), chained, mode, occurrences);
-            }
-        }
-        ir::Expr::BinaryOp { left, right, .. } | ir::Expr::Fallback { left, right, .. } => {
-            collect_expr(model_path.clone(), left, mode, occurrences);
-            collect_expr(model_path, right, mode, occurrences);
-        }
-        ir::Expr::UnaryOp { expr, .. } | ir::Expr::UnitCast { expr, .. } => {
-            collect_expr(model_path, expr, mode, occurrences);
-        }
-        ir::Expr::FunctionCall { args, .. } => {
-            for arg in args {
-                collect_expr(model_path.clone(), arg, mode, occurrences);
-            }
-        }
-        ir::Expr::Literal { .. } => {}
-    }
+    expr.walk_variables(&mut |variable| {
+        visit_variable(model_path.clone(), variable, mode, occurrences);
+    });
 }
 
 fn visit_variable(
@@ -496,31 +466,9 @@ fn push_occurrence(occurrences: &mut Vec<RenameOccurrence>, model_path: ModelPat
     occurrences.push(RenameOccurrence { model_path, span });
 }
 
-fn dedupe_occurrences(mut occurrences: Vec<RenameOccurrence>) -> Vec<RenameOccurrence> {
-    occurrences.sort_by_key(|o| {
-        (
-            o.model_path.clone(),
-            o.span.start().offset,
-            o.span.end().offset,
-        )
-    });
-    occurrences.dedup();
-    occurrences
-}
-
-fn sort_edits_descending(edits: &mut [TextEdit]) {
-    edits.sort_by(|left, right| {
-        left.range
-            .start
-            .line
-            .cmp(&right.range.start.line)
-            .then_with(|| left.range.start.character.cmp(&right.range.start.character))
-    });
-}
-
 /// Maps a cursor symbol to a prepare-rename response.
 pub fn prepare_rename_response(symbol: &SymbolAtPosition) -> Option<PrepareRenameResponse> {
-    let range = prepare_rename_range(symbol);
+    let range = span_to_range(&symbol.span());
     let placeholder = match symbol {
         SymbolAtPosition::ParameterDefinition { name, .. }
         | SymbolAtPosition::ParameterReference { name, .. }
@@ -541,17 +489,4 @@ pub fn prepare_rename_response(symbol: &SymbolAtPosition) -> Option<PrepareRenam
     };
 
     Some(PrepareRenameResponse::RangeWithPlaceholder { range, placeholder })
-}
-
-/// Returns the range to highlight during prepare-rename.
-#[must_use]
-fn prepare_rename_range(symbol: &SymbolAtPosition) -> Range {
-    span_to_range(&symbol.span())
-}
-
-fn load_model<'runtime>(
-    runtime: &'runtime mut Runtime,
-    path: &ModelPath,
-) -> Option<ModelTemplateReference<'runtime>> {
-    runtime.load_and_lower(path).0
 }
