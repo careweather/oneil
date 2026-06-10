@@ -34,7 +34,7 @@ pub mod validation_error;
 
 pub use compilation_unit::CompilationUnit;
 pub use cycle_error::CompilationCycleError;
-pub use design::ApplyDesign;
+pub use design::{ApplyDesign, OverlayParameterValue};
 pub use graph::{
     BuiltinLookup, CycleStackFrame, InstanceGraph, ModelDesignInfo, UnitGraphCache, apply_designs,
     build_instance_graph, build_unit_graph, build_unit_graph_for, classify_variables,

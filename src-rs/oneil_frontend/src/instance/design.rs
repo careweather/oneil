@@ -34,7 +34,7 @@ pub struct ApplyDesign {
 
 /// Resolved RHS for a single parameter assignment inside a design.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct OverlayParameterValue {
+pub struct OverlayParameterValue {
     /// Resolved parameter value (expression or piecewise).
     pub value: ir::ParameterValue,
     /// Span of the design assignment identifier.
@@ -101,5 +101,39 @@ impl Design {
     /// Creates an empty design with no declared target.
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    /// Returns the resolved `design <model>` target and its source span, when declared.
+    #[must_use]
+    pub fn target_model(&self) -> Option<(&ModelPath, &Span)> {
+        self.target_model.as_ref().map(|(path, span)| (path, span))
+    }
+
+    /// Returns parameters introduced by this design file.
+    pub fn parameter_additions(&self) -> impl Iterator<Item = &ir::Parameter> {
+        self.parameter_additions.values()
+    }
+
+    /// Returns parameter overrides (`id = expr`) from this design file.
+    pub fn parameter_overrides(
+        &self,
+    ) -> impl Iterator<Item = (&ParameterName, &OverlayParameterValue)> {
+        self.parameter_overrides.iter()
+    }
+
+    /// Returns scoped parameter overrides (`ref.id = expr`) from this design file.
+    pub fn scoped_parameter_overrides(
+        &self,
+    ) -> impl Iterator<Item = (&InstancePath, &ParameterName, &OverlayParameterValue)> {
+        self.scoped_overrides.iter().flat_map(|(path, overrides)| {
+            overrides
+                .iter()
+                .map(move |(name, overlay)| (path, name, overlay))
+        })
+    }
+
+    /// Returns tests added by this design file.
+    pub fn test_additions(&self) -> impl Iterator<Item = &ir::Test> {
+        self.test_additions.values()
     }
 }

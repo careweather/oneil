@@ -119,5 +119,11 @@ pub fn resolve_definition(
         }
         SymbolAtPosition::BuiltinValueReference { .. }
         | SymbolAtPosition::BuiltinFunctionReference { .. } => None,
+        SymbolAtPosition::DesignTarget { .. } => todo!(),
+        SymbolAtPosition::ApplyDesignPath { .. } => todo!(),
+        SymbolAtPosition::ApplyTargetReference { .. } => todo!(),
+        SymbolAtPosition::DesignParameterAddition { .. } => todo!(),
+        SymbolAtPosition::DesignParameterOverride { .. } => todo!(),
+        SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => todo!(),
     }
 }

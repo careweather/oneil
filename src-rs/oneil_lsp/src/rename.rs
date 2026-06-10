@@ -73,6 +73,12 @@ pub fn resolve_rename_target(
                 name: reference_name.clone(),
             })
         }
+        SymbolAtPosition::DesignTarget { .. }
+        | SymbolAtPosition::ApplyDesignPath { .. }
+        | SymbolAtPosition::ApplyTargetReference { .. }
+        | SymbolAtPosition::DesignParameterAddition { .. }
+        | SymbolAtPosition::DesignParameterOverride { .. }
+        | SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => todo!(),
         SymbolAtPosition::ModelImportDefinition { .. }
         | SymbolAtPosition::BuiltinValueReference { .. }
         | SymbolAtPosition::BuiltinFunctionReference { .. }
@@ -486,6 +492,12 @@ pub fn prepare_rename_response(symbol: &SymbolAtPosition) -> Option<PrepareRenam
         | SymbolAtPosition::BuiltinFunctionReference { .. }
         | SymbolAtPosition::PythonImport { .. }
         | SymbolAtPosition::PythonFunctionReference { .. } => return None,
+        SymbolAtPosition::DesignTarget { .. }
+        | SymbolAtPosition::ApplyDesignPath { .. }
+        | SymbolAtPosition::ApplyTargetReference { .. }
+        | SymbolAtPosition::DesignParameterAddition { .. }
+        | SymbolAtPosition::DesignParameterOverride { .. }
+        | SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => todo!(),
     };
 
     Some(PrepareRenameResponse::RangeWithPlaceholder { range, placeholder })

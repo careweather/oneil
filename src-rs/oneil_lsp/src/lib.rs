@@ -316,8 +316,7 @@ impl LanguageServer for Backend {
                 .lock()
                 .expect("if the runtime has panicked elsewhere, it is not in a useful state");
 
-            // TODO: handle design info if it exists
-            let (ir_model, _design_info_opt, errors) = runtime.load_and_lower(&current_model_path);
+            let (ir_model, design_info_opt, errors) = runtime.load_and_lower(&current_model_path);
 
             let Some(ir_model) = ir_model else {
                 let errors = errors.to_vec();
@@ -325,7 +324,9 @@ impl LanguageServer for Backend {
             };
 
             // Find the symbol at the cursor position
-            let Some(symbol) = symbol_lookup::find_symbol_at_offset(ir_model, offset) else {
+            let Some(symbol) =
+                symbol_lookup::find_symbol_at_offset(ir_model, design_info_opt.as_ref(), offset)
+            else {
                 break 'complete (Ok(None), Some("No symbol found at position".to_string()));
             };
 
@@ -423,8 +424,7 @@ impl LanguageServer for Backend {
                 .lock()
                 .expect("if the runtime has panicked elsewhere, it is not in a useful state");
 
-            // TODO: handle design info if it exists
-            let (ir_model, _design_info_opt, errors) = runtime.load_and_lower(&current_model_path);
+            let (ir_model, design_info_opt, errors) = runtime.load_and_lower(&current_model_path);
 
             let Some(ir_model) = ir_model else {
                 break 'complete (
@@ -433,7 +433,9 @@ impl LanguageServer for Backend {
                 );
             };
 
-            let Some(symbol) = symbol_lookup::find_symbol_at_offset(ir_model, offset) else {
+            let Some(symbol) =
+                symbol_lookup::find_symbol_at_offset(ir_model, design_info_opt.as_ref(), offset)
+            else {
                 break 'complete (Ok(None), Some("hover: no symbol at position".to_string()));
             };
 
@@ -552,10 +554,9 @@ impl Backend {
         let offset = self.docs.position_to_offset(uri, position).await?;
 
         let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
-        // TODO: handle design info if it exists
-        let (ir_model, _design_info_opt, _errors) = runtime.load_and_lower(&current_model_path);
+        let (ir_model, design_info_opt, _errors) = runtime.load_and_lower(&current_model_path);
         let ir_model = ir_model?;
-        let symbol = symbol_lookup::find_symbol_at_offset(ir_model, offset)?;
+        let symbol = symbol_lookup::find_symbol_at_offset(ir_model, design_info_opt.as_ref(), offset)?;
 
         Some((current_model_path, symbol))
     }

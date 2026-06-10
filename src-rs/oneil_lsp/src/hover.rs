@@ -117,6 +117,12 @@ pub fn hover_markdown(
         SymbolAtPosition::BuiltinFunctionReference { name, .. } => runtime
             .lookup_builtin_function_docs(name)
             .map(|(args, doc)| format_builtin_function_hover(name, args, doc)),
+        SymbolAtPosition::DesignTarget { .. } => todo!(),
+        SymbolAtPosition::ApplyDesignPath { .. } => todo!(),
+        SymbolAtPosition::ApplyTargetReference { .. } => todo!(),
+        SymbolAtPosition::DesignParameterAddition { .. } => todo!(),
+        SymbolAtPosition::DesignParameterOverride { .. } => todo!(),
+        SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => todo!(),
     }
 }
 
