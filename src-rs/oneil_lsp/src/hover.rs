@@ -3,17 +3,23 @@
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
+use oneil_frontend::instance::design::Design;
 use oneil_runtime::{
     Runtime,
     output::{Value, ir},
 };
 use oneil_shared::{
+    InstancePath,
     paths::{ModelPath, PythonPath},
-    symbols::{BuiltinFunctionName, BuiltinValueName, PyFunctionName},
+    symbols::{BuiltinFunctionName, BuiltinValueName, ParameterName, PyFunctionName},
 };
 use tower_lsp_server::ls_types::{HoverContents, MarkedString};
 
-use crate::{path::trim_path, symbol_lookup::SymbolAtPosition};
+use crate::{
+    model_navigation::{resolve_import_reference_model_path, resolve_instance_path_model_path},
+    path::trim_path,
+    symbol_lookup::SymbolAtPosition,
+};
 
 const PLAINTEXT_LANG_CODE: &str = "plaintext";
 
@@ -70,29 +76,19 @@ pub fn hover_markdown(
                 workspace_roots,
             ))
         }
-        SymbolAtPosition::ModelImportDefinition { path, .. } => {
+        SymbolAtPosition::ModelImportDefinition { path, .. }
+        | SymbolAtPosition::DesignTarget { path, .. }
+        | SymbolAtPosition::ApplyDesignPath { path, .. } => {
             format_model_hover_from_path(runtime, path, workspace_roots)
         }
         SymbolAtPosition::ModelImportAlias {
             alias: reference_name,
             ..
         }
-        | SymbolAtPosition::ModelImportReference { reference_name, .. } => {
-            let imported_path = {
-                // TODO: handle design info if it exists
-                let (model, _design_info_opt, _errors) = runtime.load_and_lower(current_model_path);
-                let model = model?;
-                model
-                    .reference_imports()
-                    .get(reference_name)
-                    .map(|r| r.path.clone())
-                    .or_else(|| {
-                        model
-                            .submodel_imports()
-                            .get(reference_name)
-                            .map(|s| s.instance.path().clone())
-                    })?
-            };
+        | SymbolAtPosition::ModelImportReference { reference_name, .. }
+        | SymbolAtPosition::ApplyTargetReference { reference_name, .. } => {
+            let imported_path =
+                resolve_import_reference_model_path(runtime, current_model_path, reference_name)?;
 
             format_model_hover_from_path(runtime, &imported_path, workspace_roots)
         }
@@ -117,12 +113,34 @@ pub fn hover_markdown(
         SymbolAtPosition::BuiltinFunctionReference { name, .. } => runtime
             .lookup_builtin_function_docs(name)
             .map(|(args, doc)| format_builtin_function_hover(name, args, doc)),
-        SymbolAtPosition::DesignTarget { .. } => todo!(),
-        SymbolAtPosition::ApplyDesignPath { .. } => todo!(),
-        SymbolAtPosition::ApplyTargetReference { .. } => todo!(),
-        SymbolAtPosition::DesignParameterAddition { .. } => todo!(),
-        SymbolAtPosition::DesignParameterOverride { .. } => todo!(),
-        SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => todo!(),
+
+        SymbolAtPosition::DesignParameterAddition { name, .. } => {
+            format_design_parameter_addition_hover(
+                runtime,
+                current_model_path,
+                name,
+                workspace_roots,
+            )
+        }
+        SymbolAtPosition::DesignParameterOverride {
+            name,
+            instance_path,
+            ..
+        } => format_design_parameter_override_hover(
+            runtime,
+            current_model_path,
+            name,
+            instance_path.as_ref(),
+            workspace_roots,
+        ),
+        SymbolAtPosition::DesignParameterOverrideInstancePath { instance_path, .. } => {
+            format_design_instance_path_hover(
+                runtime,
+                current_model_path,
+                instance_path,
+                workspace_roots,
+            )
+        }
     }
 }
 
@@ -146,6 +164,109 @@ fn format_parameter_hover(
     } else {
         HoverContents::Array(vec![path, name_and_label])
     }
+}
+
+/// Hover for a parameter introduced by a design file.
+fn format_design_parameter_addition_hover(
+    runtime: &mut Runtime,
+    design_file_path: &ModelPath,
+    name: &ParameterName,
+    workspace_roots: &[PathBuf],
+) -> Option<HoverContents> {
+    let (_, design_info_opt, _) = runtime.load_and_lower(design_file_path);
+    let design_info = design_info_opt?;
+    let design = design_info.design_export.as_ref()?;
+    let param = design
+        .parameter_additions()
+        .find(|parameter| parameter.name() == name)?;
+
+    Some(format_parameter_hover(
+        design_file_path,
+        param,
+        workspace_roots,
+    ))
+}
+
+/// Hover for a parameter overridden in a design file.
+fn format_design_parameter_override_hover(
+    runtime: &mut Runtime,
+    design_file_path: &ModelPath,
+    name: &ParameterName,
+    instance_path: Option<&InstancePath>,
+    workspace_roots: &[PathBuf],
+) -> Option<HoverContents> {
+    let (_, design_info_opt, _) = runtime.load_and_lower(design_file_path);
+    let design_info = design_info_opt?;
+    let design = design_info.design_export.as_ref()?;
+    let overlay = find_design_parameter_overlay(design, name, instance_path)?;
+    let (target_model_path, _) = design.target_model()?;
+    let effective_target_path =
+        resolve_instance_path_model_path(runtime, target_model_path, instance_path).ok()?;
+
+    let (target_model, _, _) = runtime.load_and_lower(&effective_target_path);
+    let target_model = target_model?;
+    let target_param = target_model.get_parameter(name)?;
+
+    let label = overlay
+        .label
+        .as_ref()
+        .map_or_else(|| target_param.label().as_str(), |label| label.as_str());
+    let name_and_label = format!("{label}: {}", name.as_str());
+    let name_and_label =
+        MarkedString::from_language_code(PLAINTEXT_LANG_CODE.to_string(), name_and_label);
+
+    let path = path_as_marked_string(effective_target_path.as_path(), workspace_roots);
+    let note = overlay.note.as_ref().or(target_param.note());
+
+    Some(match note {
+        Some(note) => HoverContents::Array(vec![path, name_and_label, note_as_marked_string(note)]),
+        None => HoverContents::Array(vec![path, name_and_label]),
+    })
+}
+
+/// Hover for an instance-path prefix in a scoped design override.
+fn format_design_instance_path_hover(
+    runtime: &mut Runtime,
+    design_file_path: &ModelPath,
+    instance_path: &InstancePath,
+    workspace_roots: &[PathBuf],
+) -> Option<HoverContents> {
+    let (_, design_info_opt, _) = runtime.load_and_lower(design_file_path);
+    let design_info = design_info_opt?;
+    let design = design_info.design_export.as_ref()?;
+    let (target_model_path, _) = design.target_model()?;
+    let effective_target_path = resolve_instance_path_model_path(
+        runtime,
+        target_model_path,
+        Some(instance_path),
+    )
+    .ok()?;
+
+    format_model_hover_from_path(runtime, &effective_target_path, workspace_roots)
+}
+
+/// Returns the design overlay for a parameter override, if present.
+fn find_design_parameter_overlay<'a>(
+    design: &'a Design,
+    name: &ParameterName,
+    instance_path: Option<&InstancePath>,
+) -> Option<&'a oneil_frontend::OverlayParameterValue> {
+    instance_path.filter(|path| !path.is_empty()).map_or_else(
+        || {
+            design
+                .parameter_overrides()
+                .find(|(parameter_name, _)| *parameter_name == name)
+                .map(|(_, overlay)| overlay)
+        },
+        |path| {
+            design
+                .scoped_parameter_overrides()
+                .find(|(scope_path, parameter_name, _)| {
+                    *scope_path == path && *parameter_name == name
+                })
+                .map(|(_, _, overlay)| overlay)
+        },
+    )
 }
 
 fn format_model_hover_from_path(
