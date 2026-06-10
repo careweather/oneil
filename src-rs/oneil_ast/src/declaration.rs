@@ -3,7 +3,10 @@
 // TODO: rename `Import` to `ImportPython`
 use std::{ops::Deref, path::PathBuf};
 
-use oneil_shared::paths::{DesignPath, ModelPath};
+use oneil_shared::{
+    paths::{DesignPath, ModelPath},
+    span::Span,
+};
 
 use crate::{
     debug_info::TraceLevelNode,
@@ -452,6 +455,17 @@ impl ApplyDesign {
     #[must_use]
     pub const fn design_file(&self) -> &IdentifierNode {
         &self.design_file
+    }
+
+    /// Returns the span of the design file path.
+    #[must_use]
+    pub fn design_file_path_span(&self) -> Span {
+        self.directory_path.first().map_or_else(
+            || self.design_file.span().clone(),
+            |first_directory_path| {
+                Span::from_start_and_end(first_directory_path.span(), self.design_file.span())
+            },
+        )
     }
 
     /// Returns the non-empty `to <ref>(.<ref>)*` path identifying the apply target.

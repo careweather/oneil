@@ -346,7 +346,7 @@ pub fn resolve_design_surface<E: ExternalResolutionContext>(
     record_applied_designs(
         &surface,
         model_path,
-        exported_target.as_ref(),
+        exported_target.as_ref().map(|(target, _span)| target),
         resolution_context,
     );
 }
@@ -359,14 +359,18 @@ fn scan_design_locals<E: ExternalResolutionContext>(
     model_path: &ModelPath,
     surface: &[DesignSurfaceItem<'_>],
     resolution_context: &mut ResolutionContext<'_, E>,
-) -> (Option<ModelPath>, IndexSet<ParameterName>) {
-    let mut explicit_target: Option<ModelPath> = None;
+) -> (Option<(ModelPath, Span)>, IndexSet<ParameterName>) {
+    let mut explicit_target: Option<(ModelPath, Span)> = None;
     let mut design_param_names: IndexSet<ParameterName> = IndexSet::new();
     for item in surface {
         match item {
             DesignSurfaceItem::Target(node) => {
                 let relative_path = node.get_target_relative_path();
-                explicit_target = Some(model_path.get_sibling_model_path(relative_path));
+                let target_span = node.span().clone();
+                explicit_target = Some((
+                    model_path.get_sibling_model_path(relative_path),
+                    target_span,
+                ));
             }
             DesignSurfaceItem::Parameter { node: p, .. } if p.instance_path().is_none() => {
                 design_param_names.insert(ParameterName::from(p.ident().as_str()));
@@ -376,7 +380,7 @@ fn scan_design_locals<E: ExternalResolutionContext>(
     }
 
     let mut design_local_param_names: IndexSet<ParameterName> = IndexSet::new();
-    if let Some(tgt) = &explicit_target {
+    if let Some((tgt, _tgt_span)) = &explicit_target {
         for name in &design_param_names {
             let exists = matches!(
                 resolution_context.lookup_model(tgt),
@@ -400,24 +404,25 @@ fn scan_design_locals<E: ExternalResolutionContext>(
 fn handle_design_target(
     node: &ast::DesignTargetNode,
     model_path: &ModelPath,
-    explicit_target: &mut Option<ModelPath>,
+    explicit_target: &mut Option<(ModelPath, Span)>,
     running: &mut Design,
 ) {
     let relative_path = node.get_target_relative_path();
+    let target_span = node.span().clone();
     let p = model_path.get_sibling_model_path(relative_path);
-    *explicit_target = Some(p.clone());
-    running.target_model = Some(p);
+    *explicit_target = Some((p.clone(), target_span.clone()));
+    running.target_model = Some((p, target_span));
 }
 
 fn handle_design_parameter<E: ExternalResolutionContext>(
     p: &ast::DesignParameterNode,
     section: Option<DesignSectionContext>,
-    explicit_target: Option<&ModelPath>,
+    explicit_target: Option<&(ModelPath, Span)>,
     design_local_param_names: &IndexSet<ParameterName>,
     running: &mut Design,
     resolution_context: &mut ResolutionContext<'_, E>,
 ) {
-    let Some(tgt) = explicit_target.cloned() else {
+    let Some((tgt, _tgt_span)) = explicit_target.cloned() else {
         resolution_context.add_design_resolution_error_to_active_model(
             "design parameter line requires a preceding `design <model>` declaration",
             p.ident().span().clone(),
@@ -429,6 +434,8 @@ fn handle_design_parameter<E: ExternalResolutionContext>(
     let instance_path = p
         .instance_path()
         .map(|seg| InstancePath::root().child(ReferenceName::new(seg.as_str().to_string())));
+
+    let instance_path_span = p.instance_path().map(|path| path.span().clone());
 
     // Resolve the RHS in the design target's scope.
     let active = resolution_context
@@ -474,6 +481,7 @@ fn handle_design_parameter<E: ExternalResolutionContext>(
     let overlay_value = OverlayParameterValue {
         value,
         design_span: design_span.clone(),
+        instance_path_span,
         original_model_span,
         note: p.note().map(|n| ir::Note::new(n.value().to_string())),
         label: p.label().map(|l| ParameterLabel::from(l.as_str())),
@@ -499,7 +507,7 @@ fn handle_design_parameter<E: ExternalResolutionContext>(
 /// design content; otherwise stores nothing.
 fn store_design_export<E: ExternalResolutionContext>(
     surface: &[DesignSurfaceItem<'_>],
-    explicit_target: Option<ModelPath>,
+    explicit_target: Option<(ModelPath, Span)>,
     mut running: Design,
     resolution_context: &mut ResolutionContext<'_, E>,
 ) {
@@ -567,6 +575,7 @@ fn record_apply_recursive<E: ExternalResolutionContext>(
     let mut target_path = outer_target.clone();
     let mut current_model = consuming_model.clone();
     let mut last_resolved = ReferenceName::new(String::new());
+    let mut target_segments = Vec::new();
 
     for (i, seg) in segments.iter().enumerate() {
         let resolved = match resolve_segment_in(&current_model, seg.as_str(), resolution_context) {
@@ -579,6 +588,8 @@ fn record_apply_recursive<E: ExternalResolutionContext>(
         };
         target_path = target_path.child(resolved.clone());
         last_resolved = resolved.clone();
+
+        target_segments.push((target_path.clone(), seg.span().clone()));
 
         // For every segment except the last, advance `current_model` to the
         // model that `resolved` points to so the next segment is validated in
@@ -608,6 +619,7 @@ fn record_apply_recursive<E: ExternalResolutionContext>(
     let relative_path = node.get_design_relative_path();
     let dpath = model_path.get_sibling_design_path(relative_path);
     let dpath_as_model = dpath.to_model_path();
+    let dpath_span = node.design_file_path_span();
 
     let final_model =
         lookup_referenced_model_path(&current_model, &last_resolved, resolution_context);
@@ -617,7 +629,7 @@ fn record_apply_recursive<E: ExternalResolutionContext>(
             .get_design_export(&dpath_as_model)
             .and_then(|d| d.target_model.clone());
 
-        if let Some(design_target) = design_target.as_ref()
+        if let Some((design_target, _design_target_span)) = design_target.as_ref()
             && !same_model_path(design_target, final_model_path)
         {
             let target_display = segments
@@ -643,7 +655,9 @@ fn record_apply_recursive<E: ExternalResolutionContext>(
 
     resolution_context.add_applied_design_to_active_model(ApplyDesign {
         design_path: dpath,
+        design_path_span: dpath_span,
         target: target_path.clone(),
+        target_segments,
         span: node.span().clone(),
     });
 

@@ -218,7 +218,9 @@ impl Runtime {
 
         vec![ApplyDesign {
             design_path: design_path.clone(),
+            design_path_span: Span::synthetic(),
             target: oneil_shared::InstancePath::root(),
+            target_segments: Vec::new(),
             span: oneil_shared::span::Span::synthetic(),
         }]
     }

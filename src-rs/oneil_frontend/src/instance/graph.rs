@@ -399,7 +399,7 @@ fn build_design_unit_graph(
     let Some(design) = info.design_export.as_ref() else {
         return empty_with_errors(ctx);
     };
-    let Some(target_path) = design.target_model.clone() else {
+    let Some((target_path, _target_span)) = design.target_model.clone() else {
         return empty_with_errors(ctx);
     };
 

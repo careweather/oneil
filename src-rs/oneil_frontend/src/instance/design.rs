@@ -22,8 +22,12 @@ use oneil_shared::{
 pub struct ApplyDesign {
     /// Path to the `.one` design file being applied.
     pub design_path: DesignPath,
+    /// Span of the design path
+    pub design_path_span: Span,
     /// Reference-name path on the consuming model identifying the target instance.
     pub target: InstancePath,
+    /// Segments of the target path and their spans. Used in the LSP
+    pub target_segments: Vec<(InstancePath, Span)>,
     /// Span of the `apply` declaration that produced this record.
     pub span: Span,
 }
@@ -35,6 +39,8 @@ pub(crate) struct OverlayParameterValue {
     pub value: ir::ParameterValue,
     /// Span of the design assignment identifier.
     pub design_span: Span,
+    /// Span of the instance path that the parameter is overridden on.
+    pub instance_path_span: Option<Span>,
     /// Span of the full parameter definition on the target model (falls back to
     /// `design_span` when the target parameter is absent from the resolved model).
     pub original_model_span: Span,
@@ -65,8 +71,8 @@ pub(crate) struct OverlayParameterValue {
 /// processed recursively by the graph builder.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Design {
-    /// Model this design parameterizes (`design <name>`), when set.
-    pub(crate) target_model: Option<ModelPath>,
+    /// Model this design parameterizes (`design <name>`) and its span, when set.
+    pub(crate) target_model: Option<(ModelPath, Span)>,
     /// Model-level documentation note from the design file itself, if present.
     ///
     /// When a design is evaluated as the entry point (e.g. `oneil eval mars.one`
