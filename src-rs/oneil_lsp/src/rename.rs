@@ -34,12 +34,6 @@ pub enum RenameTarget {
         model_path: ModelPath,
         name: ReferenceName,
     },
-    /// A parameter name in a design file override (`id = expr` or `ref.id = expr`).
-    DesignParameterOverride {
-        model_path: ModelPath,
-        name: ParameterName,
-        instance_path: Option<InstancePath>,
-    },
 }
 
 /// A single source occurrence to replace.
@@ -89,11 +83,23 @@ pub fn resolve_rename_target(
             name,
             instance_path,
             ..
-        } => Some(RenameTarget::DesignParameterOverride {
-            model_path: current_model_path.clone(),
-            name: name.clone(),
-            instance_path: instance_path.clone(),
-        }),
+        } => {
+            let (_, design_info_opt, _) = runtime.load_and_lower(current_model_path);
+            let design_info = design_info_opt?;
+            let design_export = design_info.design_export.as_ref()?;
+            let (target_model_path, _) = design_export.target_model()?;
+            let effective_target_path = resolve_instance_path_model_path(
+                runtime,
+                target_model_path,
+                instance_path.as_ref(),
+            )
+            .ok()?;
+
+            Some(RenameTarget::Parameter {
+                model_path: effective_target_path,
+                name: name.clone(),
+            })
+        }
         SymbolAtPosition::DesignParameterOverrideInstancePath { .. }
         | SymbolAtPosition::ModelImportDefinition { .. }
         | SymbolAtPosition::BuiltinValueReference { .. }
@@ -229,59 +235,6 @@ fn validate_new_name(
                 return Err(format!("import alias '{new_name}' already exists"));
             }
         }
-        RenameTarget::DesignParameterOverride {
-            model_path: design_file_path,
-            name,
-            instance_path,
-        } => {
-            if new_name == name.as_str() {
-                return Err("new name is the same as the old name".to_string());
-            }
-
-            let new_parameter_name = ParameterName::from(new_name);
-
-            let (_, design_info_opt, _) = runtime.load_and_lower(design_file_path);
-            let Some(design_info) = design_info_opt else {
-                return Err("could not load design file".to_string());
-            };
-            let Some(design) = design_info.design_export.as_ref() else {
-                return Err("design file has no design export".to_string());
-            };
-
-            if design
-                .parameter_additions()
-                .any(|parameter| parameter.name() == &new_parameter_name)
-            {
-                return Err(format!(
-                    "parameter '{new_name}' already exists in design file"
-                ));
-            }
-
-            let Some((target_model_path, _)) = design.target_model() else {
-                return Err("design file has no target model".to_string());
-            };
-
-            let effective_target_path = resolve_instance_path_model_path(
-                runtime,
-                target_model_path,
-                instance_path.as_ref(),
-            )?;
-
-            let (Some(effective_target_model), _, _) =
-                runtime.load_and_lower(&effective_target_path)
-            else {
-                return Err("could not load target model".to_string());
-            };
-
-            if effective_target_model
-                .parameters()
-                .contains_key(&new_parameter_name)
-            {
-                return Err(format!(
-                    "parameter '{new_name}' already exists on target model"
-                ));
-            }
-        }
     }
 
     Ok(())
@@ -323,59 +276,6 @@ fn collect_rename_occurrences(
             };
             let mut occurrences = Vec::new();
             collect_import_alias_occurrences(model, name, &mut occurrences);
-            occurrences
-        }
-        RenameTarget::DesignParameterOverride {
-            model_path: design_file_path,
-            name,
-            instance_path,
-        } => {
-            let (_, design_info_opt, _) = runtime.load_and_lower(design_file_path);
-            let Some(design_info) = design_info_opt else {
-                return Vec::new();
-            };
-
-            let Some(design) = design_info.design_export.as_ref() else {
-                return Vec::new();
-            };
-
-            let mut occurrences = Vec::new();
-            let mode = VariableRenameMode::LocalParameter { name };
-
-            if let Some(overlay) =
-                find_matching_design_override(design, name, instance_path.as_ref())
-            {
-                push_occurrence(
-                    &mut occurrences,
-                    design_file_path.clone(),
-                    overlay.design_span.clone(),
-                );
-            }
-
-            collect_design_export_parameter_references(
-                design_file_path,
-                design,
-                &mode,
-                &mut occurrences,
-            );
-
-            if let Some((target_model_path, _)) = design.target_model()
-                && let Ok(effective_target_path) = resolve_instance_path_model_path(
-                    runtime,
-                    target_model_path,
-                    instance_path.as_ref(),
-                )
-            {
-                collect_parameter_rename_occurrences(
-                    runtime,
-                    &effective_target_path,
-                    name,
-                    trigger_model_path,
-                    also_scan,
-                    &mut occurrences,
-                );
-            }
-
             occurrences
         }
     }
