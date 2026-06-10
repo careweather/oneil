@@ -13,6 +13,7 @@ mod diagnostics;
 mod doc_store;
 mod hover;
 mod location;
+mod model_navigation;
 mod path;
 mod rename;
 mod symbol_lookup;
@@ -556,7 +557,8 @@ impl Backend {
         let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
         let (ir_model, design_info_opt, _errors) = runtime.load_and_lower(&current_model_path);
         let ir_model = ir_model?;
-        let symbol = symbol_lookup::find_symbol_at_offset(ir_model, design_info_opt.as_ref(), offset)?;
+        let symbol =
+            symbol_lookup::find_symbol_at_offset(ir_model, design_info_opt.as_ref(), offset)?;
 
         Some((current_model_path, symbol))
     }

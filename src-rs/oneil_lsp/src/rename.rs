@@ -3,18 +3,20 @@
 use std::collections::HashMap;
 
 use indexmap::IndexSet;
+use oneil_frontend::instance::design::Design;
 use oneil_runtime::{
     Runtime,
     output::{ir, reference::ModelTemplateReference},
 };
 use oneil_shared::{
+    InstancePath,
     paths::ModelPath,
     span::Span,
     symbols::{ParameterName, ReferenceName},
 };
 use tower_lsp_server::ls_types::{PrepareRenameResponse, TextEdit, Uri, WorkspaceEdit};
 
-use crate::{location::span_to_range, symbol_lookup::SymbolAtPosition};
+use crate::{location::span_to_range, model_navigation::resolve_instance_path_model_path, symbol_lookup::SymbolAtPosition};
 
 /// What the user is renaming.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +30,12 @@ pub enum RenameTarget {
     ImportAlias {
         model_path: ModelPath,
         name: ReferenceName,
+    },
+    /// A parameter name in a design file override (`id = expr` or `ref.id = expr`).
+    DesignParameterOverride {
+        model_path: ModelPath,
+        name: ParameterName,
+        instance_path: Option<InstancePath>,
     },
 }
 
@@ -45,11 +53,6 @@ pub fn resolve_rename_target(
     current_model_path: &ModelPath,
 ) -> Option<RenameTarget> {
     match symbol {
-        SymbolAtPosition::ParameterDefinition { name, .. }
-        | SymbolAtPosition::ParameterReference { name, .. } => Some(RenameTarget::Parameter {
-            model_path: current_model_path.clone(),
-            name: name.clone(),
-        }),
         SymbolAtPosition::ExternalParameterReference {
             reference_name,
             parameter_name,
@@ -73,17 +76,30 @@ pub fn resolve_rename_target(
                 name: reference_name.clone(),
             })
         }
-        SymbolAtPosition::DesignTarget { .. }
-        | SymbolAtPosition::ApplyDesignPath { .. }
-        | SymbolAtPosition::ApplyTargetReference { .. }
-        | SymbolAtPosition::DesignParameterAddition { .. }
-        | SymbolAtPosition::DesignParameterOverride { .. }
-        | SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => todo!(),
-        SymbolAtPosition::ModelImportDefinition { .. }
+        SymbolAtPosition::ParameterDefinition { name, .. }
+        | SymbolAtPosition::ParameterReference { name, .. }
+        | SymbolAtPosition::DesignParameterAddition { name, .. } => Some(RenameTarget::Parameter {
+            model_path: current_model_path.clone(),
+            name: name.clone(),
+        }),
+        SymbolAtPosition::DesignParameterOverride {
+            name,
+            instance_path,
+            ..
+        } => Some(RenameTarget::DesignParameterOverride {
+            model_path: current_model_path.clone(),
+            name: name.clone(),
+            instance_path: instance_path.clone(),
+        }),
+        SymbolAtPosition::DesignParameterOverrideInstancePath { .. }
+        | SymbolAtPosition::ModelImportDefinition { .. }
         | SymbolAtPosition::BuiltinValueReference { .. }
         | SymbolAtPosition::BuiltinFunctionReference { .. }
         | SymbolAtPosition::PythonImport { .. }
-        | SymbolAtPosition::PythonFunctionReference { .. } => None,
+        | SymbolAtPosition::PythonFunctionReference { .. }
+        | SymbolAtPosition::DesignTarget { .. }
+        | SymbolAtPosition::ApplyDesignPath { .. }
+        | SymbolAtPosition::ApplyTargetReference { .. } => None,
     }
 }
 
@@ -210,6 +226,59 @@ fn validate_new_name(
                 return Err(format!("import alias '{new_name}' already exists"));
             }
         }
+        RenameTarget::DesignParameterOverride {
+            model_path: design_file_path,
+            name,
+            instance_path,
+        } => {
+            if new_name == name.as_str() {
+                return Err("new name is the same as the old name".to_string());
+            }
+
+            let new_parameter_name = ParameterName::from(new_name);
+
+            let (_, design_info_opt, _) = runtime.load_and_lower(design_file_path);
+            let Some(design_info) = design_info_opt else {
+                return Err("could not load design file".to_string());
+            };
+            let Some(design) = design_info.design_export.as_ref() else {
+                return Err("design file has no design export".to_string());
+            };
+
+            if design
+                .parameter_additions()
+                .any(|parameter| parameter.name() == &new_parameter_name)
+            {
+                return Err(format!(
+                    "parameter '{new_name}' already exists in design file"
+                ));
+            }
+
+            let Some((target_model_path, _)) = design.target_model() else {
+                return Err("design file has no target model".to_string());
+            };
+
+            let effective_target_path = resolve_instance_path_model_path(
+                runtime,
+                target_model_path,
+                instance_path.as_ref(),
+            )?;
+
+            let (Some(effective_target_model), _, _) =
+                runtime.load_and_lower(&effective_target_path)
+            else {
+                return Err("could not load target model".to_string());
+            };
+
+            if effective_target_model
+                .parameters()
+                .contains_key(&new_parameter_name)
+            {
+                return Err(format!(
+                    "parameter '{new_name}' already exists on target model"
+                ));
+            }
+        }
     }
 
     Ok(())
@@ -234,29 +303,15 @@ fn collect_rename_occurrences(
 ) -> Vec<RenameOccurrence> {
     match target {
         RenameTarget::Parameter { model_path, name } => {
-            let mut paths = IndexSet::new();
-            paths.insert(model_path.clone());
-            paths.insert(trigger_model_path.clone());
-            paths.extend(collect_composition_paths(runtime, trigger_model_path));
-            paths.extend(collect_composition_paths(runtime, model_path));
-            paths.extend(also_scan.clone());
-
             let mut occurrences = Vec::new();
-            for path in paths {
-                let Some(model) = runtime.load_and_lower(&path).0 else {
-                    continue;
-                };
-                if path == *model_path {
-                    collect_local_parameter_occurrences(model, name, &mut occurrences);
-                } else {
-                    collect_external_parameter_occurrences(
-                        model,
-                        model_path,
-                        name,
-                        &mut occurrences,
-                    );
-                }
-            }
+            collect_parameter_rename_occurrences(
+                runtime,
+                model_path,
+                name,
+                trigger_model_path,
+                also_scan,
+                &mut occurrences,
+            );
             occurrences
         }
         RenameTarget::ImportAlias { model_path, name } => {
@@ -267,6 +322,141 @@ fn collect_rename_occurrences(
             collect_import_alias_occurrences(model, name, &mut occurrences);
             occurrences
         }
+        RenameTarget::DesignParameterOverride {
+            model_path: design_file_path,
+            name,
+            instance_path,
+        } => {
+            let (_, design_info_opt, _) = runtime.load_and_lower(design_file_path);
+            let Some(design_info) = design_info_opt else {
+                return Vec::new();
+            };
+
+            let Some(design) = design_info.design_export.as_ref() else {
+                return Vec::new();
+            };
+
+            let mut occurrences = Vec::new();
+            let mode = VariableRenameMode::LocalParameter { name };
+
+            if let Some(overlay) =
+                find_matching_design_override(design, name, instance_path.as_ref())
+            {
+                push_occurrence(
+                    &mut occurrences,
+                    design_file_path.clone(),
+                    overlay.design_span.clone(),
+                );
+            }
+
+            collect_design_export_parameter_references(
+                design_file_path,
+                design,
+                &mode,
+                &mut occurrences,
+            );
+
+            if let Some((target_model_path, _)) = design.target_model()
+                && let Ok(effective_target_path) = resolve_instance_path_model_path(
+                    runtime,
+                    target_model_path,
+                    instance_path.as_ref(),
+                )
+            {
+                collect_parameter_rename_occurrences(
+                    runtime,
+                    &effective_target_path,
+                    name,
+                    trigger_model_path,
+                    also_scan,
+                    &mut occurrences,
+                );
+            }
+
+            occurrences
+        }
+    }
+}
+
+/// Collects local and external references to a parameter defined on `def_model_path`.
+fn collect_parameter_rename_occurrences(
+    runtime: &mut Runtime,
+    def_model_path: &ModelPath,
+    name: &ParameterName,
+    trigger_model_path: &ModelPath,
+    also_scan: &IndexSet<ModelPath>,
+    occurrences: &mut Vec<RenameOccurrence>,
+) {
+    let mut paths = IndexSet::new();
+    paths.insert(def_model_path.clone());
+    paths.insert(trigger_model_path.clone());
+    paths.extend(collect_composition_paths(runtime, trigger_model_path));
+    paths.extend(collect_composition_paths(runtime, def_model_path));
+    paths.extend(also_scan.clone());
+
+    for path in paths {
+        let Some(model) = runtime.load_and_lower(&path).0 else {
+            continue;
+        };
+
+        if path == *def_model_path {
+            collect_local_parameter_occurrences(model, name, occurrences);
+        } else {
+            collect_external_parameter_occurrences(model, def_model_path, name, occurrences);
+        }
+    }
+}
+
+/// Returns the design override assignment matching `name` at `instance_path`.
+fn find_matching_design_override<'a>(
+    design: &'a Design,
+    name: &ParameterName,
+    instance_path: Option<&InstancePath>,
+) -> Option<&'a oneil_frontend::OverlayParameterValue> {
+    instance_path.map_or_else(
+        || {
+            design
+                .parameter_overrides()
+                .find_map(|(override_name, overlay)| (override_name == name).then_some(overlay))
+        },
+        |path| {
+            design.scoped_parameter_overrides().find_map(
+                |(override_path, override_name, overlay)| {
+                    (override_path == path && override_name == name).then_some(overlay)
+                },
+            )
+        },
+    )
+}
+
+/// Collects parameter references to `mode`'s target name across a design export.
+fn collect_design_export_parameter_references(
+    design_file_path: &ModelPath,
+    design: &Design,
+    mode: &VariableRenameMode<'_>,
+    occurrences: &mut Vec<RenameOccurrence>,
+) {
+    for param in design.parameter_additions() {
+        collect_parameter_value(design_file_path, param.value(), mode, occurrences);
+        collect_limits(design_file_path, param.limits(), mode, occurrences);
+    }
+
+    for (_, overlay) in design.parameter_overrides() {
+        collect_parameter_value(design_file_path, &overlay.value, mode, occurrences);
+        if let Some(limits) = &overlay.limits_override {
+            collect_limits(design_file_path, limits, mode, occurrences);
+        }
+    }
+
+    for (_, _, overlay) in design.scoped_parameter_overrides() {
+        collect_parameter_value(design_file_path, &overlay.value, mode, occurrences);
+        if let Some(limits) = &overlay.limits_override {
+            collect_limits(design_file_path, limits, mode, occurrences);
+        }
+    }
+
+    for test in design.test_additions() {
+        collect_expr(design_file_path, test.expr(), mode, occurrences);
     }
 }
 
@@ -481,7 +671,9 @@ pub fn prepare_rename_response(symbol: &SymbolAtPosition) -> Option<PrepareRenam
         | SymbolAtPosition::ExternalParameterReference {
             parameter_name: name,
             ..
-        } => name.as_str().to_string(),
+        }
+        | SymbolAtPosition::DesignParameterOverride { name, .. }
+        | SymbolAtPosition::DesignParameterAddition { name, .. } => name.as_str().to_string(),
         SymbolAtPosition::ModelImportReference { reference_name, .. }
         | SymbolAtPosition::ModelImportAlias {
             alias: reference_name,
@@ -491,13 +683,11 @@ pub fn prepare_rename_response(symbol: &SymbolAtPosition) -> Option<PrepareRenam
         | SymbolAtPosition::BuiltinValueReference { .. }
         | SymbolAtPosition::BuiltinFunctionReference { .. }
         | SymbolAtPosition::PythonImport { .. }
-        | SymbolAtPosition::PythonFunctionReference { .. } => return None,
-        SymbolAtPosition::DesignTarget { .. }
+        | SymbolAtPosition::PythonFunctionReference { .. }
+        | SymbolAtPosition::DesignTarget { .. }
         | SymbolAtPosition::ApplyDesignPath { .. }
         | SymbolAtPosition::ApplyTargetReference { .. }
-        | SymbolAtPosition::DesignParameterAddition { .. }
-        | SymbolAtPosition::DesignParameterOverride { .. }
-        | SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => todo!(),
+        | SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => return None,
     };
 
     Some(PrepareRenameResponse::RangeWithPlaceholder { range, placeholder })
