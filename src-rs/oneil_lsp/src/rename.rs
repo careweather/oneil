@@ -100,8 +100,25 @@ pub fn resolve_rename_target(
                 name: name.clone(),
             })
         }
-        SymbolAtPosition::DesignParameterOverrideInstancePath { .. }
-        | SymbolAtPosition::ModelImportDefinition { .. }
+        SymbolAtPosition::DesignParameterOverrideInstancePath { instance_path, .. } => {
+            let (parent_path, self_ref_name) = instance_path
+                .split_parent_and_self()
+                .expect("instance path must have at least one segment");
+
+            let (_, design_info_opt, _) = runtime.load_and_lower(current_model_path);
+            let design_info = design_info_opt?;
+            let design_export = design_info.design_export.as_ref()?;
+            let (target_model_path, _) = design_export.target_model()?;
+            let effective_parent_path =
+                resolve_instance_path_model_path(runtime, target_model_path, Some(&parent_path))
+                    .ok()?;
+
+            Some(RenameTarget::ImportAlias {
+                model_path: effective_parent_path,
+                name: self_ref_name,
+            })
+        }
+        SymbolAtPosition::ModelImportDefinition { .. }
         | SymbolAtPosition::BuiltinValueReference { .. }
         | SymbolAtPosition::BuiltinFunctionReference { .. }
         | SymbolAtPosition::PythonImport { .. }

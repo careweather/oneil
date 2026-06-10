@@ -81,6 +81,13 @@ impl InstancePath {
         Self(v)
     }
 
+    /// Splits the path into the parent path and the self reference name.
+    #[must_use]
+    pub fn split_parent_and_self(&self) -> Option<(Self, ReferenceName)> {
+        let (self_ref_name, self_parent) = self.0.split_last()?;
+        Some((Self(self_parent.to_vec()), self_ref_name.clone()))
+    }
+
     /// If `longer` starts with this path's segments, returns the remaining suffix.
     ///
     /// Otherwise returns `None` (including when `longer` is shorter than `self`).
