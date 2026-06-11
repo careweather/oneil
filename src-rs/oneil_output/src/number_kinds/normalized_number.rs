@@ -83,6 +83,12 @@ impl NormalizedNumber {
         Self(self.0.pow(exponent))
     }
 
+    /// Returns the intersection of two normalized numbers.
+    #[must_use]
+    pub fn intersection(self, rhs: Self) -> Self {
+        Self(self.0.intersection(rhs.0))
+    }
+
     /// Returns the smallest interval that contains both normalized numbers.
     #[must_use]
     pub fn tightest_enclosing_interval(self, rhs: Self) -> Self {

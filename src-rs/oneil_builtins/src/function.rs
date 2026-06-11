@@ -188,6 +188,13 @@ pub fn builtin_functions_complete(
             units: get_builtin_units(fns::MNMX_BUILTIN_UNITS, units),
             function: fns::mnmx as BuiltinFunctionFn,
         },
+        BuiltinFunction {
+            name: BuiltinFunctionName::from("mxmn"),
+            args: &["n", "..."],
+            description: fns::MXMN_DESCRIPTION,
+            units: get_builtin_units(fns::MXMN_BUILTIN_UNITS, units),
+            function: fns::mxmn as BuiltinFunctionFn,
+        },
     ]
     .into_iter()
     .map(|function| (function.name.clone(), function))
@@ -928,6 +935,60 @@ mod fns {
                     .map(Cow::into_owned)
                     .reduce(|a, b| {
                         a.checked_min_max(&b)
+                            .expect("homogeneous list ensures same unit")
+                    })
+                    .expect("there should be at least one number");
+
+                Ok(Value::MeasuredNumber(result))
+            }
+        }
+    }
+
+    pub const MXMN_DESCRIPTION: &str = "Return the intersection of the given values.\n\nThe minimum is the maximum of all value minimums, and the maximum is the minimum of all value maximums. If the resulting minimum is greater than the maximum, returns an empty interval.";
+    pub const MXMN_BUILTIN_UNITS: [&str; 0] = [];
+
+    /// Returns the intersection of all given values (max of mins, min of maxes).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if no arguments are given, or if arguments are not
+    /// homogeneous numbers or measured numbers.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "matches the expected signature"
+    )]
+    pub fn mxmn(
+        identifier_span: Span,
+        args: Vec<(Value, Span)>,
+        _builtins: &IndexMap<UnitBaseName, BuiltinUnit>,
+    ) -> Result<Value, Vec<EvalError>> {
+        if args.is_empty() {
+            return Err(vec![EvalError::InvalidArgumentCount {
+                function_name: BuiltinFunctionName::from("mxmn"),
+                function_name_span: identifier_span,
+                expected_argument_count: ExpectedArgumentCount::AtLeast(1),
+                actual_argument_count: args.len(),
+            }]);
+        }
+
+        let number_list = helper::extract_homogeneous_numbers_list(&args)?;
+
+        match number_list {
+            helper::HomogeneousNumberList::Numbers(numbers) => {
+                let result = numbers
+                    .into_iter()
+                    .map(Cow::into_owned)
+                    .reduce(Number::intersection)
+                    .expect("there should be at least one number");
+
+                Ok(Value::Number(result))
+            }
+            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => {
+                let result = numbers
+                    .into_iter()
+                    .map(Cow::into_owned)
+                    .reduce(|a, b| {
+                        a.checked_intersection(&b)
                             .expect("homogeneous list ensures same unit")
                     })
                     .expect("there should be at least one number");

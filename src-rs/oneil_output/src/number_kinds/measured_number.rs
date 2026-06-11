@@ -312,6 +312,19 @@ impl MeasuredNumber {
         })
     }
 
+    /// Returns the intersection of two dimensional numbers.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ValueError::InvalidUnit)` if the dimensions don't match.
+    pub fn checked_intersection(self, rhs: &Self) -> Result<Self, BinaryEvalError> {
+        self.check_units(rhs)?;
+        Ok(Self {
+            normalized_value: self.normalized_value.intersection(rhs.normalized_value),
+            unit: self.unit,
+        })
+    }
+
     /// Negates a number value.
     #[must_use]
     pub fn checked_neg(self) -> Self {
