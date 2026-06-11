@@ -26,7 +26,7 @@ def isfloat(num):
     except ValueError:
         return False
 
-FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip", "mid": "par_mid", "sign": "par_sign"}
+FUNCTIONS = {"sin": "par_sin", "cos": "par_cos", "tan": "par_tan", "asin": "par_asin", "acos": "par_acos", "atan": "par_atan", "sinh": "par_arcsinh", "cosh": "par_cosh", "tanh": "par_tanh", "min": "par_min", "max": "par_max", "sqrt": "par_sqrt", "abs": "par_abs", "mnmx": "par_minmax", "mxmn": "par_maxmin", "log": "par_log", "log2": "par_log2", "log10": "par_log10", "ln": "par_log", "floor": "par_floor", "ceiling": "par_ceiling", "extent": "par_extent", "range": "par_range", "strip": "par_strip", "mid": "par_mid", "sign": "par_sign"}
 
 MATH_CONSTANTS = {"pi": np.pi, "e": np.exp(1), "inf": np.inf}
 
@@ -465,6 +465,12 @@ def par_extent(val1, val2=None):
         return Parameter((max(abs(val1.min), abs(val1.max), abs(val2))), val1.units, "extent({},{})".format(val1.name, val2))
     
     raise TypeError("Second input to extent() must be of type Parameter, int, or float.")
+
+@err.add_trace
+def par_minmax(val1, val2):
+    if val1.units != val2.units:
+        raise UnitEvaluationError(f"Cannot compare {un.hr_units(val1.units)} to {un.hr_units(val2.units)} (par_minmax).", [val1, val2])
+    return Parameter((min(val1.min, val2.min), max(val1.max, val2.max)), val1.units, "Min/max({},{})".format(val1.name, val2.name))
 
 @err.add_trace
 def par_minmax(val1, val2):
