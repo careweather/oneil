@@ -3,13 +3,12 @@
 use std::collections::HashMap;
 
 use indexmap::IndexSet;
-use oneil_frontend::instance::design::Design;
+use oneil_frontend::{ModelDesignInfo, instance::design::Design};
 use oneil_runtime::{
     Runtime,
     output::{ir, reference::ModelTemplateReference},
 };
 use oneil_shared::{
-    InstancePath,
     paths::ModelPath,
     span::Span,
     symbols::{ParameterName, ReferenceName},
@@ -145,17 +144,46 @@ fn resolve_reference_model_path(
         })
 }
 
+/// Maps a cursor symbol to a prepare-rename response.
+pub fn prepare_rename_response(symbol: &SymbolAtPosition) -> Option<PrepareRenameResponse> {
+    let range = span_to_range(&symbol.span());
+    let placeholder = match symbol {
+        SymbolAtPosition::ParameterDefinition { name, .. }
+        | SymbolAtPosition::ParameterReference { name, .. }
+        | SymbolAtPosition::ExternalParameterReference {
+            parameter_name: name,
+            ..
+        }
+        | SymbolAtPosition::DesignParameterOverride { name, .. }
+        | SymbolAtPosition::DesignParameterAddition { name, .. } => name.as_str().to_string(),
+        SymbolAtPosition::ModelImportReference { reference_name, .. }
+        | SymbolAtPosition::ModelImportAlias {
+            alias: reference_name,
+            ..
+        } => reference_name.as_str().to_string(),
+        SymbolAtPosition::ModelImportDefinition { .. }
+        | SymbolAtPosition::BuiltinValueReference { .. }
+        | SymbolAtPosition::BuiltinFunctionReference { .. }
+        | SymbolAtPosition::PythonImport { .. }
+        | SymbolAtPosition::PythonFunctionReference { .. }
+        | SymbolAtPosition::DesignTarget { .. }
+        | SymbolAtPosition::ApplyDesignPath { .. }
+        | SymbolAtPosition::ApplyTargetReference { .. }
+        | SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => return None,
+    };
+
+    Some(PrepareRenameResponse::RangeWithPlaceholder { range, placeholder })
+}
+
 /// Builds a workspace edit that renames `target` to `new_name`.
 pub fn workspace_edit_for_rename(
     target: &RenameTarget,
     new_name: &str,
     runtime: &mut Runtime,
-    trigger_model_path: &ModelPath,
-    also_scan: &IndexSet<ModelPath>,
 ) -> Result<WorkspaceEdit, String> {
     validate_new_name(target, new_name, runtime)?;
 
-    let occurrences = collect_rename_occurrences(target, runtime, trigger_model_path, also_scan);
+    let occurrences = collect_rename_occurrences(target, runtime);
     if occurrences.is_empty() {
         return Err("no occurrences to rename".to_string());
     }
@@ -268,301 +296,322 @@ fn is_valid_identifier(name: &str) -> bool {
 }
 
 /// Collects all source spans that should be updated for `target`.
-fn collect_rename_occurrences(
-    target: &RenameTarget,
-    runtime: &mut Runtime,
-    trigger_model_path: &ModelPath,
-    also_scan: &IndexSet<ModelPath>,
-) -> Vec<RenameOccurrence> {
+fn collect_rename_occurrences(target: &RenameTarget, runtime: &Runtime) -> Vec<RenameOccurrence> {
+    let mut occurrences = Vec::new();
     match target {
         RenameTarget::Parameter { model_path, name } => {
-            let mut occurrences = Vec::new();
-            collect_parameter_rename_occurrences(
-                runtime,
-                model_path,
-                name,
-                trigger_model_path,
-                also_scan,
+            let (model, _design_info) = runtime.get_loaded_model(model_path);
+            let model = model.expect("model must be loaded");
+
+            // rename the parameter in the local model
+            collect_parameter_occurrences(
+                model,
+                VariableRenameMode::LocalParameter {
+                    parameter_name: name,
+                },
                 &mut occurrences,
             );
-            occurrences
+
+            // collect all the paths that reference the parameter model,
+            // including the parameter model itself
+            let mut paths_referencing_model = get_designs_referencing_model(model_path, runtime);
+            paths_referencing_model.insert(model_path.clone());
+
+            for model in runtime.get_loaded_models() {
+                let (model, design_info) = runtime.get_loaded_model(&model);
+                let model = model.expect("model must be loaded");
+
+                if let Some(design_info) = design_info.as_ref()
+                    && paths_referencing_model.contains(model.path())
+                {
+                    // in each design that references the model, rename the
+                    // parameter as a local parameter
+                    collect_design_parameter_occurrences(
+                        model,
+                        design_info,
+                        VariableRenameMode::LocalParameter {
+                            parameter_name: name,
+                        },
+                        runtime,
+                        &mut occurrences,
+                    );
+                }
+
+                // wherever the parameter model, or a design that references the
+                // parameter model, is referenced as an external parameter,
+                // rename the parameter as an external parameter
+                collect_external_parameter_occurrences(
+                    model,
+                    design_info.as_ref(),
+                    name,
+                    &paths_referencing_model,
+                    runtime,
+                    &mut occurrences,
+                );
+            }
         }
         RenameTarget::ImportAlias { model_path, name } => {
-            let Some(model) = runtime.load_and_lower(model_path).0 else {
-                return Vec::new();
-            };
-            let mut occurrences = Vec::new();
-            collect_import_alias_occurrences(model, name, &mut occurrences);
-            occurrences
+            todo!()
         }
     }
+    occurrences
 }
 
-/// Collects local and external references to a parameter defined on `def_model_path`.
-fn collect_parameter_rename_occurrences(
-    runtime: &mut Runtime,
-    def_model_path: &ModelPath,
-    name: &ParameterName,
-    trigger_model_path: &ModelPath,
-    also_scan: &IndexSet<ModelPath>,
-    occurrences: &mut Vec<RenameOccurrence>,
-) {
-    let mut paths = IndexSet::new();
-    paths.insert(def_model_path.clone());
-    paths.insert(trigger_model_path.clone());
-    paths.extend(collect_composition_paths(runtime, trigger_model_path));
-    paths.extend(collect_composition_paths(runtime, def_model_path));
-    paths.extend(also_scan.clone());
-
-    for path in paths {
-        let Some(model) = runtime.load_and_lower(&path).0 else {
-            continue;
-        };
-
-        if path == *def_model_path {
-            collect_local_parameter_occurrences(model, name, occurrences);
-        } else {
-            collect_external_parameter_occurrences(model, def_model_path, name, occurrences);
-        }
-    }
-}
-
-/// Returns the design override assignment matching `name` at `instance_path`.
-fn find_matching_design_override<'a>(
-    design: &'a Design,
-    name: &ParameterName,
-    instance_path: Option<&InstancePath>,
-) -> Option<&'a oneil_frontend::OverlayParameterValue> {
-    instance_path.map_or_else(
-        || {
-            design
-                .parameter_overrides()
-                .find_map(|(override_name, overlay)| (override_name == name).then_some(overlay))
-        },
-        |path| {
-            design.scoped_parameter_overrides().find_map(
-                |(override_path, override_name, overlay)| {
-                    (override_path == path && override_name == name).then_some(overlay)
-                },
-            )
-        },
-    )
-}
-
-/// Collects parameter references to `mode`'s target name across a design export.
-fn collect_design_export_parameter_references(
-    design_file_path: &ModelPath,
-    design: &Design,
-    mode: &VariableRenameMode<'_>,
-    occurrences: &mut Vec<RenameOccurrence>,
-) {
-    for param in design.parameter_additions() {
-        collect_parameter_value(design_file_path, param.value(), mode, occurrences);
-        collect_limits(design_file_path, param.limits(), mode, occurrences);
-    }
-
-    for (_, overlay) in design.parameter_overrides() {
-        collect_parameter_value(design_file_path, &overlay.value, mode, occurrences);
-        if let Some(limits) = &overlay.limits_override {
-            collect_limits(design_file_path, limits, mode, occurrences);
-        }
-    }
-
-    for (_, _, overlay) in design.scoped_parameter_overrides() {
-        collect_parameter_value(design_file_path, &overlay.value, mode, occurrences);
-        if let Some(limits) = &overlay.limits_override {
-            collect_limits(design_file_path, limits, mode, occurrences);
-        }
-    }
-
-    for test in design.test_additions() {
-        collect_expr(design_file_path, test.expr(), mode, occurrences);
-    }
-}
-
-/// Collects all model paths that should be scanned for composition occurrences.
-fn collect_composition_paths(runtime: &mut Runtime, path: &ModelPath) -> Vec<ModelPath> {
-    runtime.check_model(path).0
-}
-
-/// How to match variable occurrences while walking expressions.
-enum VariableRenameMode<'a> {
-    LocalParameter {
-        name: &'a ParameterName,
-    },
-    ExternalParameter {
-        model: ModelTemplateReference<'a>,
-        def_path: &'a ModelPath,
-        name: &'a ParameterName,
-    },
-    ImportAlias {
-        name: &'a ReferenceName,
-    },
-}
-
-fn collect_local_parameter_occurrences(
+fn collect_parameter_occurrences(
     model: ModelTemplateReference<'_>,
-    name: &ParameterName,
+    mode: VariableRenameMode<'_>,
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
-    let mode = VariableRenameMode::LocalParameter { name };
+    for param in model.parameters().values() {
+        if let VariableRenameMode::LocalParameter {
+            parameter_name: name,
+        } = mode
+            && param.name() == name
+        {
+            push_occurrence(occurrences, model.path().clone(), param.name_span().clone());
+        }
 
-    collect_model_occurrences(model, &mode, occurrences);
+        collect_parameter_value(model, None, param.value(), mode, occurrences);
+        collect_limits(model, None, param.limits(), mode, occurrences);
+    }
+
+    for test in model.tests().values() {
+        collect_expr(model, None, test.expr(), mode, occurrences);
+    }
+}
+
+fn collect_design_parameter_occurrences(
+    model: ModelTemplateReference<'_>,
+    design_info: &ModelDesignInfo,
+    mode: VariableRenameMode<'_>,
+    runtime: &Runtime,
+    occurrences: &mut Vec<RenameOccurrence>,
+) {
+    if let Some(design_export) = design_info.design_export.as_ref() {
+        for param in design_export.parameter_additions() {
+            // if renaming a local parameter and the parameter is defined in the design,
+            // add the parameter name span to the occurrences
+            if let VariableRenameMode::LocalParameter {
+                parameter_name: name,
+            } = mode
+                && param.name() == name
+            {
+                push_occurrence(occurrences, model.path().clone(), param.name_span().clone());
+            }
+
+            collect_parameter_value(model, None, param.value(), mode, occurrences);
+
+            collect_limits(model, None, param.limits(), mode, occurrences);
+        }
+
+        for test in design_export.test_additions() {
+            collect_expr(model, None, test.expr(), mode, occurrences);
+        }
+
+        for (param_name, overlay) in design_export.parameter_overrides() {
+            // if renaming a local parameter and the parameter is overridden in the design,
+            // add the design span to the occurrences
+            if let VariableRenameMode::LocalParameter {
+                parameter_name: name,
+            } = mode
+                && param_name == name
+            {
+                push_occurrence(
+                    occurrences,
+                    model.path().clone(),
+                    overlay.design_span.clone(),
+                );
+            }
+
+            collect_parameter_value(model, None, &overlay.value, mode, occurrences);
+
+            if let Some(limits) = overlay.limits_override.as_ref() {
+                collect_limits(model, None, limits, mode, occurrences);
+            }
+        }
+
+        for (param_instance_path, param_name, overlay) in design_export.scoped_parameter_overrides()
+        {
+            // if renaming an external parameter and the parameter is overridden in the design,
+            // add the design span to the occurrences
+            if let VariableRenameMode::ExternalParameter {
+                external_model_paths,
+                parameter_name,
+            } = mode
+                && param_name == parameter_name
+            {
+                let param_model_path = design_export
+                    .target_model()
+                    .and_then(|(path, _)| runtime.get_loaded_model(path).0)
+                    .and_then(|model| {
+                        resolve_instance_path_model_path(
+                            runtime,
+                            model.path(),
+                            Some(param_instance_path),
+                        )
+                        .ok()
+                    });
+
+                if let Some(param_model_path) = param_model_path
+                    && external_model_paths.contains(&param_model_path)
+                {
+                    push_occurrence(
+                        occurrences,
+                        model.path().clone(),
+                        overlay.design_span.clone(),
+                    );
+                }
+            }
+
+            collect_parameter_value(model, None, &overlay.value, mode, occurrences);
+
+            if let Some(limits) = overlay.limits_override.as_ref() {
+                collect_limits(model, None, limits, mode, occurrences);
+            }
+        }
+    }
 }
 
 fn collect_external_parameter_occurrences(
     model: ModelTemplateReference<'_>,
-    def_path: &ModelPath,
+    design_info: Option<&ModelDesignInfo>,
     name: &ParameterName,
+    paths_referencing_model: &IndexSet<ModelPath>,
+    runtime: &Runtime,
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
     let mode = VariableRenameMode::ExternalParameter {
-        model,
-        def_path,
-        name,
+        external_model_paths: paths_referencing_model,
+        parameter_name: name,
     };
 
-    collect_model_occurrences(model, &mode, occurrences);
-}
+    collect_parameter_occurrences(model, mode, occurrences);
 
-fn collect_import_alias_occurrences(
-    model: ModelTemplateReference<'_>,
-    name: &ReferenceName,
-    occurrences: &mut Vec<RenameOccurrence>,
-) {
-    let mode = VariableRenameMode::ImportAlias { name };
-    let model_path = model.path();
-
-    if let Some(reference) = model.reference_imports().get(name) {
-        push_occurrence(occurrences, model_path.clone(), reference.name_span.clone());
-    } else if let Some(submodel) = model.submodel_imports().get(name) {
-        let span = submodel
-            .alias_span
-            .clone()
-            .unwrap_or_else(|| submodel.name_span.clone());
-        push_occurrence(occurrences, model_path.clone(), span);
-    } else if let Some(alias_import) = model.alias_imports().get(name) {
-        let span = alias_import
-            .alias_span
-            .clone()
-            .unwrap_or_else(|| alias_import.name_span.clone());
-        push_occurrence(occurrences, model_path.clone(), span);
-    }
-
-    collect_model_occurrences(model, &mode, occurrences);
-}
-
-fn collect_model_occurrences(
-    model: ModelTemplateReference<'_>,
-    mode: &VariableRenameMode<'_>,
-    occurrences: &mut Vec<RenameOccurrence>,
-) {
-    let model_path = model.path();
-
-    for param in model.parameters().values() {
-        if let VariableRenameMode::LocalParameter { name } = mode
-            && param.name() == *name
-        {
-            push_occurrence(occurrences, model_path.clone(), param.name_span().clone());
-        }
-
-        collect_parameter_value(model_path, param.value(), mode, occurrences);
-        collect_limits(model_path, param.limits(), mode, occurrences);
-    }
-
-    for test in model.tests().values() {
-        collect_expr(model_path, test.expr(), mode, occurrences);
+    if let Some(design_info) = design_info.as_ref() {
+        collect_design_parameter_occurrences(model, design_info, mode, runtime, occurrences);
     }
 }
 
 fn collect_parameter_value(
-    model_path: &ModelPath,
+    model: ModelTemplateReference<'_>,
+    target_model: Option<ModelTemplateReference<'_>>,
     value: &ir::ParameterValue,
-    mode: &VariableRenameMode<'_>,
+    mode: VariableRenameMode<'_>,
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
     match value {
         ir::ParameterValue::Simple(expr, _) => {
-            collect_expr(model_path, expr, mode, occurrences);
+            collect_expr(model, target_model, expr, mode, occurrences);
         }
         ir::ParameterValue::Piecewise(exprs, _) => {
             for piecewise in exprs {
-                collect_expr(model_path, piecewise.expr(), mode, occurrences);
-                collect_expr(model_path, piecewise.if_expr(), mode, occurrences);
+                collect_expr(model, target_model, piecewise.expr(), mode, occurrences);
+                collect_expr(model, target_model, piecewise.if_expr(), mode, occurrences);
             }
         }
     }
 }
 
 fn collect_limits(
-    model_path: &ModelPath,
+    model: ModelTemplateReference<'_>,
+    target_model: Option<ModelTemplateReference<'_>>,
     limits: &ir::Limits,
-    mode: &VariableRenameMode<'_>,
+    mode: VariableRenameMode<'_>,
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
     match limits {
         ir::Limits::Default => {}
         ir::Limits::Continuous { min, max, .. } => {
-            collect_expr(model_path, min, mode, occurrences);
-            collect_expr(model_path, max, mode, occurrences);
+            collect_expr(model, target_model, min, mode, occurrences);
+            collect_expr(model, target_model, max, mode, occurrences);
         }
         ir::Limits::Discrete { values, .. } => {
             for value in values {
-                collect_expr(model_path, value, mode, occurrences);
+                collect_expr(model, target_model, value, mode, occurrences);
             }
         }
     }
 }
 
 fn collect_expr(
-    model_path: &ModelPath,
+    model: ModelTemplateReference<'_>,
+    target_model: Option<ModelTemplateReference<'_>>,
     expr: &ir::Expr,
-    mode: &VariableRenameMode<'_>,
+    mode: VariableRenameMode<'_>,
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
     expr.walk_variables(&mut |variable| {
-        visit_variable(model_path.clone(), variable, mode, occurrences);
+        visit_variable(model, target_model, variable, mode, occurrences);
     });
 }
 
+/// How to match variable occurrences while walking expressions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VariableRenameMode<'a> {
+    LocalParameter {
+        parameter_name: &'a ParameterName,
+    },
+    ExternalParameter {
+        external_model_paths: &'a IndexSet<ModelPath>,
+        parameter_name: &'a ParameterName,
+    },
+    ImportAlias {
+        import_alias_name: &'a ReferenceName,
+    },
+}
+
 fn visit_variable(
-    model_path: ModelPath,
+    model: ModelTemplateReference<'_>,
+    target_model: Option<ModelTemplateReference<'_>>,
     variable: &ir::Variable,
-    mode: &VariableRenameMode<'_>,
+    mode: VariableRenameMode<'_>,
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
     match mode {
-        VariableRenameMode::LocalParameter { name } => {
+        VariableRenameMode::LocalParameter { parameter_name } => {
             if let ir::Variable::Parameter {
-                parameter_name,
+                parameter_name: current_parameter_name,
                 parameter_span,
             } = variable
-                && parameter_name == *name
+                && current_parameter_name == parameter_name
             {
-                push_occurrence(occurrences, model_path, parameter_span.clone());
+                push_occurrence(occurrences, model.path().clone(), parameter_span.clone());
             }
         }
         VariableRenameMode::ExternalParameter {
-            model,
-            def_path,
-            name,
+            external_model_paths,
+            parameter_name,
         } => {
             let ir::Variable::External {
                 reference_name,
-                parameter_name,
+                parameter_name: current_parameter_name,
                 parameter_span,
                 ..
             } = variable
             else {
                 return;
             };
-            if parameter_name == *name
-                && resolve_reference_model_path(*model, reference_name).as_ref() == Some(def_path)
+
+            if current_parameter_name == parameter_name
+                && resolve_reference_model_path(model, reference_name)
+                    .as_ref()
+                    .is_some_and(|path| external_model_paths.contains(path))
             {
-                push_occurrence(occurrences, model_path, parameter_span.clone());
+                push_occurrence(occurrences, model.path().clone(), parameter_span.clone());
+            } else if current_parameter_name == parameter_name
+                && let Some(target_model) = target_model
+                && resolve_reference_model_path(target_model, reference_name)
+                    .as_ref()
+                    .is_some_and(|path| external_model_paths.contains(path))
+            {
+                push_occurrence(
+                    occurrences,
+                    target_model.path().clone(),
+                    parameter_span.clone(),
+                );
             }
         }
-        VariableRenameMode::ImportAlias { name } => {
+        VariableRenameMode::ImportAlias { import_alias_name } => {
             let ir::Variable::External {
                 reference_name,
                 reference_span,
@@ -571,44 +620,36 @@ fn visit_variable(
             else {
                 return;
             };
-            if reference_name == *name {
-                push_occurrence(occurrences, model_path, reference_span.clone());
+
+            if reference_name == import_alias_name {
+                push_occurrence(occurrences, model.path().clone(), reference_span.clone());
             }
         }
     }
 }
 
-fn push_occurrence(occurrences: &mut Vec<RenameOccurrence>, model_path: ModelPath, span: Span) {
-    occurrences.push(RenameOccurrence { model_path, span });
+fn get_designs_referencing_model(
+    param_model_path: &ModelPath,
+    runtime: &Runtime,
+) -> IndexSet<ModelPath> {
+    runtime
+        .get_loaded_models()
+        .iter()
+        .filter_map(|model| {
+            let (model, design_info) = runtime.get_loaded_model(model);
+            let model = model.expect("model must be loaded");
+
+            let (path, _) = design_info
+                .as_ref()?
+                .design_export
+                .as_ref()?
+                .target_model()?;
+
+            (path == param_model_path).then(|| model.path().clone())
+        })
+        .collect()
 }
 
-/// Maps a cursor symbol to a prepare-rename response.
-pub fn prepare_rename_response(symbol: &SymbolAtPosition) -> Option<PrepareRenameResponse> {
-    let range = span_to_range(&symbol.span());
-    let placeholder = match symbol {
-        SymbolAtPosition::ParameterDefinition { name, .. }
-        | SymbolAtPosition::ParameterReference { name, .. }
-        | SymbolAtPosition::ExternalParameterReference {
-            parameter_name: name,
-            ..
-        }
-        | SymbolAtPosition::DesignParameterOverride { name, .. }
-        | SymbolAtPosition::DesignParameterAddition { name, .. } => name.as_str().to_string(),
-        SymbolAtPosition::ModelImportReference { reference_name, .. }
-        | SymbolAtPosition::ModelImportAlias {
-            alias: reference_name,
-            ..
-        } => reference_name.as_str().to_string(),
-        SymbolAtPosition::ModelImportDefinition { .. }
-        | SymbolAtPosition::BuiltinValueReference { .. }
-        | SymbolAtPosition::BuiltinFunctionReference { .. }
-        | SymbolAtPosition::PythonImport { .. }
-        | SymbolAtPosition::PythonFunctionReference { .. }
-        | SymbolAtPosition::DesignTarget { .. }
-        | SymbolAtPosition::ApplyDesignPath { .. }
-        | SymbolAtPosition::ApplyTargetReference { .. }
-        | SymbolAtPosition::DesignParameterOverrideInstancePath { .. } => return None,
-    };
-
-    Some(PrepareRenameResponse::RangeWithPlaceholder { range, placeholder })
+fn push_occurrence(occurrences: &mut Vec<RenameOccurrence>, model_path: ModelPath, span: Span) {
+    occurrences.push(RenameOccurrence { model_path, span });
 }

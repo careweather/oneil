@@ -26,7 +26,7 @@ pub fn resolve_import_reference_model_path(
 
 /// Resolves the model path reached by following `instance_path` from `start_path`.
 pub fn resolve_instance_path_model_path(
-    runtime: &mut Runtime,
+    runtime: &Runtime,
     start_path: &ModelPath,
     instance_path: Option<&InstancePath>,
 ) -> Result<ModelPath, String> {
@@ -45,11 +45,11 @@ pub fn resolve_instance_path_model_path(
 
 /// Returns the model path reached by following one reference-name segment from `current_path`.
 fn resolve_segment_model_path(
-    runtime: &mut Runtime,
+    runtime: &Runtime,
     current_path: &ModelPath,
     segment: &ReferenceName,
 ) -> Result<ModelPath, String> {
-    let (Some(model), _, _) = runtime.load_and_lower(current_path) else {
+    let (Some(model), _) = runtime.get_loaded_model(current_path) else {
         return Err("could not load model along instance path".to_string());
     };
 
@@ -74,14 +74,14 @@ fn resolve_segment_model_path(
 
 /// Returns the model path at the end of an extracted alias path.
 fn resolve_alias_path(
-    runtime: &mut Runtime,
+    runtime: &Runtime,
     host_path: &ModelPath,
     alias_path: &InstancePath,
 ) -> Result<ModelPath, String> {
     let mut current_path = host_path.clone();
 
     for segment in alias_path.segments() {
-        let (Some(model), _, _) = runtime.load_and_lower(&current_path) else {
+        let (Some(model), _) = runtime.get_loaded_model(&current_path) else {
             return Err("could not load model along alias path".to_string());
         };
 

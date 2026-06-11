@@ -520,22 +520,13 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        // get a list of all other open model paths
-        let also_scan = runtime.get_loaded_models();
-
         // build and return the rename edits
-        let edit = rename::workspace_edit_for_rename(
-            &target,
-            &params.new_name,
-            &mut runtime,
-            &current_model_path,
-            &also_scan,
-        )
-        .map_err(|message| jsonrpc::Error {
-            code: jsonrpc::ErrorCode::InvalidParams,
-            message: message.into(),
-            data: None,
-        })?;
+        let edit = rename::workspace_edit_for_rename(&target, &params.new_name, &mut runtime)
+            .map_err(|message| jsonrpc::Error {
+                code: jsonrpc::ErrorCode::InvalidParams,
+                message: message.into(),
+                data: None,
+            })?;
 
         Ok(Some(edit))
     }
