@@ -117,14 +117,24 @@ pub fn resolve_rename_target(
                 name: self_ref_name,
             })
         }
+        SymbolAtPosition::ApplyTargetReference { reference_name, .. } => {
+            let (_, design_info_opt, _) = runtime.load_and_lower(current_model_path);
+            let design_info = design_info_opt?;
+            let design_export = design_info.design_export.as_ref()?;
+            let (target_model_path, _) = design_export.target_model()?;
+
+            Some(RenameTarget::ImportAlias {
+                model_path: target_model_path.clone(),
+                name: reference_name.clone(),
+            })
+        }
         SymbolAtPosition::ModelImportDefinition { .. }
         | SymbolAtPosition::BuiltinValueReference { .. }
         | SymbolAtPosition::BuiltinFunctionReference { .. }
         | SymbolAtPosition::PythonImport { .. }
         | SymbolAtPosition::PythonFunctionReference { .. }
         | SymbolAtPosition::DesignTarget { .. }
-        | SymbolAtPosition::ApplyDesignPath { .. }
-        | SymbolAtPosition::ApplyTargetReference { .. } => None,
+        | SymbolAtPosition::ApplyDesignPath { .. } => None,
     }
 }
 
