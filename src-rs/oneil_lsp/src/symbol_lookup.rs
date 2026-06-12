@@ -308,7 +308,7 @@ fn find_symbol_in_apply_design(apply: &ApplyDesign, offset: usize) -> Option<Sym
 
     for (path, seg_span) in &apply.target_segments {
         if span_contains_offset(seg_span, offset) {
-            let reference_name = path.segments().last()?.clone();
+            let reference_name = path.clone();
             return Some(SymbolAtPosition::ApplyTargetReference {
                 reference_name,
                 span: seg_span.clone(),

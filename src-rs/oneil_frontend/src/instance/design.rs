@@ -10,7 +10,7 @@ use oneil_shared::{
     labels::{ParameterLabel, RenderName, SectionLabel},
     paths::{DesignPath, ModelPath},
     span::Span,
-    symbols::{ParameterName, TestIndex},
+    symbols::{ParameterName, ReferenceName, TestIndex},
 };
 
 /// Declarative record of an `apply <file> to <path>` declaration.
@@ -27,7 +27,7 @@ pub struct ApplyDesign {
     /// Reference-name path on the consuming model identifying the target instance.
     pub target: InstancePath,
     /// Segments of the target path and their spans. Used in the LSP
-    pub target_segments: Vec<(InstancePath, Span)>,
+    pub target_segments: Vec<(ReferenceName, Span)>,
     /// Span of the `apply` declaration that produced this record.
     pub span: Span,
 }

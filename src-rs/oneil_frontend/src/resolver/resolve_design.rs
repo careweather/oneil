@@ -589,7 +589,7 @@ fn record_apply_recursive<E: ExternalResolutionContext>(
         target_path = target_path.child(resolved.clone());
         last_resolved = resolved.clone();
 
-        target_segments.push((target_path.clone(), seg.span().clone()));
+        target_segments.push((resolved.clone(), seg.span().clone()));
 
         // For every segment except the last, advance `current_model` to the
         // model that `resolved` points to so the next segment is validated in

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexSet;
-use oneil_frontend::{ModelDesignInfo, instance::design::Design};
+use oneil_frontend::ModelDesignInfo;
 use oneil_runtime::{
     Runtime,
     output::{ir, reference::ModelTemplateReference},
@@ -361,7 +361,33 @@ fn collect_rename_occurrences(target: &RenameTarget, runtime: &Runtime) -> Vec<R
             }
         }
         RenameTarget::ImportAlias { model_path, name } => {
-            todo!()
+            let (model, _) = runtime.get_loaded_model(model_path);
+            let model = model.expect("model must be loaded");
+
+            collect_import_alias_definition_occurrences(model, name, &mut occurrences);
+
+            let mode = VariableRenameMode::ImportAlias {
+                import_alias_name: name,
+            };
+
+            collect_parameter_occurrences(model, mode, &mut occurrences);
+
+            let designs_referencing_model = get_designs_referencing_model(model_path, runtime);
+
+            for loaded_path in designs_referencing_model {
+                let (model, design_info) = runtime.get_loaded_model(&loaded_path);
+                let model = model.expect("model must be loaded");
+
+                if let Some(design_info) = design_info.as_ref() {
+                    collect_design_parameter_occurrences(
+                        model,
+                        design_info,
+                        mode,
+                        runtime,
+                        &mut occurrences,
+                    );
+                }
+            }
         }
     }
     occurrences
@@ -398,24 +424,43 @@ fn collect_design_parameter_occurrences(
     occurrences: &mut Vec<RenameOccurrence>,
 ) {
     if let Some(design_export) = design_info.design_export.as_ref() {
-        for param in design_export.parameter_additions() {
-            // if renaming a local parameter and the parameter is defined in the design,
-            // add the parameter name span to the occurrences
-            if let VariableRenameMode::LocalParameter {
-                parameter_name: name,
-            } = mode
-                && param.name() == name
-            {
-                push_occurrence(occurrences, model.path().clone(), param.name_span().clone());
+        if !matches!(mode, VariableRenameMode::ImportAlias { .. }) {
+            for param in design_export.parameter_additions() {
+                // if renaming a local parameter and the parameter is defined in the design,
+                // add the parameter name span to the occurrences
+                if let VariableRenameMode::LocalParameter {
+                    parameter_name: name,
+                } = mode
+                    && param.name() == name
+                {
+                    push_occurrence(occurrences, model.path().clone(), param.name_span().clone());
+                }
+
+                collect_parameter_value(model, None, param.value(), mode, occurrences);
+
+                collect_limits(model, None, param.limits(), mode, occurrences);
             }
 
-            collect_parameter_value(model, None, param.value(), mode, occurrences);
-
-            collect_limits(model, None, param.limits(), mode, occurrences);
+            for test in design_export.test_additions() {
+                collect_expr(model, None, test.expr(), mode, occurrences);
+            }
         }
 
-        for test in design_export.test_additions() {
-            collect_expr(model, None, test.expr(), mode, occurrences);
+        if let VariableRenameMode::ImportAlias { import_alias_name } = mode {
+            for applied_design in &design_info.applied_designs {
+                let (first_segment, first_segment_span) = applied_design
+                    .target_segments
+                    .first()
+                    .expect("target must have at least one segment");
+
+                if first_segment == import_alias_name {
+                    push_occurrence(
+                        occurrences,
+                        model.path().clone(),
+                        first_segment_span.clone(),
+                    );
+                }
+            }
         }
 
         for (param_name, overlay) in design_export.parameter_overrides() {
@@ -469,6 +514,24 @@ fn collect_design_parameter_occurrences(
                         occurrences,
                         model.path().clone(),
                         overlay.design_span.clone(),
+                    );
+                }
+            }
+
+            if let VariableRenameMode::ImportAlias { import_alias_name } = mode {
+                let first_segment = param_instance_path
+                    .segments()
+                    .first()
+                    .expect("instance path must have at least one segment");
+
+                if first_segment == import_alias_name {
+                    push_occurrence(
+                        occurrences,
+                        model.path().clone(),
+                        overlay
+                            .instance_path_span
+                            .clone()
+                            .expect("instance path span must be present"),
                     );
                 }
             }
@@ -634,6 +697,37 @@ fn visit_variable(
             if reference_name == import_alias_name {
                 push_occurrence(occurrences, model.path().clone(), reference_span.clone());
             }
+        }
+    }
+}
+
+/// Collects alias-definition spans for an explicit `as` import alias.
+fn collect_import_alias_definition_occurrences(
+    model: ModelTemplateReference<'_>,
+    name: &ReferenceName,
+    occurrences: &mut Vec<RenameOccurrence>,
+) {
+    for reference_import in model.reference_imports().values() {
+        if reference_import.alias.as_ref() == Some(name)
+            && let Some(span) = reference_import.alias_span.as_ref()
+        {
+            push_occurrence(occurrences, model.path().clone(), span.clone());
+        }
+    }
+
+    for submodel_import in model.submodel_imports().values() {
+        if submodel_import.alias.as_ref() == Some(name)
+            && let Some(span) = submodel_import.alias_span.as_ref()
+        {
+            push_occurrence(occurrences, model.path().clone(), span.clone());
+        }
+    }
+
+    for alias_import in model.alias_imports().values() {
+        if alias_import.alias.as_ref() == Some(name)
+            && let Some(span) = alias_import.alias_span.as_ref()
+        {
+            push_occurrence(occurrences, model.path().clone(), span.clone());
         }
     }
 }
