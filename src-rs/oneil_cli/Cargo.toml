@@ -12,6 +12,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+oneil_frontend = { path = "../oneil_frontend" }
 oneil_lsp = { path = "../oneil_lsp" }
 oneil_output = { path = "../oneil_output" }
 oneil_runtime = { path = "../oneil_runtime" }

@@ -16,7 +16,10 @@ use oneil_shared::{
 };
 use tower_lsp_server::ls_types::{PrepareRenameResponse, TextEdit, Uri, WorkspaceEdit};
 
-use crate::{location::span_to_range, model_navigation::resolve_instance_path_model_path, symbol_lookup::SymbolAtPosition};
+use crate::{
+    location::span_to_range, model_navigation::resolve_instance_path_model_path,
+    symbol_lookup::SymbolAtPosition,
+};
 
 /// What the user is renaming.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -2,11 +2,15 @@
 
 use anstream::println;
 use indexmap::IndexMap;
+use oneil_frontend::{
+    ApplyDesign, ModelDesignInfo, OverlayParameterValue, instance::design::Design,
+};
 use oneil_runtime::output::{
     ir,
     reference::{ModelTemplateReference, ReferenceImportReference, SubmodelImportReference},
 };
 use oneil_shared::{
+    InstancePath,
     paths::PythonPath,
     symbols::{ParameterName, ReferenceName, TestIndex},
 };
@@ -89,7 +93,14 @@ pub struct IrPrintConfig {
 /// Collects all errors from the model IR by traversing the hierarchy. If there are errors, they
 /// are printed. If there are no errors or `display_partial` is true, the IR is displayed.
 /// When displaying, only the top-level model IR is shown unless `recursive` is true.
-pub fn print(ir_result: ModelTemplateReference<'_>, ir_print_config: &IrPrintConfig) {
+///
+/// When `design_info_opt` is present, applied designs and resolved design-export content for the
+/// entry file are printed alongside the lowered template IR.
+pub fn print(
+    ir_result: ModelTemplateReference<'_>,
+    design_info_opt: Option<&ModelDesignInfo>,
+    ir_print_config: &IrPrintConfig,
+) {
     println!("{}", dbg_style::ROOT_HEADER.style("ModelCollection"));
     println!(
         "{} {}",
@@ -97,14 +108,16 @@ pub fn print(ir_result: ModelTemplateReference<'_>, ir_print_config: &IrPrintCon
         dbg_style::SECTION.style("Models:")
     );
     let prefix = "└──";
-    print_model(ir_result, 1, prefix, ir_print_config);
+    print_model(ir_result, design_info_opt, 1, prefix, ir_print_config);
 }
 
 /// Prints a single model with its components.
 ///
 /// When `recursive` is true and `model_ref` is `Some`, also prints nested submodels and references.
+/// Design metadata from `design_info_opt` is printed only for the entry model (when `Some`).
 fn print_model(
     model_ref: ModelTemplateReference<'_>,
+    design_info_opt: Option<&ModelDesignInfo>,
     indent: usize,
     prefix: &str,
     config: &IrPrintConfig,
@@ -156,6 +169,10 @@ fn print_model(
         }
     }
 
+    if let Some(design_info) = design_info_opt {
+        push_design_sections(design_info, config, &mut section_list);
+    }
+
     for (i, (section_name, count, tag)) in section_list.iter().enumerate() {
         let is_last = i == section_list.len() - 1;
         let section_prefix = if is_last { "└──" } else { "├──" };
@@ -175,6 +192,18 @@ fn print_model(
             SectionTag::Parameters => print_parameters(&model_ref.parameters(), indent + 2, config),
             SectionTag::References => print_references(&model_ref.reference_models(), indent + 2),
             SectionTag::Tests => print_tests(model_ref.tests(), indent + 2, config),
+            SectionTag::AppliedDesigns => {
+                if let Some(design_info) = design_info_opt {
+                    print_applied_designs(&design_info.applied_designs, indent + 2);
+                }
+            }
+            SectionTag::DesignExport => {
+                if let Some(design_info) = design_info_opt
+                    && let Some(design) = design_info.design_export.as_ref()
+                {
+                    print_design_export(design, indent + 2, config);
+                }
+            }
         }
     }
 
@@ -190,7 +219,7 @@ fn print_model(
         for (i, nested_ref) in refs_to_print.iter().enumerate() {
             let is_last = i == refs_to_print.len() - 1;
             let nested_prefix = if is_last { "└──" } else { "├──" };
-            print_model(*nested_ref, indent + 1, nested_prefix, config);
+            print_model(*nested_ref, None, indent + 1, nested_prefix, config);
         }
     }
 }
@@ -201,6 +230,206 @@ enum SectionTag {
     Parameters,
     References,
     Tests,
+    AppliedDesigns,
+    DesignExport,
+}
+
+/// Appends design-related sections to `section_list` when the entry file carries design metadata.
+fn push_design_sections(
+    design_info: &ModelDesignInfo,
+    config: &IrPrintConfig,
+    section_list: &mut Vec<(&str, usize, SectionTag)>,
+) {
+    if !design_info.applied_designs.is_empty() {
+        section_list.push((
+            "Applied designs",
+            design_info.applied_designs.len(),
+            SectionTag::AppliedDesigns,
+        ));
+    }
+
+    let Some(design) = design_info.design_export.as_ref() else {
+        return;
+    };
+
+    let mut export_count = 0_usize;
+    if design.target_model().is_some() {
+        export_count += 1;
+    }
+    if config.sections.show_parameters() {
+        export_count += design.parameter_overrides().count();
+        export_count += design.scoped_parameter_overrides().count();
+        export_count += design.parameter_additions().count();
+    }
+    if config.sections.show_tests() {
+        export_count += design.test_additions().count();
+    }
+
+    if export_count > 0 {
+        section_list.push(("Design export", export_count, SectionTag::DesignExport));
+    }
+}
+
+/// Prints `apply <design> to <path>` declarations from the entry file.
+fn print_applied_designs(applied_designs: &[ApplyDesign], indent: usize) {
+    for (i, apply) in applied_designs.iter().enumerate() {
+        let is_last = i == applied_designs.len() - 1;
+        let prefix = if is_last { "└──" } else { "├──" };
+        let target = format_instance_path(&apply.target);
+        println!(
+            "{}    {} {} \"{}\"{}",
+            "    ".repeat(indent),
+            dbg_style::TREE.style(prefix),
+            dbg_style::LABEL.style("ApplyDesign:"),
+            dbg_style::IDENTIFIER.style(apply.design_path.as_path().display()),
+            dbg_style::LITERAL.style(format!(" to {target}"))
+        );
+    }
+}
+
+/// Prints resolved design-export content from a `.one` design file.
+fn print_design_export(design: &Design, indent: usize, config: &IrPrintConfig) {
+    let sections = &config.sections;
+    let mut items: Vec<DesignExportItem<'_>> = Vec::new();
+
+    if let Some((target, _)) = design.target_model() {
+        items.push(DesignExportItem::Target(target));
+    }
+
+    if sections.show_parameters() {
+        for (name, overlay) in design.parameter_overrides() {
+            items.push(DesignExportItem::ParameterOverride { name, overlay });
+        }
+        for (path, name, overlay) in design.scoped_parameter_overrides() {
+            items.push(DesignExportItem::ScopedOverride {
+                path,
+                name,
+                overlay,
+            });
+        }
+        for parameter in design.parameter_additions() {
+            items.push(DesignExportItem::ParameterAddition(parameter));
+        }
+    }
+
+    if sections.show_tests() {
+        for test in design.test_additions() {
+            items.push(DesignExportItem::TestAddition(test));
+        }
+    }
+
+    for (i, item) in items.iter().enumerate() {
+        let is_last = i == items.len() - 1;
+        let prefix = if is_last { "└──" } else { "├──" };
+        match item {
+            DesignExportItem::Target(path) => {
+                println!(
+                    "{}    {} {} \"{}\"",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style(prefix),
+                    dbg_style::LABEL.style("Design target:"),
+                    dbg_style::IDENTIFIER.style(path.as_path().display())
+                );
+            }
+            DesignExportItem::ParameterOverride { name, overlay } => {
+                print_overlay_parameter(name, None, overlay, indent, prefix, config);
+            }
+            DesignExportItem::ScopedOverride {
+                path,
+                name,
+                overlay,
+            } => {
+                print_overlay_parameter(name, Some(path), overlay, indent, prefix, config);
+            }
+            DesignExportItem::ParameterAddition(parameter) => {
+                print_parameter(parameter.name(), parameter, indent, prefix, config);
+            }
+            DesignExportItem::TestAddition(test) => {
+                println!(
+                    "{}    {} {}:",
+                    "    ".repeat(indent),
+                    dbg_style::TREE.style(prefix),
+                    dbg_style::LABEL.style("Test addition")
+                );
+                print_test(test, indent + 1, config);
+            }
+        }
+    }
+}
+
+enum DesignExportItem<'design> {
+    Target(&'design oneil_shared::paths::ModelPath),
+    ParameterOverride {
+        name: &'design ParameterName,
+        overlay: &'design OverlayParameterValue,
+    },
+    ScopedOverride {
+        path: &'design InstancePath,
+        name: &'design ParameterName,
+        overlay: &'design OverlayParameterValue,
+    },
+    ParameterAddition(&'design ir::Parameter),
+    TestAddition(&'design ir::Test),
+}
+
+/// Formats an instance path as dot-separated reference segments.
+fn format_instance_path(path: &InstancePath) -> String {
+    path.segments()
+        .iter()
+        .map(oneil_shared::symbols::ReferenceName::as_str)
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+/// Prints a design parameter override or scoped override.
+fn print_overlay_parameter(
+    parameter_name: &ParameterName,
+    instance_path: Option<&InstancePath>,
+    overlay: &OverlayParameterValue,
+    indent: usize,
+    prefix: &str,
+    config: &IrPrintConfig,
+) {
+    let scoped_prefix = instance_path
+        .map(format_instance_path)
+        .map_or_else(String::new, |path| format!("{path}."));
+    let label = if instance_path.is_some() {
+        "Scoped override:"
+    } else {
+        "Parameter override:"
+    };
+
+    println!(
+        "{}    {} {} \"{}{}\"",
+        "    ".repeat(indent),
+        dbg_style::TREE.style(prefix),
+        dbg_style::LABEL.style(label),
+        dbg_style::IDENTIFIER.style(scoped_prefix),
+        dbg_style::IDENTIFIER.style(parameter_name.as_str())
+    );
+
+    if !config.print_values {
+        return;
+    }
+
+    let value_indent = indent + 1;
+    println!(
+        "{}    {} {}",
+        "    ".repeat(value_indent),
+        dbg_style::TREE.style("├──"),
+        dbg_style::DETAIL.style("Value:")
+    );
+    print_parameter_value(&overlay.value, value_indent + 1);
+
+    if let Some(limits) = overlay.limits_override.as_ref() {
+        println!(
+            "{}    {} {}",
+            "    ".repeat(value_indent),
+            dbg_style::TREE.style("└──"),
+            dbg_style::DETAIL.style("Limits:")
+        );
+        print_limits(limits, value_indent + 1);
+    }
 }
 
 /// Prints Python imports, showing the path and function names for each import.

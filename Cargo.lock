@@ -699,6 +699,7 @@ dependencies = [
  "clap",
  "indexmap",
  "notify",
+ "oneil_frontend",
  "oneil_lsp",
  "oneil_output",
  "oneil_runtime",
