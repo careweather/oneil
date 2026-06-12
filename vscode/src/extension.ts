@@ -69,6 +69,16 @@ export async function activate(context: vscode.ExtensionContext) {
             if (e.affectsConfiguration("oneil.pdf.offlineOnly")) {
                 updateStatusBar(statusBar)
             }
+
+            if (
+                e.affectsConfiguration("oneil.serverPath")
+                || e.affectsConfiguration("oneil.cacheReadPolicy")
+                || e.affectsConfiguration("oneil.cacheWritePolicy")
+                || e.affectsConfiguration("oneil.workspaceDiscovery.skipDirs")
+                || e.affectsConfiguration("oneil.workspaceDiscovery.disabled")
+            ) {
+                void restartLanguageServer(context)
+            }
         }),
     )
 
@@ -100,6 +110,14 @@ function buildOptions(): { serverOptions: ServerOptions; clientOptions: Language
 
     const cacheReadPolicy = config.get<string>("cacheReadPolicy", "always")
     const cacheWritePolicy = config.get<string>("cacheWritePolicy", "always")
+    const skipDirs = config.get<string[]>("workspaceDiscovery.skipDirs", [
+        "node_modules",
+        "target",
+        "venv",
+        "__pycache__",
+        "__oncache__",
+    ])
+    const workspaceDiscoveryDisabled = config.get<boolean>("workspaceDiscovery.disabled", false)
 
     const args = [
         "lsp",
@@ -107,7 +125,13 @@ function buildOptions(): { serverOptions: ServerOptions; clientOptions: Language
         cacheReadPolicy,
         "--cache-overwrite",
         cacheWritePolicy,
+        "--skip-dirs",
+        skipDirs.join(","),
     ]
+
+    if (workspaceDiscoveryDisabled) {
+        args.push("--disable-workspace-discovery")
+    }
 
     return {
         serverOptions: { command, args },
@@ -123,23 +147,23 @@ function buildOptions(): { serverOptions: ServerOptions; clientOptions: Language
 /**
  * Restarts the Oneil language server. Uses the current configuration (e.g. serverPath).
  */
-async function restartLanguageServer(context: vscode.ExtensionContext): Promise<void> {
-    if (client == null) {
-        const { serverOptions, clientOptions } = buildOptions()
-
-        const newClient = new LanguageClient(
-            "oneil-language-server",
-            "Oneil Language Server",
-            serverOptions,
-            clientOptions,
-        )
-        await newClient.start()
-
-        client = newClient
-        client.info("language server initialized")
-    } else {
+async function restartLanguageServer(_context: vscode.ExtensionContext): Promise<void> {
+    if (client != null) {
         client.info("restarting language server")
-        await client.restart()
-        client.info("language server restarted")
+        await client.stop()
+        client = undefined
     }
+
+    const { serverOptions, clientOptions } = buildOptions()
+
+    const newClient = new LanguageClient(
+        "oneil-language-server",
+        "Oneil Language Server",
+        serverOptions,
+        clientOptions,
+    )
+    await newClient.start()
+
+    client = newClient
+    client.info("language server initialized")
 }

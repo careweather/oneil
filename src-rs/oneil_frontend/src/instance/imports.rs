@@ -18,7 +18,12 @@
 //! * The build pass walks the submodel declarations, recursively builds
 //!   each child's subtree, and replaces the stub `instance`.
 
-use oneil_shared::{InstancePath, paths::ModelPath, span::Span, symbols::SubmodelName};
+use oneil_shared::{
+    InstancePath,
+    paths::ModelPath,
+    span::Span,
+    symbols::{ReferenceName, SubmodelName},
+};
 
 use super::model::InstancedModel;
 
@@ -29,8 +34,15 @@ use super::model::InstancedModel;
 /// the alias's source span and target path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReferenceImport {
+    /// Source-level reference name (`foo` in `reference foo as bar`).
+    pub name: ReferenceName,
     /// Span of the reference's alias identifier in source.
     pub name_span: Span,
+    /// Explicit `as` alias when the declaration includes one; otherwise
+    /// the map key is the model name and this is `None`.
+    pub alias: Option<ReferenceName>,
+    /// Span of [`Self::alias`] in source, if present.
+    pub alias_span: Option<Span>,
     /// On-disk path of the referenced model file. Doubles as the lookup
     /// key into the containing graph's `reference_pool`.
     pub path: ModelPath,
@@ -39,8 +51,20 @@ pub struct ReferenceImport {
 impl ReferenceImport {
     /// Creates a new reference import.
     #[must_use]
-    pub const fn new(name_span: Span, path: ModelPath) -> Self {
-        Self { name_span, path }
+    pub const fn new(
+        name: ReferenceName,
+        name_span: Span,
+        alias: Option<ReferenceName>,
+        alias_span: Option<Span>,
+        path: ModelPath,
+    ) -> Self {
+        Self {
+            name,
+            name_span,
+            alias,
+            alias_span,
+            path,
+        }
     }
 }
 
@@ -52,6 +76,11 @@ pub struct SubmodelImport {
     pub name: SubmodelName,
     /// Span of the source-level model name in the file.
     pub name_span: Span,
+    /// Explicit `as` alias when the declaration includes one; otherwise
+    /// the map key is the model name and this is `None`.
+    pub alias: Option<ReferenceName>,
+    /// Span of [`Self::alias`] in source, if present.
+    pub alias_span: Option<Span>,
     /// The owned child subtree. The resolver creates this as a path-only
     /// stub (see [`InstancedModel::empty_for`]); the build pass replaces
     /// it with the recursively-built subtree.
@@ -62,10 +91,18 @@ impl SubmodelImport {
     /// Creates a new submodel import with a path-only stub child.
     /// The build pass replaces the stub with the built subtree.
     #[must_use]
-    pub fn stub(name: SubmodelName, name_span: Span, child_path: ModelPath) -> Self {
+    pub fn stub(
+        name: SubmodelName,
+        name_span: Span,
+        alias: Option<ReferenceName>,
+        alias_span: Option<Span>,
+        child_path: ModelPath,
+    ) -> Self {
         Self {
             name,
             name_span,
+            alias,
+            alias_span,
             instance: Box::new(InstancedModel::empty_for(child_path)),
         }
     }
@@ -84,6 +121,12 @@ pub struct AliasImport {
     pub source: SubmodelName,
     /// Span of the source-level submodel name in the file.
     pub name_span: Span,
+    /// Explicit `as` alias from the extraction item when one was written;
+    /// otherwise the map key is derived from the extracted path and this
+    /// is `None`.
+    pub alias: Option<ReferenceName>,
+    /// Span of [`Self::alias`] in source, if present.
+    pub alias_span: Option<Span>,
     /// Reference-name segments to descend from the host instance to
     /// reach the alias target.
     pub alias_path: InstancePath,
@@ -92,10 +135,18 @@ pub struct AliasImport {
 impl AliasImport {
     /// Creates a new alias import.
     #[must_use]
-    pub const fn new(source: SubmodelName, name_span: Span, alias_path: InstancePath) -> Self {
+    pub const fn new(
+        source: SubmodelName,
+        name_span: Span,
+        alias: Option<ReferenceName>,
+        alias_span: Option<Span>,
+        alias_path: InstancePath,
+    ) -> Self {
         Self {
             source,
             name_span,
+            alias,
+            alias_span,
             alias_path,
         }
     }

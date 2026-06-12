@@ -128,6 +128,23 @@ pub enum Commands {
 /// Arguments for `oneil lsp`.
 #[derive(Args, Clone)]
 pub struct LspArgs {
+    /// Directory names to skip while discovering model files in workspace roots
+    ///
+    /// Hidden directories (names starting with `.`) are always skipped in
+    /// addition to these names. Pass an empty value to skip only hidden
+    /// directories.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "DIR",
+        default_value = "node_modules,target,venv,__pycache__,__oncache__"
+    )]
+    pub skip_dirs: Vec<String>,
+
+    /// Do not scan workspace roots for model files at startup
+    #[arg(long)]
+    pub disable_workspace_discovery: bool,
+
     #[command(flatten)]
     pub common: CommonArgs,
 }

@@ -10,7 +10,7 @@ use indexmap::{IndexMap, IndexSet};
 use oneil_frontend::{
     CompilationUnit, InstancedModel,
     instance::graph::UnitGraphCache,
-    instance::imports::{ReferenceImport, SubmodelImport},
+    instance::imports::{AliasImport, ReferenceImport, SubmodelImport},
 };
 use oneil_ir as ir;
 use oneil_shared::{
@@ -190,6 +190,12 @@ impl<'runtime> ModelTemplateReference<'runtime> {
         self.model.references().iter().collect()
     }
 
+    /// Returns a map of extracted alias names to their `AliasImport`s.
+    #[must_use]
+    pub fn alias_imports(&self) -> IndexMap<&'runtime ReferenceName, &'runtime AliasImport> {
+        self.model.aliases().iter().collect()
+    }
+
     /// Returns a map of reference names to their template model references.
     #[must_use]
     pub fn reference_models(
@@ -268,6 +274,18 @@ impl<'runtime> SubmodelImportReference<'runtime> {
         &self.submodel_import.name_span
     }
 
+    /// Returns the explicit `as` alias, if the declaration includes one.
+    #[must_use]
+    pub const fn alias(&self) -> Option<&'runtime ReferenceName> {
+        self.submodel_import.alias.as_ref()
+    }
+
+    /// Returns the span of the explicit `as` alias, if the declaration includes one.
+    #[must_use]
+    pub const fn alias_span(&self) -> Option<&'runtime Span> {
+        self.submodel_import.alias_span.as_ref()
+    }
+
     /// Returns the alias under which the submodel is bound in the parent
     /// (`bar` in `submodel foo as bar`).
     #[must_use]
@@ -325,6 +343,18 @@ impl<'runtime> ReferenceImportReference<'runtime> {
     #[must_use]
     pub const fn name_span(&self) -> &'runtime Span {
         &self.reference_import.name_span
+    }
+
+    /// Returns the explicit `as` alias, if the declaration includes one.
+    #[must_use]
+    pub const fn alias(&self) -> Option<&'runtime ReferenceName> {
+        self.reference_import.alias.as_ref()
+    }
+
+    /// Returns the span of the explicit `as` alias, if the declaration includes one.
+    #[must_use]
+    pub const fn alias_span(&self) -> Option<&'runtime Span> {
+        self.reference_import.alias_span.as_ref()
     }
 
     /// Returns the path of the reference.

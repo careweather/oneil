@@ -14,14 +14,16 @@ mod doc_store;
 mod hover;
 mod location;
 mod path;
+mod rename;
 mod symbol_lookup;
+mod workspace;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use oneil_runtime::{CacheReadPolicy, CacheWritePolicy, Runtime as OneilRuntime};
 use oneil_shared::paths::{ModelPath, SourcePath};
-use tower_lsp_server::ls_types::OneOf;
+use tower_lsp_server::ls_types::{Position, WorkDoneProgressOptions};
 use tower_lsp_server::{
     Client, LanguageServer, LspService, Server,
     jsonrpc::{self, Result},
@@ -29,9 +31,11 @@ use tower_lsp_server::{
         DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
         DidSaveTextDocumentParams, ExecuteCommandOptions, ExecuteCommandParams,
         GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability,
-        InitializeParams, InitializeResult, InitializedParams, LSPAny, MessageType,
-        PositionEncodingKind, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
+        InitializeParams, InitializeResult, InitializedParams, LSPAny, MessageType, OneOf,
+        PositionEncodingKind, PrepareRenameResponse, RenameOptions, RenameParams,
+        ServerCapabilities, ServerInfo, TextDocumentPositionParams, TextDocumentSyncCapability,
         TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Uri,
+        WorkspaceEdit,
     },
 };
 
@@ -40,9 +44,14 @@ use diagnostics::diagnostics_from_runtime_errors;
 use doc_store::DocumentStore;
 use hover::hover_markdown;
 use location::span_to_range;
+pub use workspace::WorkspaceDiscoveryOptions;
 
 #[tokio::main]
-pub async fn run(cache_read_policy: CacheReadPolicy, cache_write_policy: CacheWritePolicy) {
+pub async fn run(
+    cache_read_policy: CacheReadPolicy,
+    cache_write_policy: CacheWritePolicy,
+    discovery_options: WorkspaceDiscoveryOptions,
+) {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
@@ -53,6 +62,7 @@ pub async fn run(cache_read_policy: CacheReadPolicy, cache_write_policy: CacheWr
         client,
         docs,
         workspace_roots: Mutex::new(Vec::new()),
+        discovery_options,
         runtime,
     });
 
@@ -64,6 +74,8 @@ struct Backend {
     docs: Arc<DocumentStore>,
     /// Workspace folder paths from `initialize`, longest first (nested folders match innermost).
     workspace_roots: Mutex<Vec<PathBuf>>,
+    /// Directories skipped while discovering model files in workspace roots.
+    discovery_options: WorkspaceDiscoveryOptions,
     // TODO: figure out how to handle async runtime operations better.
     //
     //       Right now, only one thing can use the runtime at a time.
@@ -127,6 +139,10 @@ impl LanguageServer for Backend {
                     commands: vec!["oneil/instanceTree".to_string()],
                     ..Default::default()
                 }),
+                rename_provider: Some(OneOf::Right(RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                })),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -140,6 +156,48 @@ impl LanguageServer for Backend {
     async fn initialized(&self, _params: InitializedParams) {
         self.client
             .log_message(MessageType::INFO, "initialized called")
+            .await;
+
+        let workspace_roots = self
+            .workspace_roots
+            .lock()
+            .expect("workspace_roots mutex poisoned")
+            .clone();
+
+        if !self.discovery_options.enabled {
+            self.client
+                .log_message(
+                    MessageType::INFO,
+                    "workspace discovery disabled; skipping workspace model load",
+                )
+                .await;
+            return;
+        }
+
+        if workspace_roots.is_empty() {
+            self.client
+                .log_message(
+                    MessageType::WARNING,
+                    "no workspace roots; skipping workspace model load",
+                )
+                .await;
+            return;
+        }
+
+        let loaded_count = {
+            let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
+            workspace::load_workspace_models(
+                &mut runtime,
+                &workspace_roots,
+                &self.discovery_options,
+            )
+        };
+
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!("loaded {loaded_count} workspace model file(s)"),
+            )
             .await;
     }
 
@@ -410,9 +468,104 @@ impl LanguageServer for Backend {
 
         result
     }
+
+    async fn prepare_rename(
+        &self,
+        params: TextDocumentPositionParams,
+    ) -> Result<Option<PrepareRenameResponse>> {
+        // get the symbol at the current position, if it exists
+        let uri = params.text_document.uri;
+        let position = params.position;
+
+        let Some((current_model_path, symbol)) = self.symbol_at_position(&uri, position).await
+        else {
+            return Ok(None);
+        };
+
+        // check if the symbol resolves to a rename target
+        let can_rename = {
+            let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
+            rename::resolve_rename_target(&symbol, &mut runtime, &current_model_path).is_some()
+        };
+
+        if !can_rename {
+            return Ok(None);
+        }
+
+        // return the "prepare rename" response
+        Ok(rename::prepare_rename_response(&symbol))
+    }
+
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        // get the symbol at the current position, if it exists
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        let Some((current_model_path, symbol)) = self.symbol_at_position(&uri, position).await
+        else {
+            return Ok(None);
+        };
+
+        // resolve the rename target
+        let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
+
+        let Some(target) =
+            rename::resolve_rename_target(&symbol, &mut runtime, &current_model_path)
+        else {
+            return Ok(None);
+        };
+
+        // get a list of all other open model paths
+        let also_scan = runtime.get_loaded_models();
+
+        // build and return the rename edits
+        let edit = rename::workspace_edit_for_rename(
+            &target,
+            &params.new_name,
+            &mut runtime,
+            &current_model_path,
+            &also_scan,
+        )
+        .map_err(|message| jsonrpc::Error {
+            code: jsonrpc::ErrorCode::InvalidParams,
+            message: message.into(),
+            data: None,
+        })?;
+
+        Ok(Some(edit))
+    }
 }
 
 impl Backend {
+    /// Resolves the symbol at an LSP position in a model file.
+    async fn symbol_at_position(
+        &self,
+        uri: &Uri,
+        position: Position,
+    ) -> Option<(ModelPath, symbol_lookup::SymbolAtPosition)> {
+        let Ok(current_model_path) = ModelPath::try_from(uri.path().as_str()) else {
+            return None;
+        };
+
+        let offset = self.docs.position_to_offset(uri, position).await?;
+
+        let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
+        let (ir_model, _) = runtime.load_and_lower(&current_model_path);
+        let ir_model = ir_model?;
+        let symbol = symbol_lookup::find_symbol_at_offset(ir_model, offset)?;
+
+        Some((current_model_path, symbol))
+    }
+
+    /// Model paths for open documents other than `uri`, when they are Oneil model files.
+    async fn open_model_paths_except(&self, uri: &Uri) -> Vec<ModelPath> {
+        let uris = self.docs.open_uris().await;
+        uris.into_iter()
+            .filter(|open_uri| open_uri != uri)
+            .filter_map(|open_uri| ModelPath::try_from(open_uri.path().as_str()).ok())
+            .collect()
+    }
+
     /// Evaluates the model at the given URI and publishes any errors as LSP diagnostics.
     async fn publish_diagnostics_for_model_path(
         &self,
