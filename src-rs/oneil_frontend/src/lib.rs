@@ -44,11 +44,10 @@ pub use crate::context::{
 pub use crate::error::{DesignResolutionError, ResolutionErrorCollection};
 pub use crate::instance::{
     AliasImport, ApplyDesign, BuiltinLookup, CompilationCycleError, CompilationUnit,
-    OverlayParameterValue,
     ContributionDiagnostic, CycleMember, CycleStackFrame, HostLocation, InstanceGraph,
     InstanceValidationError, InstanceValidationErrorKind, InstancedModel, ModelDesignInfo,
-    ReferenceImport, SubmodelImport, UnitGraphCache, apply_designs, build_instance_graph,
-    build_unit_graph, build_unit_graph_for, classify_variables,
+    OverlayParameterValue, ReferenceImport, SubmodelImport, UnitGraphCache, apply_designs,
+    build_instance_graph, build_unit_graph, build_unit_graph_for, classify_variables,
 };
 
 use crate::context::ResolutionContext;

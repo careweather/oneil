@@ -235,12 +235,8 @@ fn format_design_instance_path_hover(
     let design_info = design_info_opt?;
     let design = design_info.design_export.as_ref()?;
     let (target_model_path, _) = design.target_model()?;
-    let effective_target_path = resolve_instance_path_model_path(
-        runtime,
-        target_model_path,
-        Some(instance_path),
-    )
-    .ok()?;
+    let effective_target_path =
+        resolve_instance_path_model_path(runtime, target_model_path, Some(instance_path)).ok()?;
 
     format_model_hover_from_path(runtime, &effective_target_path, workspace_roots)
 }
