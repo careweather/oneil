@@ -16,6 +16,7 @@ mod location;
 mod model_navigation;
 mod occurrences;
 mod path;
+mod references;
 mod rename;
 mod symbol_lookup;
 mod workspace;
@@ -25,7 +26,7 @@ use std::sync::{Arc, Mutex};
 
 use oneil_runtime::{CacheReadPolicy, CacheWritePolicy, Runtime as OneilRuntime};
 use oneil_shared::paths::{ModelPath, SourcePath};
-use tower_lsp_server::ls_types::{Position, WorkDoneProgressOptions};
+use tower_lsp_server::ls_types::{Location, Position, ReferenceParams, WorkDoneProgressOptions};
 use tower_lsp_server::{
     Client, LanguageServer, LspService, Server,
     jsonrpc::{self, Result},
@@ -145,6 +146,7 @@ impl LanguageServer for Backend {
                     prepare_provider: Some(true),
                     work_done_progress_options: WorkDoneProgressOptions::default(),
                 })),
+                references_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -473,6 +475,23 @@ impl LanguageServer for Backend {
         }
 
         result
+    }
+
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        let position = params.text_document_position.position;
+        let uri = params.text_document_position.text_document.uri;
+
+        let Some((current_model_path, symbol)) = self.symbol_at_position(&uri, position).await
+        else {
+            return Ok(None);
+        };
+
+        let locations = {
+            let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
+            references::reference_locations(&symbol, &mut runtime, &current_model_path)
+        };
+
+        Ok(locations)
     }
 
     async fn prepare_rename(
