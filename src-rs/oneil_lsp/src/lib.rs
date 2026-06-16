@@ -14,6 +14,7 @@ mod doc_store;
 mod hover;
 mod location;
 mod model_navigation;
+mod occurrences;
 mod path;
 mod rename;
 mod symbol_lookup;
@@ -490,7 +491,7 @@ impl LanguageServer for Backend {
         // check if the symbol resolves to a rename target
         let can_rename = {
             let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
-            rename::resolve_rename_target(&symbol, &mut runtime, &current_model_path).is_some()
+            occurrences::resolve_search_target(&symbol, &mut runtime, &current_model_path).is_some()
         };
 
         if !can_rename {
@@ -515,7 +516,7 @@ impl LanguageServer for Backend {
         let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
 
         let Some(target) =
-            rename::resolve_rename_target(&symbol, &mut runtime, &current_model_path)
+            occurrences::resolve_search_target(&symbol, &mut runtime, &current_model_path)
         else {
             return Ok(None);
         };
