@@ -8,9 +8,9 @@
 
 pub mod custom_requests;
 mod definition;
-
 mod diagnostics;
 mod doc_store;
+mod document_highlight;
 mod hover;
 mod location;
 mod model_navigation;
@@ -32,13 +32,13 @@ use tower_lsp_server::{
     jsonrpc::{self, Result},
     ls_types::{
         DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-        DidSaveTextDocumentParams, ExecuteCommandOptions, ExecuteCommandParams,
-        GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability,
-        InitializeParams, InitializeResult, InitializedParams, LSPAny, MessageType, OneOf,
-        PositionEncodingKind, PrepareRenameResponse, RenameOptions, RenameParams,
-        ServerCapabilities, ServerInfo, TextDocumentPositionParams, TextDocumentSyncCapability,
-        TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, Uri,
-        WorkspaceEdit,
+        DidSaveTextDocumentParams, DocumentHighlight, DocumentHighlightParams,
+        ExecuteCommandOptions, ExecuteCommandParams, GotoDefinitionParams, GotoDefinitionResponse,
+        Hover, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
+        InitializedParams, LSPAny, MessageType, OneOf, PositionEncodingKind, PrepareRenameResponse,
+        RenameOptions, RenameParams, ServerCapabilities, ServerInfo, TextDocumentPositionParams,
+        TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+        TextDocumentSyncSaveOptions, Uri, WorkspaceEdit,
     },
 };
 
@@ -147,6 +147,7 @@ impl LanguageServer for Backend {
                     work_done_progress_options: WorkDoneProgressOptions::default(),
                 })),
                 references_provider: Some(OneOf::Left(true)),
+                document_highlight_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -492,6 +493,26 @@ impl LanguageServer for Backend {
         };
 
         Ok(locations)
+    }
+
+    async fn document_highlight(
+        &self,
+        params: DocumentHighlightParams,
+    ) -> Result<Option<Vec<DocumentHighlight>>> {
+        let position = params.text_document_position_params.position;
+        let uri = params.text_document_position_params.text_document.uri;
+
+        let Some((current_model_path, symbol)) = self.symbol_at_position(&uri, position).await
+        else {
+            return Ok(None);
+        };
+
+        let highlights = {
+            let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
+            document_highlight::document_highlights(&symbol, &mut runtime, &current_model_path)
+        };
+
+        Ok(highlights)
     }
 
     async fn prepare_rename(
