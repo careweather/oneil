@@ -248,7 +248,9 @@ fn collect_parameter_occurrences(
         } = mode
             && param.name() == name
         {
-            push_occurrence(occurrences, model.path().clone(), param.name_span().clone());
+            let model_path = model.path().clone();
+            let span = param.name_span().clone();
+            occurrences.push(Occurrence { model_path, span });
         }
 
         collect_parameter_value(model, None, param.value(), mode, occurrences);
@@ -277,7 +279,9 @@ fn collect_design_parameter_occurrences(
                 } = mode
                     && param.name() == name
                 {
-                    push_occurrence(occurrences, model.path().clone(), param.name_span().clone());
+                    let model_path = model.path().clone();
+                    let span = param.name_span().clone();
+                    occurrences.push(Occurrence { model_path, span });
                 }
 
                 collect_parameter_value(model, None, param.value(), mode, occurrences);
@@ -298,11 +302,9 @@ fn collect_design_parameter_occurrences(
                     .expect("target must have at least one segment");
 
                 if first_segment == import_alias_name {
-                    push_occurrence(
-                        occurrences,
-                        model.path().clone(),
-                        first_segment_span.clone(),
-                    );
+                    let model_path = model.path().clone();
+                    let span = first_segment_span.clone();
+                    occurrences.push(Occurrence { model_path, span });
                 }
             }
         }
@@ -315,11 +317,9 @@ fn collect_design_parameter_occurrences(
             } = mode
                 && param_name == name
             {
-                push_occurrence(
-                    occurrences,
-                    model.path().clone(),
-                    overlay.design_span.clone(),
-                );
+                let model_path = model.path().clone();
+                let span = overlay.design_span.clone();
+                occurrences.push(Occurrence { model_path, span });
             }
 
             collect_parameter_value(model, None, &overlay.value, mode, occurrences);
@@ -354,11 +354,9 @@ fn collect_design_parameter_occurrences(
                 if let Some(param_model_path) = param_model_path
                     && external_model_paths.contains(&param_model_path)
                 {
-                    push_occurrence(
-                        occurrences,
-                        model.path().clone(),
-                        overlay.design_span.clone(),
-                    );
+                    let model_path = model.path().clone();
+                    let span = overlay.design_span.clone();
+                    occurrences.push(Occurrence { model_path, span });
                 }
             }
 
@@ -369,14 +367,12 @@ fn collect_design_parameter_occurrences(
                     .expect("instance path must have at least one segment");
 
                 if first_segment == import_alias_name {
-                    push_occurrence(
-                        occurrences,
-                        model.path().clone(),
-                        overlay
-                            .instance_path_span
-                            .clone()
-                            .expect("instance path span must be present"),
-                    );
+                    let model_path = model.path().clone();
+                    let span = overlay
+                        .instance_path_span
+                        .clone()
+                        .expect("instance path span must be present");
+                    occurrences.push(Occurrence { model_path, span });
                 }
             }
 
@@ -492,7 +488,9 @@ fn visit_variable(
             } = variable
                 && current_parameter_name == parameter_name
             {
-                push_occurrence(occurrences, model.path().clone(), parameter_span.clone());
+                let model_path = model.path().clone();
+                let span = parameter_span.clone();
+                occurrences.push(Occurrence { model_path, span });
             }
         }
         VariableRenameMode::ExternalParameter {
@@ -514,18 +512,18 @@ fn visit_variable(
                     .as_ref()
                     .is_some_and(|path| external_model_paths.contains(path))
             {
-                push_occurrence(occurrences, model.path().clone(), parameter_span.clone());
+                let model_path = model.path().clone();
+                let span = parameter_span.clone();
+                occurrences.push(Occurrence { model_path, span });
             } else if current_parameter_name == parameter_name
                 && let Some(target_model) = target_model
                 && resolve_reference_model_path(target_model, reference_name)
                     .as_ref()
                     .is_some_and(|path| external_model_paths.contains(path))
             {
-                push_occurrence(
-                    occurrences,
-                    target_model.path().clone(),
-                    parameter_span.clone(),
-                );
+                let model_path = target_model.path().clone();
+                let span = parameter_span.clone();
+                occurrences.push(Occurrence { model_path, span });
             }
         }
         VariableRenameMode::ImportAlias { import_alias_name } => {
@@ -539,7 +537,9 @@ fn visit_variable(
             };
 
             if reference_name == import_alias_name {
-                push_occurrence(occurrences, model.path().clone(), reference_span.clone());
+                let model_path = model.path().clone();
+                let span = reference_span.clone();
+                occurrences.push(Occurrence { model_path, span });
             }
         }
     }
@@ -555,7 +555,9 @@ fn collect_import_alias_definition_occurrences(
         if reference_import.alias.as_ref() == Some(name)
             && let Some(span) = reference_import.alias_span.as_ref()
         {
-            push_occurrence(occurrences, model.path().clone(), span.clone());
+            let model_path = model.path().clone();
+            let span = span.clone();
+            occurrences.push(Occurrence { model_path, span });
         }
     }
 
@@ -563,7 +565,9 @@ fn collect_import_alias_definition_occurrences(
         if submodel_import.alias.as_ref() == Some(name)
             && let Some(span) = submodel_import.alias_span.as_ref()
         {
-            push_occurrence(occurrences, model.path().clone(), span.clone());
+            let model_path = model.path().clone();
+            let span = span.clone();
+            occurrences.push(Occurrence { model_path, span });
         }
     }
 
@@ -571,7 +575,9 @@ fn collect_import_alias_definition_occurrences(
         if alias_import.alias.as_ref() == Some(name)
             && let Some(span) = alias_import.alias_span.as_ref()
         {
-            push_occurrence(occurrences, model.path().clone(), span.clone());
+            let model_path = model.path().clone();
+            let span = span.clone();
+            occurrences.push(Occurrence { model_path, span });
         }
     }
 }
@@ -596,8 +602,4 @@ fn get_designs_referencing_model(
             (path == param_model_path).then(|| model.path().clone())
         })
         .collect()
-}
-
-fn push_occurrence(occurrences: &mut Vec<Occurrence>, model_path: ModelPath, span: Span) {
-    occurrences.push(Occurrence { model_path, span });
 }
