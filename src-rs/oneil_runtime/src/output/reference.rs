@@ -213,6 +213,22 @@ impl<'runtime> ModelTemplateReference<'runtime> {
             .collect()
     }
 
+    /// Resolves a reference name to the model path it imports from this model.
+    #[must_use]
+    pub fn resolve_reference_model_path(
+        &self,
+        reference_name: &ReferenceName,
+    ) -> Option<ModelPath> {
+        self.reference_imports()
+            .get(reference_name)
+            .map(|reference_import| reference_import.path.clone())
+            .or_else(|| {
+                self.submodel_imports()
+                    .get(reference_name)
+                    .map(|submodel_import| submodel_import.instance.path().clone())
+            })
+    }
+
     /// Returns a map of parameter names to their parameter data.
     #[must_use]
     pub fn parameters(&self) -> IndexMap<&'runtime ParameterName, &'runtime ir::Parameter> {

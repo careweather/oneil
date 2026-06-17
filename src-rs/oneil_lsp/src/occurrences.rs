@@ -36,23 +36,6 @@ pub struct Occurrence {
     pub span: Span,
 }
 
-/// Resolves a reference name to the model path it imports from a loaded model.
-pub fn resolve_reference_model_path(
-    model: ModelTemplateReference<'_>,
-    reference_name: &ReferenceName,
-) -> Option<ModelPath> {
-    model
-        .reference_imports()
-        .get(reference_name)
-        .map(|r| r.path.clone())
-        .or_else(|| {
-            model
-                .submodel_imports()
-                .get(reference_name)
-                .map(|s| s.instance.path().clone())
-        })
-}
-
 /// Resolves the symbol under the cursor to a search target, if occurrence lookup is supported.
 pub fn resolve_search_target(
     symbol: &SymbolAtPosition,
@@ -67,7 +50,7 @@ pub fn resolve_search_target(
         } => {
             let model = runtime.load_and_lower(current_model_path).0;
             let model = model?;
-            let model_path = resolve_reference_model_path(model, reference_name)?;
+            let model_path = model.resolve_reference_model_path(reference_name)?;
             Some(SearchTarget::Parameter {
                 model_path,
                 name: parameter_name.clone(),
@@ -508,7 +491,8 @@ fn visit_variable(
             };
 
             if current_parameter_name == parameter_name
-                && resolve_reference_model_path(model, reference_name)
+                && model
+                    .resolve_reference_model_path(reference_name)
                     .as_ref()
                     .is_some_and(|path| external_model_paths.contains(path))
             {
@@ -517,7 +501,8 @@ fn visit_variable(
                 occurrences.push(Occurrence { model_path, span });
             } else if current_parameter_name == parameter_name
                 && let Some(target_model) = target_model
-                && resolve_reference_model_path(target_model, reference_name)
+                && target_model
+                    .resolve_reference_model_path(reference_name)
                     .as_ref()
                     .is_some_and(|path| external_model_paths.contains(path))
             {
