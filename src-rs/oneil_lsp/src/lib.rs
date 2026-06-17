@@ -49,6 +49,8 @@ use hover::hover_markdown;
 use location::span_to_range;
 pub use workspace::WorkspaceDiscoveryOptions;
 
+use crate::symbol_lookup::SymbolAtPosition;
+
 #[tokio::main]
 pub async fn run(
     cache_read_policy: CacheReadPolicy,
@@ -482,15 +484,11 @@ impl LanguageServer for Backend {
         let position = params.text_document_position.position;
         let uri = params.text_document_position.text_document.uri;
 
-        let Some((current_model_path, symbol)) = self.symbol_at_position(&uri, position).await
-        else {
-            return Ok(None);
-        };
-
-        let locations = {
-            let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
-            references::reference_locations(&symbol, &mut runtime, &current_model_path)
-        };
+        let locations = self
+            .with_symbol_at_position(&uri, position, |current_model_path, symbol, runtime| {
+                references::reference_locations(&symbol, runtime, &current_model_path)
+            })
+            .await;
 
         Ok(locations)
     }
@@ -502,15 +500,11 @@ impl LanguageServer for Backend {
         let position = params.text_document_position_params.position;
         let uri = params.text_document_position_params.text_document.uri;
 
-        let Some((current_model_path, symbol)) = self.symbol_at_position(&uri, position).await
-        else {
-            return Ok(None);
-        };
-
-        let highlights = {
-            let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
-            document_highlight::document_highlights(&symbol, &mut runtime, &current_model_path)
-        };
+        let highlights = self
+            .with_symbol_at_position(&uri, position, |current_model_path, symbol, runtime| {
+                document_highlight::document_highlights(&symbol, runtime, &current_model_path)
+            })
+            .await;
 
         Ok(highlights)
     }
@@ -523,20 +517,15 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri;
         let position = params.position;
 
-        let Some((current_model_path, symbol)) = self.symbol_at_position(&uri, position).await
+        let Some(symbol) = self
+            .with_symbol_at_position(&uri, position, |current_model_path, symbol, runtime| {
+                occurrences::resolve_search_target(&symbol, runtime, &current_model_path)
+                    .map(|_| symbol)
+            })
+            .await
         else {
             return Ok(None);
         };
-
-        // check if the symbol resolves to a rename target
-        let can_rename = {
-            let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
-            occurrences::resolve_search_target(&symbol, &mut runtime, &current_model_path).is_some()
-        };
-
-        if !can_rename {
-            return Ok(None);
-        }
 
         // return the "prepare rename" response
         Ok(rename::prepare_rename_response(&symbol))
@@ -678,5 +667,17 @@ impl Backend {
                 .log_message(MessageType::INFO, "diagnostics published".to_string())
                 .await;
         }
+    }
+
+    async fn with_symbol_at_position<T>(
+        &self,
+        uri: &Uri,
+        position: Position,
+        f: impl FnOnce(ModelPath, SymbolAtPosition, &mut oneil_runtime::Runtime) -> Option<T>,
+    ) -> Option<T> {
+        let (current_model_path, symbol) = self.symbol_at_position(uri, position).await?;
+
+        let mut runtime = self.runtime.lock().expect("runtime mutex poisoned");
+        f(current_model_path, symbol, &mut runtime)
     }
 }
