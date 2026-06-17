@@ -1,6 +1,6 @@
 //! Source location spans for mapping data structures to source code
 
-use std::{path::Path, sync::Arc};
+use std::{fmt, path::Path, sync::Arc};
 
 /// A span of source code.
 ///
@@ -16,7 +16,7 @@ use std::{path::Path, sync::Arc};
 /// parameter equation.
 ///
 /// Because [`Rc`] is not [`Copy`], `Span` is deliberately `Clone`-only.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Span {
     start: SourceLocation,
     end: SourceLocation,
@@ -161,6 +161,23 @@ impl Span {
         };
 
         Self::new(start_loc, end_loc, Arc::from(Path::new("")), Arc::from(""))
+    }
+}
+
+/// Formats the span as `path:line:column`. Debug output is formatted in a way
+/// that consoles can pick up as a clickable link to the source code.
+///
+/// This excludes the source text from the output, since it is not directly
+/// relevant to the span in terms of debugging.
+impl fmt::Debug for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}",
+            self.path.display(),
+            self.start.line,
+            self.start.column
+        )
     }
 }
 
