@@ -112,6 +112,7 @@ impl Runtime {
         visited: &mut IndexSet<EvalInstanceKey>,
     ) -> RuntimeErrors {
         let model_path = &eval_instance_key.model_path;
+
         if !visited.insert(eval_instance_key.clone()) {
             return RuntimeErrors::default();
         }
@@ -162,10 +163,11 @@ impl Runtime {
         let ir_errors = ir_error_collection
             .map(|errors| collect_ir_errors(errors, model_path, source, include_indirect_errors));
 
-        let raw_validation_errors: Option<Vec<InstanceValidationError>> = self
+        let (raw_validation_errors, other_models_with_validation_errors) = self
             .composed_graph
             .as_ref()
-            .map(|graph| collect_validation_errors_from_graph(graph, model_path));
+            .map(|graph| collect_validation_errors_from_graph(graph, model_path))
+            .unzip();
         let cycle_param_names: IndexSet<ParameterName> = raw_validation_errors
             .as_deref()
             .map(parameter_cycle_names)
@@ -179,6 +181,11 @@ impl Runtime {
                 &self.source_cache,
             )
         });
+        let other_models_with_validation_errors = other_models_with_validation_errors
+            .into_iter()
+            .flatten()
+            .map(EvalInstanceKey::root)
+            .collect::<IndexSet<_>>();
 
         // get the eval errors, if any. Eval-time `CircularParameterEvaluation`
         // is suppressed for parameters that the graph-time SCC pass already
@@ -271,6 +278,7 @@ impl Runtime {
         let model_references = models_with_errors
             .iter()
             .chain(model_successful_references)
+            .chain(other_models_with_validation_errors.iter())
             .collect::<IndexSet<_>>();
 
         for eval_instance_key in model_references {
@@ -1119,13 +1127,23 @@ fn get_python_path_from_python_import_error(
 fn collect_validation_errors_from_graph(
     graph: &InstanceGraph,
     model_path: &ModelPath,
-) -> Vec<InstanceValidationError> {
-    graph
+) -> (Vec<InstanceValidationError>, IndexSet<ModelPath>) {
+    let (current_model_errors, other_model_errors): (Vec<_>, Vec<_>) = graph
         .validation_errors
         .iter()
-        .filter(|e| host_path_model(graph, &e.host_path) == Some(model_path))
+        .partition(|e| host_path_model(graph, &e.host_path) == Some(model_path));
+
+    let current_model_errors = current_model_errors
+        .into_iter()
         .cloned()
-        .collect()
+        .collect::<Vec<_>>();
+
+    let other_models_with_errors = other_model_errors
+        .iter()
+        .filter_map(|e| host_path_model(graph, &e.host_path).cloned())
+        .collect::<IndexSet<_>>();
+
+    (current_model_errors, other_models_with_errors)
 }
 
 /// Returns the [`ModelPath`] of the host node identified by `host_path` in
