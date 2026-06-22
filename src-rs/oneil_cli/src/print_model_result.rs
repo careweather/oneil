@@ -25,6 +25,7 @@ pub struct ModelPrintConfig {
     pub recursive: bool,
     pub with_header: bool,
     pub with_test_report: bool,
+    pub ignore_failing_tests: bool,
     pub print_utils_config: PrintUtilsConfig,
     /// Path to show in the "Run `oneil test <path>`" hint.
     /// When running a design file, this should be the design path.
@@ -45,7 +46,7 @@ pub fn print_eval_result(
         print_model_header(model_result.path(), &test_info);
     }
 
-    if test_info.passed_count != test_info.test_count {
+    if !model_config.ignore_failing_tests && test_info.passed_count != test_info.test_count {
         if model_config.with_test_report {
             println!("{divider_line}");
             print_failing_tests(&test_info, model_config.print_utils_config);

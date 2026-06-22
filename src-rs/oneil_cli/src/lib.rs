@@ -438,6 +438,7 @@ fn handle_eval_command(args: EvalArgs) {
         recursive,
         with_header,
         with_test_report,
+        ignore_failing_tests,
         common,
     } = args;
 
@@ -459,6 +460,7 @@ fn handle_eval_command(args: EvalArgs) {
         recursive,
         with_header,
         with_test_report,
+        ignore_failing_tests,
         print_utils_config,
         hint_path,
     };

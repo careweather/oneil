@@ -239,6 +239,13 @@ pub struct EvalArgs {
     #[arg(long)]
     pub with_test_report: bool,
 
+    /// Do not print failing test output at all during eval
+    ///
+    /// When provided, this suppresses both the failing test hint and
+    /// `--with-test-report` output.
+    #[arg(long)]
+    pub ignore_failing_tests: bool,
+
     #[command(flatten)]
     pub common: CommonArgs,
 }
