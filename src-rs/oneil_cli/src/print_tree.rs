@@ -156,7 +156,7 @@ fn print_children<T: PrintableTreeValue>(
         || (!config.recursive && value.is_outside_top_model(context.top_model_path));
 
     if has_children && skip_printing_children {
-        print_truncated_node(indent, rest_prefix);
+        print_truncated_node(indent, rest_prefix, context.is_first);
     } else if has_children {
         parent_prefixes.push(context.is_first);
 
@@ -247,8 +247,12 @@ fn get_equation_str(
         })
 }
 
-fn print_truncated_node(indent: &str, rest_prefix: &str) {
-    println!("{indent}{rest_prefix}┌──╶╶╶");
+fn print_truncated_node(indent: &str, rest_prefix: &str, is_first: bool) {
+    if is_first {
+        println!("{indent}    ┌──╶╶╶");
+    } else {
+        println!("{indent}{rest_prefix}┌──╶╶╶");
+    }
 }
 
 trait PrintableTreeValue {
