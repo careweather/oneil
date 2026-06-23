@@ -557,16 +557,18 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         self.force_parameter(&current_key, parameter_name, variable_span, &current_key)
     }
 
-    /// Returns the model path of the instance reached via `reference_name` from the active model.
+    /// Returns the instance key reached via `reference_name` from the active model.
     ///
-    /// Used when building `ExternalDependency` output where the model path is needed but
+    /// Used when building `ExternalDependency` output where the instance key is needed but
     /// is no longer stored in `Variable::External`.
     #[must_use]
-    pub fn lookup_external_model_path(&self, reference_name: &ReferenceName) -> Option<ModelPath> {
+    pub fn lookup_external_instance_key(
+        &self,
+        reference_name: &ReferenceName,
+    ) -> Option<EvalInstanceKey> {
         let current = self.eval_scope.last()?;
         let model = self.models.get(current)?;
-        let key = model.references.get(reference_name)?;
-        Some(key.model_path.clone())
+        model.references.get(reference_name).cloned()
     }
 
     /// Looks up a parameter on the instance reached via `reference_name` from the active model,

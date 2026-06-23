@@ -2,7 +2,7 @@
 
 use indexmap::IndexSet;
 use oneil_shared::{
-    paths::ModelPath,
+    EvalInstanceKey,
     symbols::{BuiltinValueName, ParameterName, ReferenceName},
 };
 
@@ -59,8 +59,8 @@ pub struct ParameterDependency {
 /// accessed through model references. These create cross-model dependency relationships.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ExternalDependency {
-    /// The path to the external model containing the parameter.
-    pub model_path: ModelPath,
+    /// The evaluated model instance containing the parameter.
+    pub instance_key: EvalInstanceKey,
     /// The reference name used to access the external model.
     pub reference_name: ReferenceName,
     /// The name of the parameter in the external model.

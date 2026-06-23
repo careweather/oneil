@@ -2,6 +2,7 @@
 
 use oneil_output::DependencySet;
 use oneil_shared::{
+    EvalInstanceKey,
     paths::ModelPath,
     symbols::{ParameterName, ReferenceName, TestIndex},
 };
@@ -16,7 +17,7 @@ use crate::{
 
 #[derive(Debug)]
 struct TreeValueLocation {
-    pub model_path: ModelPath,
+    pub instance_key: EvalInstanceKey,
     pub reference_name: Option<ReferenceName>,
     pub parameter_name: ParameterName,
 }
@@ -43,7 +44,7 @@ pub fn get_dependency_tree<E: ExternalAnalysisContext>(
     TreeErrors,
 ) {
     let location = TreeValueLocation {
-        model_path: model_path.clone(),
+        instance_key: EvalInstanceKey::root(model_path.clone()),
         reference_name: None,
         parameter_name: parameter_name.clone(),
     };
@@ -54,7 +55,7 @@ pub fn get_dependency_tree<E: ExternalAnalysisContext>(
         get_dependency_value,
         |location, tree_context| {
             get_dependency_tree_children(
-                &location.model_path,
+                &location.instance_key,
                 location.reference_name.as_ref(),
                 &location.parameter_name,
                 tree_context,
@@ -68,7 +69,7 @@ fn get_dependency_value<E: ExternalAnalysisContext>(
     tree_context: &TreeContext<'_, E>,
 ) -> Option<Result<output::DependencyTreeValue, GetValueError>> {
     let parameter =
-        tree_context.lookup_parameter_value(&location.model_path, &location.parameter_name)?;
+        tree_context.lookup_parameter_value(&location.instance_key, &location.parameter_name)?;
 
     let result = parameter.map(|parameter| {
         let dependency_name = location.reference_name.as_ref().map_or_else(
@@ -82,7 +83,10 @@ fn get_dependency_value<E: ExternalAnalysisContext>(
         );
 
         let parameter_value = parameter.value;
-        let display_info = Some((location.model_path.clone(), parameter.expr_span));
+        let display_info = Some((
+            location.instance_key.model_path.clone(),
+            parameter.expr_span,
+        ));
 
         output::DependencyTreeValue {
             dependency_name,
@@ -95,7 +99,7 @@ fn get_dependency_value<E: ExternalAnalysisContext>(
 }
 
 fn get_dependency_tree_children(
-    model_path: &ModelPath,
+    instance_key: &EvalInstanceKey,
     reference_name: Option<&ReferenceName>,
     parameter_name: &ParameterName,
     tree_context: &TreeContext<'_, impl ExternalAnalysisContext>,
@@ -104,7 +108,7 @@ fn get_dependency_tree_children(
         builtin_dependencies,
         parameter_dependencies,
         external_dependencies,
-    } = tree_context.dependents(model_path, parameter_name);
+    } = tree_context.dependents(instance_key, parameter_name);
 
     let builtin_children = builtin_dependencies
         .into_iter()
@@ -127,7 +131,7 @@ fn get_dependency_tree_children(
     let parameter_args = parameter_dependencies
         .into_iter()
         .map(|dep| TreeValueLocation {
-            model_path: model_path.clone(),
+            instance_key: instance_key.clone(),
             reference_name: reference_name.cloned(),
             parameter_name: dep.parameter_name,
         });
@@ -135,7 +139,7 @@ fn get_dependency_tree_children(
     let external_args = external_dependencies
         .into_iter()
         .map(|dep| TreeValueLocation {
-            model_path: dep.model_path.clone(),
+            instance_key: dep.instance_key.clone(),
             reference_name: Some(dep.reference_name.clone()),
             parameter_name: dep.parameter_name,
         });
@@ -161,7 +165,7 @@ pub fn get_reference_tree<E: ExternalAnalysisContext>(
     parameter_name: &ParameterName,
 ) -> (Option<output::Tree<output::ReferenceTreeValue>>, TreeErrors) {
     let location = TreeValueLocation {
-        model_path: model_path.clone(),
+        instance_key: EvalInstanceKey::root(model_path.clone()),
         reference_name: None,
         parameter_name: parameter_name.clone(),
     };
@@ -172,7 +176,7 @@ pub fn get_reference_tree<E: ExternalAnalysisContext>(
         get_reference_value,
         |location, tree_context| {
             get_reference_tree_children(
-                &location.model_path,
+                &location.instance_key,
                 &location.parameter_name,
                 tree_context,
             )
@@ -185,10 +189,10 @@ fn get_reference_value<E: ExternalAnalysisContext>(
     tree_context: &TreeContext<'_, E>,
 ) -> Option<Result<output::ReferenceTreeValue, GetValueError>> {
     let parameter =
-        tree_context.lookup_parameter_value(&location.model_path, &location.parameter_name)?;
+        tree_context.lookup_parameter_value(&location.instance_key, &location.parameter_name)?;
 
     let result = parameter.map(|parameter| {
-        let model_path = location.model_path.clone();
+        let model_path = location.instance_key.model_path.clone();
         let parameter_name = location.parameter_name.clone();
         let parameter_value = parameter.value;
         let display_info = (model_path.clone(), parameter.expr_span);
@@ -205,7 +209,7 @@ fn get_reference_value<E: ExternalAnalysisContext>(
 }
 
 fn get_reference_tree_children(
-    model_path: &ModelPath,
+    instance_key: &EvalInstanceKey,
     parameter_name: &ParameterName,
     tree_context: &TreeContext<'_, impl ExternalAnalysisContext>,
 ) -> GetChildrenResult<output::ReferenceTreeValue> {
@@ -214,10 +218,11 @@ fn get_reference_tree_children(
         Test(ModelPath, TestIndex),
     }
 
-    let deps = tree_context.references(model_path, parameter_name);
+    let deps = tree_context.references(instance_key, parameter_name);
+    let model_path = &instance_key.model_path;
 
     let parameter_children = deps.parameter.into_iter().map(|dep| TreeValueLocation {
-        model_path: model_path.clone(),
+        instance_key: instance_key.clone(),
         reference_name: None,
         parameter_name: dep.parameter_name,
     });
@@ -226,7 +231,7 @@ fn get_reference_tree_children(
         .external_parameter
         .into_iter()
         .map(|dep| TreeValueLocation {
-            model_path: dep.model_path,
+            instance_key: dep.instance_key,
             reference_name: None,
             parameter_name: dep.parameter_name,
         });
@@ -234,7 +239,7 @@ fn get_reference_tree_children(
     let all_param_children = parameter_children.chain(external_children).collect();
 
     let test_children = deps.test.iter().filter_map(|dep| {
-        let test = tree_context.lookup_test_value(model_path, dep.test_index)?;
+        let test = tree_context.lookup_test_value(instance_key, dep.test_index)?;
 
         let result = test
             .map(|test| {
@@ -257,24 +262,27 @@ fn get_reference_tree_children(
     });
 
     let test_external_children = deps.external_test.iter().filter_map(|dep| {
-        let test = tree_context.lookup_test_value(&dep.model_path, dep.test_index)?;
+        let test = tree_context.lookup_test_value(&dep.instance_key, dep.test_index)?;
 
         let result = test
             .map(|test| {
                 let test_passed = test.passed();
-                let display_info = (dep.model_path.clone(), test.expr_span);
+                let model_path = dep.instance_key.model_path.clone();
+                let display_info = (model_path.clone(), test.expr_span);
 
                 output::ReferenceTreeValue::Test {
-                    model_path: dep.model_path.clone(),
+                    model_path,
                     test_index: dep.test_index,
                     test_passed,
                     display_info,
                 }
             })
             .map_err(|error| match error {
-                GetTestValueError::Model => GetTestError::Model(dep.model_path.clone()),
+                GetTestValueError::Model => {
+                    GetTestError::Model(dep.instance_key.model_path.clone())
+                }
                 GetTestValueError::Test => {
-                    GetTestError::Test(dep.model_path.clone(), dep.test_index)
+                    GetTestError::Test(dep.instance_key.model_path.clone(), dep.test_index)
                 }
             });
 
@@ -353,14 +361,14 @@ where
             Ok(value) => value,
             Err(GetValueError::Model) => {
                 let mut tree_errors = TreeErrors::empty();
-                tree_errors.insert_model_error(location.model_path.clone());
+                tree_errors.insert_model_error(location.instance_key.model_path.clone());
 
                 return (None, tree_errors);
             }
             Err(GetValueError::Parameter) => {
                 let mut tree_errors = TreeErrors::empty();
                 tree_errors.insert_parameter_error(
-                    location.model_path.clone(),
+                    location.instance_key.model_path.clone(),
                     location.parameter_name.clone(),
                 );
 
@@ -412,30 +420,20 @@ fn get_dependency_graph<E: ExternalAnalysisContext>(
 ) -> crate::dep_graph::DependencyGraph {
     let mut dependency_graph = crate::dep_graph::DependencyGraph::new();
 
-    for (model_path, model) in external_context.get_all_model_ir() {
-        // Resolve the model path for an external `parameter.reference`
-        // dependency. The path is no longer stored in `Dependencies`
-        // (it is resolved lazily from the live instance graph), so we
-        // look it up from the model's own reference/submodel maps here.
-        let resolve_external_path = |reference_name: &oneil_shared::symbols::ReferenceName| {
-            model
-                .references()
-                .get(reference_name)
-                .map(|r| &r.path)
-                .or_else(|| {
-                    model
-                        .submodels()
-                        .get(reference_name)
-                        .map(|s| s.instance.path())
-                })
-        };
+    let all_model_ir = external_context.get_all_model_ir();
+
+    for (instance_key, model) in &all_model_ir {
+        let resolve_external_key =
+            |reference_name: &oneil_shared::symbols::ReferenceName| -> Option<EvalInstanceKey> {
+                resolve_external_instance_key(instance_key, model, &all_model_ir, reference_name)
+            };
 
         for (parameter_name, parameter) in model.parameters() {
             let dependencies = parameter.dependencies();
 
             for builtin_dep in dependencies.builtin().keys() {
                 dependency_graph.add_depends_on_builtin(
-                    model_path.clone(),
+                    instance_key.clone(),
                     parameter_name.clone(),
                     oneil_output::BuiltinDependency {
                         name: builtin_dep.clone(),
@@ -445,7 +443,7 @@ fn get_dependency_graph<E: ExternalAnalysisContext>(
 
             for parameter_dep in dependencies.parameter().keys() {
                 dependency_graph.add_depends_on_parameter(
-                    model_path.clone(),
+                    instance_key.clone(),
                     parameter_name.clone(),
                     oneil_output::ParameterDependency {
                         parameter_name: parameter_dep.clone(),
@@ -454,14 +452,14 @@ fn get_dependency_graph<E: ExternalAnalysisContext>(
             }
 
             for ((reference_dep_name, parameter_dep_name), _span) in dependencies.external() {
-                let Some(external_model_path) = resolve_external_path(reference_dep_name) else {
+                let Some(external_instance_key) = resolve_external_key(reference_dep_name) else {
                     continue;
                 };
                 dependency_graph.add_depends_on_external(
-                    model_path.clone(),
+                    instance_key.clone(),
                     parameter_name.clone(),
                     oneil_output::ExternalDependency {
-                        model_path: external_model_path.clone(),
+                        instance_key: external_instance_key,
                         reference_name: reference_dep_name.clone(),
                         parameter_name: parameter_dep_name.clone(),
                     },
@@ -474,7 +472,7 @@ fn get_dependency_graph<E: ExternalAnalysisContext>(
 
             for parameter_dep in dependencies.parameter().keys() {
                 dependency_graph.add_test_depends_on_parameter(
-                    model_path.clone(),
+                    instance_key.clone(),
                     *test_index,
                     oneil_output::ParameterDependency {
                         parameter_name: parameter_dep.clone(),
@@ -483,14 +481,14 @@ fn get_dependency_graph<E: ExternalAnalysisContext>(
             }
 
             for ((reference_dep_name, parameter_dep_name), _span) in dependencies.external() {
-                let Some(external_model_path) = resolve_external_path(reference_dep_name) else {
+                let Some(external_instance_key) = resolve_external_key(reference_dep_name) else {
                     continue;
                 };
                 dependency_graph.add_test_depends_on_external(
-                    model_path.clone(),
+                    instance_key.clone(),
                     *test_index,
                     oneil_output::ExternalDependency {
-                        model_path: external_model_path.clone(),
+                        instance_key: external_instance_key,
                         reference_name: reference_dep_name.clone(),
                         parameter_name: parameter_dep_name.clone(),
                     },
@@ -500,4 +498,52 @@ fn get_dependency_graph<E: ExternalAnalysisContext>(
     }
 
     dependency_graph
+}
+
+/// Resolves a reference name from an instanced IR node to the evaluated instance key it targets.
+fn resolve_external_instance_key(
+    instance_key: &EvalInstanceKey,
+    model: &oneil_frontend::InstancedModel,
+    all_model_ir: &indexmap::IndexMap<EvalInstanceKey, &oneil_frontend::InstancedModel>,
+    reference_name: &ReferenceName,
+) -> Option<EvalInstanceKey> {
+    if let Some(reference) = model.references().get(reference_name) {
+        return Some(EvalInstanceKey::root(reference.path.clone()));
+    }
+
+    if let Some(submodel) = model.submodels().get(reference_name) {
+        return Some(EvalInstanceKey {
+            model_path: submodel.instance.path().clone(),
+            instance_path: instance_key
+                .instance_path
+                .clone()
+                .child(reference_name.clone()),
+        });
+    }
+
+    let alias = model.aliases().get(reference_name)?;
+    let mut segments = alias.alias_path.segments().iter();
+    let first = segments.next()?;
+
+    let mut current_key = if let Some(submodel) = model.submodels().get(first) {
+        EvalInstanceKey {
+            model_path: submodel.instance.path().clone(),
+            instance_path: instance_key.instance_path.clone().child(first.clone()),
+        }
+    } else if let Some(reference) = model.references().get(first) {
+        EvalInstanceKey::root(reference.path.clone())
+    } else {
+        return None;
+    };
+
+    for segment in segments {
+        let current_model = all_model_ir.get(&current_key)?;
+        let submodel = current_model.submodels().get(segment)?;
+        current_key = EvalInstanceKey {
+            model_path: submodel.instance.path().clone(),
+            instance_path: current_key.instance_path.child(segment.clone()),
+        };
+    }
+
+    Some(current_key)
 }

@@ -844,11 +844,11 @@ pub fn build_output_parameter<E: ExternalEvaluationContext>(
         .external()
         .keys()
         .filter_map(|(reference_name, parameter_name)| {
-            // Model path is looked up from the live eval context since it is no
+            // Instance key is looked up from the live eval context since it is no
             // longer stored in `ir::Variable::External`.
-            let model_path = context.lookup_external_model_path(reference_name)?;
+            let instance_key = context.lookup_external_instance_key(reference_name)?;
             Some(ExternalDependency {
-                model_path,
+                instance_key,
                 reference_name: reference_name.clone(),
                 parameter_name: parameter_name.clone(),
             })

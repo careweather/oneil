@@ -3,15 +3,15 @@
 use indexmap::{IndexMap, IndexSet};
 use oneil_output::{BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency};
 use oneil_shared::{
-    paths::ModelPath,
+    EvalInstanceKey,
     symbols::{ParameterName, ReferenceName, TestIndex},
 };
 
 /// A dependency graph for the results of evaluating Oneil models.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DependencyGraph {
-    depends_on: IndexMap<ModelPath, IndexMap<ParameterName, DependencySet>>,
-    referenced_by: IndexMap<ModelPath, IndexMap<ParameterName, ReferenceSet>>,
+    depends_on: IndexMap<EvalInstanceKey, IndexMap<ParameterName, DependencySet>>,
+    referenced_by: IndexMap<EvalInstanceKey, IndexMap<ParameterName, ReferenceSet>>,
 }
 
 impl DependencyGraph {
@@ -27,12 +27,12 @@ impl DependencyGraph {
     /// Adds a builtin dependency to the graph.
     pub fn add_depends_on_builtin(
         &mut self,
-        param_path: ModelPath,
+        param_key: EvalInstanceKey,
         param_name: ParameterName,
         dependency: BuiltinDependency,
     ) {
         self.depends_on
-            .entry(param_path)
+            .entry(param_key)
             .or_default()
             .entry(param_name)
             .or_default()
@@ -43,12 +43,12 @@ impl DependencyGraph {
     /// Adds a parameter dependency to the graph.
     pub fn add_depends_on_parameter(
         &mut self,
-        param_path: ModelPath,
+        param_key: EvalInstanceKey,
         param_name: ParameterName,
         dependency: ParameterDependency,
     ) {
         self.depends_on
-            .entry(param_path.clone())
+            .entry(param_key.clone())
             .or_default()
             .entry(param_name.clone())
             .or_default()
@@ -64,7 +64,7 @@ impl DependencyGraph {
         };
 
         self.referenced_by
-            .entry(param_path)
+            .entry(param_key)
             .or_default()
             .entry(dependency_parameter_name)
             .or_default()
@@ -75,12 +75,12 @@ impl DependencyGraph {
     /// Adds an external dependency to the graph.
     pub fn add_depends_on_external(
         &mut self,
-        param_path: ModelPath,
+        param_key: EvalInstanceKey,
         param_name: ParameterName,
         dependency: ExternalDependency,
     ) {
         self.depends_on
-            .entry(param_path.clone())
+            .entry(param_key.clone())
             .or_default()
             .entry(param_name.clone())
             .or_default()
@@ -88,19 +88,19 @@ impl DependencyGraph {
             .insert(dependency.clone());
 
         let ExternalDependency {
-            model_path: dependency_model_path,
+            instance_key: dependency_instance_key,
             reference_name: dependency_reference_name,
             parameter_name: dependency_parameter_name,
         } = dependency;
 
         let reference = ExternalParameterReference {
-            model_path: param_path,
+            instance_key: param_key,
             parameter_name: param_name,
             using_reference_name: dependency_reference_name,
         };
 
         self.referenced_by
-            .entry(dependency_model_path)
+            .entry(dependency_instance_key)
             .or_default()
             .entry(dependency_parameter_name)
             .or_default()
@@ -111,7 +111,7 @@ impl DependencyGraph {
     /// Records that a test depends on another parameter in the same model, and the reverse edge.
     pub fn add_test_depends_on_parameter(
         &mut self,
-        model_path: ModelPath,
+        instance_key: EvalInstanceKey,
         test_index: TestIndex,
         dependency: ParameterDependency,
     ) {
@@ -122,7 +122,7 @@ impl DependencyGraph {
         let reference = TestReference { test_index };
 
         self.referenced_by
-            .entry(model_path)
+            .entry(instance_key)
             .or_default()
             .entry(dependency_parameter_name)
             .or_default()
@@ -133,24 +133,24 @@ impl DependencyGraph {
     /// Records that a test depends on a parameter in another model, and the reverse edge.
     pub fn add_test_depends_on_external(
         &mut self,
-        model_path: ModelPath,
+        instance_key: EvalInstanceKey,
         test_index: TestIndex,
         dependency: ExternalDependency,
     ) {
         let ExternalDependency {
-            model_path: dependency_model_path,
+            instance_key: dependency_instance_key,
             reference_name: dependency_reference_name,
             parameter_name: dependency_parameter_name,
         } = dependency;
 
         self.referenced_by
-            .entry(dependency_model_path)
+            .entry(dependency_instance_key)
             .or_default()
             .entry(dependency_parameter_name)
             .or_default()
             .external_test
             .insert(ExternalTestReference {
-                model_path,
+                instance_key,
                 test_index,
                 using_reference_name: dependency_reference_name,
             });
@@ -160,10 +160,10 @@ impl DependencyGraph {
     #[must_use]
     pub fn dependents(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
     ) -> Option<&DependencySet> {
-        let model = self.depends_on.get(model_path)?;
+        let model = self.depends_on.get(instance_key)?;
         model.get(parameter_name)
     }
 
@@ -171,10 +171,10 @@ impl DependencyGraph {
     #[must_use]
     pub fn references(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
     ) -> Option<&ReferenceSet> {
-        let model = self.referenced_by.get(model_path)?;
+        let model = self.referenced_by.get(instance_key)?;
         model.get(parameter_name)
     }
 }
@@ -236,8 +236,8 @@ pub struct ParameterReference {
 /// it indicates that a parameter in another model references this parameter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ExternalParameterReference {
-    /// The path to the model that references this parameter.
-    pub model_path: ModelPath,
+    /// The evaluated model instance that references this parameter.
+    pub instance_key: EvalInstanceKey,
     /// The name of the parameter in the external model that references this parameter.
     pub parameter_name: ParameterName,
     /// The reference name used by the external model to access this model.
@@ -254,8 +254,8 @@ pub struct TestReference {
 /// A reference from a test in another model, via a reference import.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ExternalTestReference {
-    /// The path to the model that contains the test.
-    pub model_path: ModelPath,
+    /// The evaluated model instance that contains the test.
+    pub instance_key: EvalInstanceKey,
     /// The index of the test that references this parameter.
     pub test_index: TestIndex,
     /// The reference name the test's model uses for the model that defines this parameter.

@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use oneil_frontend::InstancedModel;
 use oneil_output::{DependencySet, Model, Parameter, Test, Value};
 use oneil_shared::{
+    EvalInstanceKey,
     load_result::LoadResult,
     paths::ModelPath,
     symbols::{BuiltinValueName, ParameterName, TestIndex},
@@ -17,13 +18,13 @@ use crate::{
 
 /// External context provided to tree operations.
 pub trait ExternalAnalysisContext {
-    /// Returns the full map of model paths to their lowered [`InstancedModel`] templates.
-    fn get_all_model_ir(&self) -> IndexMap<&ModelPath, &InstancedModel>;
+    /// Returns the full map of evaluated instance keys to their lowered [`InstancedModel`]s.
+    fn get_all_model_ir(&self) -> IndexMap<EvalInstanceKey, &InstancedModel>;
 
     /// Returns the value of a builtin variable by identifier, if defined.
     fn lookup_builtin_variable(&self, identifier: &BuiltinValueName) -> Option<&Value>;
 
-    /// Looks up the evaluated model at the given path.
+    /// Looks up the evaluated root model at the given path.
     ///
     /// Returns `None` if the model is not in the context. Otherwise returns a
     /// [`LoadResult`]: success with the model reference, partial with the model and
@@ -33,23 +34,23 @@ pub trait ExternalAnalysisContext {
         model_path: &ModelPath,
     ) -> Option<LoadResult<&Model, ModelEvalHasErrors>>;
 
-    /// Looks up an evaluated parameter by model path and parameter name.
+    /// Looks up an evaluated parameter by instance key and parameter name.
     ///
     /// Returns `None` if the model is not in the context, `Some(Err(...))` on value errors,
     /// or `Some(Ok(parameter))` when the parameter is found.
     fn lookup_parameter_value(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
     ) -> Option<Result<Parameter, GetValueError>>;
 
-    /// Looks up an evaluated test by model path and test index.
+    /// Looks up an evaluated test by instance key and test index.
     ///
     /// Returns `None` if the model is not in the context, `Some(Err(...))` on lookup errors,
     /// or `Some(Ok(test))` when the test is found.
     fn lookup_test_value(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         test_index: TestIndex,
     ) -> Option<Result<Test, GetTestValueError>>;
 }
@@ -85,11 +86,11 @@ impl<'external, E: ExternalAnalysisContext> TreeContext<'external, E> {
     #[must_use]
     pub fn dependents(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
     ) -> DependencySet {
         self.dependency_graph
-            .dependents(model_path, parameter_name)
+            .dependents(instance_key, parameter_name)
             .cloned()
             .unwrap_or_default()
     }
@@ -98,11 +99,11 @@ impl<'external, E: ExternalAnalysisContext> TreeContext<'external, E> {
     #[must_use]
     pub fn references(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
     ) -> ReferenceSet {
         self.dependency_graph
-            .references(model_path, parameter_name)
+            .references(instance_key, parameter_name)
             .cloned()
             .unwrap_or_default()
     }
@@ -111,20 +112,20 @@ impl<'external, E: ExternalAnalysisContext> TreeContext<'external, E> {
     #[must_use]
     pub fn lookup_test_value(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         test_index: TestIndex,
     ) -> Option<Result<Test, GetTestValueError>> {
-        self.external.lookup_test_value(model_path, test_index)
+        self.external.lookup_test_value(instance_key, test_index)
     }
 
-    /// Looks up an evaluated parameter by model path and parameter name, delegating to the external context.
+    /// Looks up an evaluated parameter by instance key and parameter name, delegating to the external context.
     #[must_use]
     pub fn lookup_parameter_value(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
     ) -> Option<Result<Parameter, GetValueError>> {
         self.external
-            .lookup_parameter_value(model_path, parameter_name)
+            .lookup_parameter_value(instance_key, parameter_name)
     }
 }

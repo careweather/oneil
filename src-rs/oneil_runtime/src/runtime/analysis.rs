@@ -10,6 +10,7 @@ use oneil_analysis::{
 };
 use oneil_frontend::{CompilationUnit, InstancedModel};
 use oneil_shared::{
+    EvalInstanceKey,
     load_result::LoadResult,
     paths::ModelPath,
     symbols::{BuiltinValueName, ParameterName, TestIndex},
@@ -128,17 +129,28 @@ impl Runtime {
 }
 
 impl analysis::ExternalAnalysisContext for Runtime {
-    fn get_all_model_ir(&self) -> IndexMap<&ModelPath, &InstancedModel> {
+    fn get_all_model_ir(&self) -> IndexMap<EvalInstanceKey, &InstancedModel> {
         self.unit_graph_cache
             .iter()
-            .filter_map(|(unit, graph)| {
-                let CompilationUnit::Model(path) = unit else {
-                    return None;
-                };
-                let template: &InstancedModel = graph.root.as_ref();
-                Some((path, template))
+            .fold(IndexMap::new(), |mut instances, (unit, graph)| {
+                if let CompilationUnit::Model(path) = unit {
+                    insert_model_ir_subtree(
+                        graph.root.as_ref(),
+                        &EvalInstanceKey::root(path.clone()),
+                        &mut instances,
+                    );
+
+                    for (path, instance) in &graph.reference_pool {
+                        insert_model_ir_subtree(
+                            instance.as_ref(),
+                            &EvalInstanceKey::root(path.clone()),
+                            &mut instances,
+                        );
+                    }
+                }
+
+                instances
             })
-            .collect()
     }
 
     fn get_evaluated_model(
@@ -159,10 +171,10 @@ impl analysis::ExternalAnalysisContext for Runtime {
 
     fn lookup_parameter_value(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
     ) -> Option<Result<oneil_output::Parameter, oneil_analysis::output::error::GetValueError>> {
-        let entry = self.eval_cache.get_entry(model_path)?;
+        let entry = self.eval_cache.get_entry_instance(instance_key)?;
         let parameter = entry.value().map_or_else(
             || Err(oneil_analysis::output::error::GetValueError::Model),
             |model| {
@@ -179,10 +191,10 @@ impl analysis::ExternalAnalysisContext for Runtime {
 
     fn lookup_test_value(
         &self,
-        model_path: &ModelPath,
+        instance_key: &EvalInstanceKey,
         test_index: TestIndex,
     ) -> Option<Result<oneil_output::Test, oneil_analysis::output::error::GetTestValueError>> {
-        let entry = self.eval_cache.get_entry(model_path)?;
+        let entry = self.eval_cache.get_entry_instance(instance_key)?;
         let test = entry.value().map_or_else(
             || Err(oneil_analysis::output::error::GetTestValueError::Model),
             |model| {
@@ -195,5 +207,25 @@ impl analysis::ExternalAnalysisContext for Runtime {
         );
 
         Some(test)
+    }
+}
+
+/// Inserts an instanced model and its owned submodel descendants keyed by eval instance.
+fn insert_model_ir_subtree<'model>(
+    instance: &'model InstancedModel,
+    instance_key: &EvalInstanceKey,
+    instances: &mut IndexMap<EvalInstanceKey, &'model InstancedModel>,
+) {
+    instances.insert(instance_key.clone(), instance);
+
+    for (alias, submodel) in instance.submodels() {
+        insert_model_ir_subtree(
+            submodel.instance.as_ref(),
+            &EvalInstanceKey {
+                model_path: submodel.instance.path().clone(),
+                instance_path: instance_key.instance_path.clone().child(alias.clone()),
+            },
+            instances,
+        );
     }
 }
