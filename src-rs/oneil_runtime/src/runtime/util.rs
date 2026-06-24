@@ -75,4 +75,28 @@ impl Runtime {
             .map(CompilationUnit::source_path)
             .collect()
     }
+
+    /// Gets the designs that reference a given model path.
+    #[must_use]
+    #[expect(clippy::missing_panics_doc, reason = "panic enforces an invariant")]
+    pub fn get_designs_referencing_model(
+        &self,
+        param_model_path: &ModelPath,
+    ) -> IndexSet<ModelPath> {
+        self.get_loaded_models()
+            .iter()
+            .filter_map(|model| {
+                let (model, design_info) = self.get_loaded_model(model);
+                let model = model.expect("model must be loaded");
+
+                let (path, _) = design_info
+                    .as_ref()?
+                    .design_export
+                    .as_ref()?
+                    .target_model()?;
+
+                (path == param_model_path).then(|| model.path().clone())
+            })
+            .collect()
+    }
 }
