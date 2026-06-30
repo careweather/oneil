@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Interval, NumberType,
-    util::{DEFAULT_SIG_FIGS, float_to_string, is_close},
+    util::{DEFAULT_SIG_FIGS, deserialize_f64, float_to_string, is_close, serialize_f64},
 };
 
 /// A number value in Oneil.
@@ -16,7 +16,7 @@ use crate::{
 #[serde(untagged)]
 pub enum Number {
     /// A scalar number value.
-    Scalar(f64),
+    Scalar(#[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")] f64),
     /// An interval number value.
     Interval(Interval),
 }
@@ -509,6 +509,49 @@ impl fmt::Display for Number {
                 let max = float_to_string(interval.max(), DEFAULT_SIG_FIGS);
                 write!(f, "{min} | {max}")
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod serde_tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn finite_scalar_serializes_as_number() {
+        assert_eq!(
+            serde_json::to_value(Number::Scalar(1.5)).expect("serialize number"),
+            json!(1.5)
+        );
+    }
+
+    #[test]
+    fn infinite_scalar_serializes_as_special_float_object() {
+        assert_eq!(
+            serde_json::to_value(Number::Scalar(f64::INFINITY)).expect("serialize number"),
+            json!({ "float_special": "INFINITY" })
+        );
+    }
+
+    #[test]
+    fn negative_infinite_scalar_deserializes_from_special_float_object() {
+        let number: Number =
+            serde_json::from_value(json!({ "float_special": "NEGATIVE_INFINITY" }))
+                .expect("deserialize number");
+
+        assert_eq!(number, Number::Scalar(f64::NEG_INFINITY));
+    }
+
+    #[test]
+    fn nan_scalar_round_trips_through_special_float_object() {
+        let json = serde_json::to_value(Number::Scalar(f64::NAN)).expect("serialize number");
+        let number: Number = serde_json::from_value(json).expect("deserialize number");
+
+        match number {
+            Number::Scalar(value) => assert!(value.is_nan()),
+            Number::Interval(_) => panic!("expected scalar number"),
         }
     }
 }

@@ -2,7 +2,7 @@ use std::ops;
 
 use serde::{Deserialize, Serialize};
 
-use crate::util::is_close;
+use crate::util::{deserialize_f64, is_close, serialize_f64};
 
 // TODO: maybe add more comparison functions for
 //       intervals into the standard library (
@@ -33,7 +33,9 @@ use crate::util::is_close;
 /// to be part of the interval.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Interval {
+    #[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")]
     min: f64,
+    #[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")]
     max: f64,
 }
 
@@ -1198,5 +1200,59 @@ fn classify(interval: &Interval) -> IntervalClass {
         IntervalClass::Negative1
     } else {
         panic!("invalid interval: ({}, {})", interval.min, interval.max)
+    }
+}
+
+#[cfg(test)]
+mod serde_tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn finite_interval_serializes_as_numbers() {
+        let interval = Interval::new(1.0, 2.0);
+
+        assert_eq!(
+            serde_json::to_value(interval).expect("serialize interval"),
+            json!({ "min": 1.0, "max": 2.0 })
+        );
+    }
+
+    #[test]
+    fn infinite_interval_bounds_serialize_as_special_float_objects() {
+        let interval = Interval::new(f64::NEG_INFINITY, f64::INFINITY);
+
+        assert_eq!(
+            serde_json::to_value(interval).expect("serialize interval"),
+            json!({
+                "min": { "float_special": "NEGATIVE_INFINITY" },
+                "max": { "float_special": "INFINITY" }
+            })
+        );
+    }
+
+    #[test]
+    fn empty_interval_bounds_serialize_as_nan_objects() {
+        let interval = Interval::empty();
+
+        assert_eq!(
+            serde_json::to_value(interval).expect("serialize interval"),
+            json!({
+                "min": { "float_special": "NAN" },
+                "max": { "float_special": "NAN" }
+            })
+        );
+    }
+
+    #[test]
+    fn special_float_objects_deserialize_to_interval_bounds() {
+        let interval: Interval = serde_json::from_value(json!({
+            "min": { "float_special": "NEGATIVE_INFINITY" },
+            "max": { "float_special": "INFINITY" }
+        }))
+        .expect("deserialize interval");
+
+        assert_eq!(interval, Interval::new(f64::NEG_INFINITY, f64::INFINITY));
     }
 }
