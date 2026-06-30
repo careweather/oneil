@@ -234,10 +234,6 @@ mod fns {
     pub const MIN_DESCRIPTION: &str = "Find the minimum value of the given values.\n\nIf a value is an interval, the minimum value of the interval is used.";
     pub const MIN_BUILTIN_UNITS: [&str; 0] = [];
 
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "matches the expected signature"
-    )]
     pub fn min(
         identifier_span: Span,
         args: Vec<(Value, Span)>,
@@ -252,69 +248,31 @@ mod fns {
             }]);
         }
 
+        if args.len() == 1 {
+            return helper::unary_number_or_measured_number_fn(
+                identifier_span,
+                args,
+                "min",
+                |n, _arg_span| Ok(Value::Number(Number::Scalar(n.min()))),
+                |m, _arg_span| Ok(Value::MeasuredNumber(m.min())),
+            );
+        }
+
         let number_list = helper::extract_homogeneous_numbers_list(&args)?;
 
         match number_list {
-            helper::HomogeneousNumberList::Numbers(numbers) => numbers
-                .into_iter()
-                .filter_map(|number| match number.into_owned() {
-                    Number::Scalar(value) => Some(value),
-                    Number::Interval(interval) => {
-                        if interval.is_empty() {
-                            None
-                        } else {
-                            Some(interval.min())
-                        }
-                    }
-                })
-                .reduce(f64::min)
-                .map_or_else(
-                    || {
-                        Err(vec![EvalError::BuiltinFnCustomError {
-                            error_location: identifier_span,
-                            msg: "list contains no numbers or non-empty intervals".to_string(),
-                        }])
-                    },
-                    |min| Ok(Value::Number(Number::Scalar(min))),
-                ),
-            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => numbers
-                .into_iter()
-                .filter_map(|number| match number.normalized_value().as_number() {
-                    Number::Scalar(_) => Some(number.min()),
-                    Number::Interval(interval) => {
-                        if interval.is_empty() {
-                            None
-                        } else {
-                            Some(number.min())
-                        }
-                    }
-                })
-                .reduce(|a, b| {
-                    if a.normalized_value().lt(b.normalized_value()) {
-                        a
-                    } else {
-                        b
-                    }
-                })
-                .map_or_else(
-                    || {
-                        Err(vec![EvalError::BuiltinFnCustomError {
-                            error_location: identifier_span,
-                            msg: "list contains no numbers or non-empty intervals".to_string(),
-                        }])
-                    },
-                    |min| Ok(Value::MeasuredNumber(min)),
-                ),
+            helper::HomogeneousNumberList::Numbers(numbers) => Ok(Value::Number(
+                helper::reduce_numbers(numbers, helper::min_number),
+            )),
+            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => Ok(Value::MeasuredNumber(
+                helper::reduce_measured_numbers(numbers, helper::min_number),
+            )),
         }
     }
 
     pub const MAX_DESCRIPTION: &str = "Find the maximum value of the given values.\n\nIf a value is an interval, the maximum value of the interval is used.";
     pub const MAX_BUILTIN_UNITS: [&str; 0] = [];
 
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "matches the expected signature"
-    )]
     pub fn max(
         identifier_span: Span,
         args: Vec<(Value, Span)>,
@@ -329,59 +287,25 @@ mod fns {
             }]);
         }
 
+        if args.len() == 1 {
+            return helper::unary_number_or_measured_number_fn(
+                identifier_span,
+                args,
+                "max",
+                |n, _arg_span| Ok(Value::Number(Number::Scalar(n.max()))),
+                |m, _arg_span| Ok(Value::MeasuredNumber(m.max())),
+            );
+        }
+
         let number_list = helper::extract_homogeneous_numbers_list(&args)?;
 
         match number_list {
-            helper::HomogeneousNumberList::Numbers(numbers) => numbers
-                .into_iter()
-                .filter_map(|number| match number.into_owned() {
-                    Number::Scalar(value) => Some(value),
-                    Number::Interval(interval) => {
-                        if interval.is_empty() {
-                            None
-                        } else {
-                            Some(interval.max())
-                        }
-                    }
-                })
-                .reduce(f64::max)
-                .map_or_else(
-                    || {
-                        Err(vec![EvalError::BuiltinFnCustomError {
-                            error_location: identifier_span,
-                            msg: "list contains no numbers or non-empty intervals".to_string(),
-                        }])
-                    },
-                    |max| Ok(Value::Number(Number::Scalar(max))),
-                ),
-            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => numbers
-                .into_iter()
-                .filter_map(|number| match number.normalized_value().as_number() {
-                    Number::Scalar(_) => Some(number.max()),
-                    Number::Interval(interval) => {
-                        if interval.is_empty() {
-                            None
-                        } else {
-                            Some(number.max())
-                        }
-                    }
-                })
-                .reduce(|a, b| {
-                    if a.normalized_value().gt(b.normalized_value()) {
-                        a
-                    } else {
-                        b
-                    }
-                })
-                .map_or_else(
-                    || {
-                        Err(vec![EvalError::BuiltinFnCustomError {
-                            error_location: identifier_span,
-                            msg: "list contains no numbers or non-empty intervals".to_string(),
-                        }])
-                    },
-                    |max| Ok(Value::MeasuredNumber(max)),
-                ),
+            helper::HomogeneousNumberList::Numbers(numbers) => Ok(Value::Number(
+                helper::reduce_numbers(numbers, helper::max_number),
+            )),
+            helper::HomogeneousNumberList::MeasuredNumbers(numbers) => Ok(Value::MeasuredNumber(
+                helper::reduce_measured_numbers(numbers, helper::max_number),
+            )),
         }
     }
 
@@ -1003,7 +927,7 @@ mod helper {
     use std::borrow::Cow;
 
     use oneil_output::{
-        EvalError, MeasuredNumber, Number, Unit, Value, ValueType,
+        EvalError, Interval, MeasuredNumber, Number, Unit, Value, ValueType,
         error::{ExpectedArgumentCount, ExpectedType},
     };
     use oneil_shared::{span::Span, symbols::BuiltinFunctionName};
@@ -1120,6 +1044,94 @@ mod helper {
         }
 
         Ok(measured.into_number_using_unit(unit))
+    }
+
+    /// Reduces a non-empty list of numbers with an interval-preserving operation.
+    pub fn reduce_numbers(
+        numbers: Vec<Cow<'_, Number>>,
+        op: fn(Number, Number) -> Number,
+    ) -> Number {
+        numbers
+            .into_iter()
+            .map(Cow::into_owned)
+            .reduce(op)
+            .expect("there should be at least one number")
+    }
+
+    /// Reduces measured numbers after converting them into the first number's unit.
+    pub fn reduce_measured_numbers(
+        numbers: Vec<Cow<'_, MeasuredNumber>>,
+        op: fn(Number, Number) -> Number,
+    ) -> MeasuredNumber {
+        let mut numbers = numbers.into_iter().map(Cow::into_owned);
+
+        let first_number = numbers.next().expect("there should be at least one number");
+        let result_unit = first_number.unit().clone();
+        let first_number = first_number.into_number_using_unit(&result_unit);
+
+        let result = numbers
+            .map(|number| number.into_number_using_unit(&result_unit))
+            .fold(first_number, op);
+
+        MeasuredNumber::from_number_and_unit(result, result_unit)
+    }
+
+    /// Returns the interval-preserving minimum of two numbers.
+    pub fn min_number(lhs: Number, rhs: Number) -> Number {
+        match (lhs, rhs) {
+            (Number::Scalar(lhs), Number::Scalar(rhs)) => Number::Scalar(f64::min(lhs, rhs)),
+            (Number::Interval(interval), Number::Scalar(value))
+            | (Number::Scalar(value), Number::Interval(interval)) => {
+                if value < interval.min() {
+                    Number::Scalar(value)
+                } else if value < interval.max() {
+                    Number::Interval(Interval::new(interval.min(), value))
+                } else {
+                    Number::Interval(interval)
+                }
+            }
+            (Number::Interval(lhs), Number::Interval(rhs)) => {
+                if lhs.max() < rhs.min() {
+                    Number::Interval(lhs)
+                } else if rhs.max() < lhs.min() {
+                    Number::Interval(rhs)
+                } else {
+                    Number::Interval(Interval::new(
+                        f64::min(lhs.min(), rhs.min()),
+                        f64::min(lhs.max(), rhs.max()),
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Returns the interval-preserving maximum of two numbers.
+    pub fn max_number(lhs: Number, rhs: Number) -> Number {
+        match (lhs, rhs) {
+            (Number::Scalar(lhs), Number::Scalar(rhs)) => Number::Scalar(f64::max(lhs, rhs)),
+            (Number::Interval(interval), Number::Scalar(value))
+            | (Number::Scalar(value), Number::Interval(interval)) => {
+                if value > interval.max() {
+                    Number::Scalar(value)
+                } else if value > interval.min() {
+                    Number::Interval(Interval::new(value, interval.max()))
+                } else {
+                    Number::Interval(interval)
+                }
+            }
+            (Number::Interval(lhs), Number::Interval(rhs)) => {
+                if lhs.min() > rhs.max() {
+                    Number::Interval(lhs)
+                } else if rhs.min() > lhs.max() {
+                    Number::Interval(rhs)
+                } else {
+                    Number::Interval(Interval::new(
+                        f64::max(lhs.min(), rhs.min()),
+                        f64::max(lhs.max(), rhs.max()),
+                    ))
+                }
+            }
+        }
     }
 
     #[derive(Debug)]
