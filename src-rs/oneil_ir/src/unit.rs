@@ -2,6 +2,7 @@
 
 use oneil_output::{DimensionMap, DisplayUnit as ResolvedDisplayUnit, Unit as ResolvedUnit};
 use oneil_shared::{
+    serde::f64 as f64_serde,
     span::Span,
     symbols::{UnitBaseName, UnitName, UnitPrefix},
 };
@@ -256,6 +257,7 @@ pub struct DisplayUnit {
     /// The name of the unit
     pub name: String,
     /// The exponent of the unit
+    #[serde(with = "f64_serde")]
     pub exponent: f64,
 }
 

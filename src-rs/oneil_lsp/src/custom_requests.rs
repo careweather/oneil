@@ -31,6 +31,7 @@ use oneil_frontend::{InstanceGraph, InstancedModel};
 use oneil_ir::{self as ir, SectionItem};
 use oneil_runtime::{Runtime, output};
 use oneil_shared::paths::ModelPath;
+use oneil_shared::serde::f64 as f64_serde;
 use oneil_shared::symbols::{ParameterName, ReferenceName};
 use serde::Serialize;
 
@@ -231,15 +232,19 @@ pub enum RenderedValue {
     /// A dimensionless number (scalar or interval).
     Number {
         /// Scalar value, or interval lower bound.
+        #[serde(with = "f64_serde")]
         value: f64,
         /// Interval upper bound, `null` for scalars.
+        #[serde(serialize_with = "f64_option::serialize")]
         max: Option<f64>,
     },
     /// A number with a display unit.
     MeasuredNumber {
         /// Scalar value, or interval lower bound (in display unit).
+        #[serde(with = "f64_serde")]
         value: f64,
         /// Interval upper bound, `null` for scalars (in display unit).
+        #[serde(serialize_with = "f64_option::serialize")]
         max: Option<f64>,
         /// Display unit string (e.g. `"kg"`, `"m/s^2"`).
         unit: String,
@@ -649,5 +654,25 @@ fn assemble_node(
         children,
         references,
         applied_designs,
+    }
+}
+
+mod f64_option {
+    use oneil_shared::serde::f64;
+    use serde::Serializer;
+
+    /// Serializes `None` as `null` and `Some` values with the shared `f64` serializer.
+    #[expect(
+        clippy::ref_option,
+        reason = "serde `serialize_with` passes `&Option<T>`"
+    )]
+    pub fn serialize<S>(value: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            None => serializer.serialize_none(),
+            Some(value) => f64::serialize(value, serializer),
+        }
     }
 }

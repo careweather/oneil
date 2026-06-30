@@ -2,6 +2,7 @@
 
 use oneil_shared::{
     paths::PythonPath,
+    serde::f64 as f64_serde,
     span::Span,
     symbols::{
         BuiltinFunctionName, BuiltinValueName, ParameterName, PyFunctionName, ReferenceName,
@@ -613,7 +614,7 @@ impl Variable {
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum Literal {
     /// Numeric literal (floating-point).
-    Number(f64),
+    Number(#[serde(with = "f64_serde")] f64),
     /// String literal.
     String(String),
     /// Boolean literal.
