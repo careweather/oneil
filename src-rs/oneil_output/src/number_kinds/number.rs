@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Interval, NumberType,
-    util::{DEFAULT_SIG_FIGS, deserialize_f64, float_to_string, is_close, serialize_f64},
+    util::{DEFAULT_SIG_FIGS, float_to_string, is_close},
 };
+use oneil_shared::serde::f64 as f64_serde;
 
 /// A number value in Oneil.
 ///
@@ -16,7 +17,7 @@ use crate::{
 #[serde(untagged)]
 pub enum Number {
     /// A scalar number value.
-    Scalar(#[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")] f64),
+    Scalar(#[serde(with = "f64_serde")] f64),
     /// An interval number value.
     Interval(Interval),
 }

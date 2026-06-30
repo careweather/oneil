@@ -8,6 +8,7 @@ pub mod load_result;
 pub mod partial;
 pub mod paths;
 pub mod search;
+pub mod serde;
 pub mod span;
 pub mod symbols;
 

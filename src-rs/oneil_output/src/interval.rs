@@ -2,7 +2,8 @@ use std::ops;
 
 use serde::{Deserialize, Serialize};
 
-use crate::util::{deserialize_f64, is_close, serialize_f64};
+use crate::util::is_close;
+use oneil_shared::serde::f64 as f64_serde;
 
 // TODO: maybe add more comparison functions for
 //       intervals into the standard library (
@@ -33,9 +34,9 @@ use crate::util::{deserialize_f64, is_close, serialize_f64};
 /// to be part of the interval.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Interval {
-    #[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")]
+    #[serde(with = "f64_serde")]
     min: f64,
-    #[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")]
+    #[serde(with = "f64_serde")]
     max: f64,
 }
 
