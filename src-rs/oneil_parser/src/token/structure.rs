@@ -39,6 +39,37 @@ fn comment(input: InputSpan<'_>) -> Result<'_, InputSpan<'_>, TokenError> {
     recognize((char('#'), not_line_ending, line_ending.or(eof))).parse(input)
 }
 
+/// Parses optional leading content at the start of a file.
+///
+/// This function recognizes any combination of:
+/// - Inline whitespace (spaces and tabs)
+/// - End-of-line markers (line breaks, comments, end-of-file)
+///
+/// Unlike [`end_of_line`], leading inline whitespace is accepted before
+/// end-of-line markers. This parser always succeeds.
+pub fn start_of_file(input: InputSpan<'_>) -> Result<'_, Token<'_>, TokenError> {
+    let lexeme_str = &input.fragment()[..0];
+    let lexeme_span = span_from(&input, &input);
+
+    let (rest, whitespace) = recognize(|input| {
+        let (rest, _) = inline_whitespace.parse(input)?;
+        let (rest, _) = opt(end_of_line).parse(rest)?;
+        Ok((rest, ()))
+    })
+    .parse(input)?;
+
+    let whitespace_span = span_from(&whitespace, &rest);
+
+    Ok((
+        rest,
+        Token {
+            lexeme_str,
+            lexeme_span,
+            whitespace_span,
+        },
+    ))
+}
+
 /// Parses one or more linebreaks, comments, or end-of-file markers, including trailing whitespace.
 ///
 /// This function recognizes any combination of:
@@ -324,6 +355,79 @@ mod tests {
             };
 
             assert!(matches!(token_error.kind, TokenErrorKind::NomError(_)));
+        }
+    }
+
+    mod start_of_file {
+        use super::*;
+
+        #[test]
+        fn empty_input() {
+            let input = InputSpan::new_extra("", Config::default());
+            let (rest, matched) = start_of_file(input).expect("should parse empty input");
+            assert_eq!(rest.fragment(), &"");
+            assert_eq!(matched.lexeme_str, "");
+        }
+
+        #[test]
+        fn no_leading_content() {
+            let input = InputSpan::new_extra("param = 1", Config::default());
+            let (rest, matched) =
+                start_of_file(input).expect("should parse with no leading content");
+            assert_eq!(rest.fragment(), &"param = 1");
+            assert_eq!(matched.lexeme_str, "");
+        }
+
+        #[test]
+        fn leading_inline_whitespace() {
+            let input = InputSpan::new_extra("   param = 1", Config::default());
+            let (rest, matched) =
+                start_of_file(input).expect("should parse leading inline whitespace");
+            assert_eq!(rest.fragment(), &"param = 1");
+            assert_eq!(matched.lexeme_str, "");
+        }
+
+        #[test]
+        fn leading_end_of_line() {
+            let input = InputSpan::new_extra("\nparam = 1", Config::default());
+            let (rest, matched) = start_of_file(input).expect("should parse leading end of line");
+            assert_eq!(rest.fragment(), &"param = 1");
+            assert_eq!(matched.lexeme_str, "");
+        }
+
+        #[test]
+        fn leading_inline_whitespace_before_end_of_line() {
+            let input = InputSpan::new_extra("   \nparam = 1", Config::default());
+            let (rest, matched) =
+                start_of_file(input).expect("should parse whitespace before end of line");
+            assert_eq!(rest.fragment(), &"param = 1");
+            assert_eq!(matched.lexeme_str, "");
+        }
+
+        #[test]
+        fn leading_comment() {
+            let input = InputSpan::new_extra("# comment\nparam = 1", Config::default());
+            let (rest, matched) = start_of_file(input).expect("should parse leading comment");
+            assert_eq!(rest.fragment(), &"param = 1");
+            assert_eq!(matched.lexeme_str, "");
+        }
+
+        #[test]
+        fn leading_whitespace_before_comment() {
+            let input = InputSpan::new_extra("   # comment\nparam = 1", Config::default());
+            let (rest, matched) =
+                start_of_file(input).expect("should parse whitespace before comment");
+            assert_eq!(rest.fragment(), &"param = 1");
+            assert_eq!(matched.lexeme_str, "");
+        }
+
+        #[test]
+        fn multiple_leading_end_of_lines() {
+            let input = InputSpan::new_extra("\n\n# foo\n\nparam = 1", Config::default());
+            let (rest, matched) =
+                start_of_file(input).expect("should parse multiple leading end of lines");
+            assert_eq!(rest.fragment(), &"param = 1");
+            assert_eq!(matched.lexeme_str, "");
         }
     }
 

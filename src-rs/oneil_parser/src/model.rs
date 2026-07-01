@@ -28,7 +28,11 @@ use crate::{
         reason::{ExpectKind, ParserErrorReason},
     },
     note::parse as parse_note,
-    token::{keyword::section, naming::label, structure::end_of_line},
+    token::{
+        keyword::section,
+        naming::label,
+        structure::{end_of_line, start_of_file},
+    },
     util::{InputSpan, Result, source_location_from},
 };
 
@@ -61,7 +65,7 @@ fn model(input: InputSpan<'_>) -> Result<'_, ModelNode, Box<ParserPartialModelEr
     // Capture the start location before consuming input.
     let model_span_start = source_location_from(&input);
 
-    let (rest, end_of_line_token) = opt(end_of_line).parse(input).expect("should always parse");
+    let (rest, start_of_file_token) = start_of_file(input).expect("should always parse");
 
     let (rest, note) = opt(parse_note)
         .parse(rest.clone())
@@ -76,8 +80,10 @@ fn model(input: InputSpan<'_>) -> Result<'_, ModelNode, Box<ParserPartialModelEr
     let errors = [decl_errors, section_errors].concat();
 
     // get the last span/whitespace span of the model
-    let last_end_of_line_spans =
-        end_of_line_token.map(|token| (token.lexeme_span, token.whitespace_span));
+    let start_of_file_spans = (
+        start_of_file_token.lexeme_span,
+        start_of_file_token.whitespace_span,
+    );
     let last_note_spans = note
         .as_ref()
         .map(|note| (note.span().clone(), note.whitespace_span().clone()));
@@ -88,25 +94,21 @@ fn model(input: InputSpan<'_>) -> Result<'_, ModelNode, Box<ParserPartialModelEr
         .last()
         .map(|section| (section.span().clone(), section.whitespace_span().clone()));
 
-    let (last_node_span, last_node_whitespace_span) = [
-        last_end_of_line_spans,
-        last_note_spans,
-        last_decl_spans,
-        last_section_spans,
-    ]
-    .into_iter()
-    .flatten()
-    .max_by(|a, b| {
-        let a_end = a.0.end();
-        let b_end = b.0.end();
-        a_end
-            .partial_cmp(b_end)
-            .expect("should always compare because they are from the same file")
-    })
-    .unzip();
+    let (last_node_span, last_node_whitespace_span) =
+        [last_note_spans, last_decl_spans, last_section_spans]
+            .into_iter()
+            .flatten()
+            .max_by(|a, b| {
+                let a_end = a.0.end();
+                let b_end = b.0.end();
+                a_end
+                    .partial_cmp(b_end)
+                    .expect("should always compare because they are from the same file")
+            })
+            .unwrap_or(start_of_file_spans);
 
     // calculate the end of the model span
-    let model_span_end = last_node_span.map_or(model_span_start, |span| *span.end());
+    let model_span_end = *last_node_span.end();
 
     // build the model span
     let model_span = Span::new(
@@ -118,8 +120,7 @@ fn model(input: InputSpan<'_>) -> Result<'_, ModelNode, Box<ParserPartialModelEr
 
     // calculate the whitespace span of the model
     // (if there was no last node, use the model span)
-    let model_whitespace_span = last_node_whitespace_span
-        .unwrap_or_else(|| Span::new(*model_span.end(), *model_span.end(), path, source));
+    let model_whitespace_span = last_node_whitespace_span;
 
     let model_node = Node::new(
         Model::new(note, decls, sections),
