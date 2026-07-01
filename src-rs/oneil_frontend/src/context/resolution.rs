@@ -455,6 +455,12 @@ impl<'external, E: ExternalResolutionContext> ResolutionContext<'external, E> {
             .add_reference(reference_name, import);
     }
 
+    /// Records that an import on the active model points at a target with errors.
+    pub fn add_reference_with_error_to_active_model(&mut self, reference_name: ReferenceName) {
+        self.active_model_mut()
+            .add_reference_with_error(reference_name);
+    }
+
     /// Adds a direct submodel to the active model.
     ///
     /// `alias` is the alias (`bar` in `submodel foo as bar`), which is the map

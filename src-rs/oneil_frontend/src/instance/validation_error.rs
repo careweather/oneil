@@ -117,6 +117,17 @@ pub enum InstanceValidationErrorKind {
         /// of 1 indicates a self-referential parameter.
         cycle: Vec<CycleMember>,
     },
+    /// The host reference has errors internally.
+    ReferenceHasError {
+        /// The reference name as written in the source (e.g. `r` in `p.r`).
+        reference_name: ReferenceName,
+        /// Span of the reference identifier (in the design file when
+        /// `design_info` is `Some`, otherwise in the host model file).
+        reference_span: Span,
+        /// When the containing parameter was set by a design, the design
+        /// file path and the span of its `param = value` assignment line.
+        design_info: Option<(ModelPath, Span)>,
+    },
 }
 
 /// One link in a parameter-dependency cycle.
@@ -148,7 +159,8 @@ impl InstanceValidationError {
             | InstanceValidationErrorKind::ParameterCycle { parameter_span, .. } => {
                 parameter_span.clone()
             }
-            InstanceValidationErrorKind::UndefinedReference { reference_span, .. } => {
+            InstanceValidationErrorKind::UndefinedReference { reference_span, .. }
+            | InstanceValidationErrorKind::ReferenceHasError { reference_span, .. } => {
                 reference_span.clone()
             }
         }
@@ -182,20 +194,15 @@ impl AsOneilDiagnostic for InstanceValidationError {
             }
             InstanceValidationErrorKind::UndefinedReference {
                 reference_name,
-                best_match,
                 design_info,
                 ..
             } => {
                 let name = reference_name.as_str();
-                let suggestion = best_match
-                    .as_ref()
-                    .map(|m| format!(" (did you mean `{}`?)", m.as_str()))
-                    .unwrap_or_default();
                 if let Some((design_path, _)) = design_info {
                     let design = design_name(design_path);
-                    format!("design `{design}` introduced undefined reference `{name}`{suggestion}")
+                    format!("design `{design}` introduced undefined reference `{name}`")
                 } else {
-                    format!("undefined reference `{name}`{suggestion}")
+                    format!("undefined reference `{name}`")
                 }
             }
             InstanceValidationErrorKind::UndefinedReferenceParameter {
@@ -238,6 +245,10 @@ impl AsOneilDiagnostic for InstanceValidationError {
                     format!("circular dependency detected in parameters - {chain} -> {host}")
                 }
             }
+            InstanceValidationErrorKind::ReferenceHasError { reference_name, .. } => {
+                let reference = reference_name.as_str();
+                format!("reference `{reference}` has errors")
+            }
         }
     }
 
@@ -264,8 +275,16 @@ impl AsOneilDiagnostic for InstanceValidationError {
                     .map(|m| vec![Context::Help(format!("did you mean `{m}`?"))])
                     .unwrap_or_default()
             }
-            InstanceValidationErrorKind::ParameterCycle { .. } => Vec::new(),
+            InstanceValidationErrorKind::ParameterCycle { .. }
+            | InstanceValidationErrorKind::ReferenceHasError { .. } => Vec::new(),
         }
+    }
+
+    fn is_internal_diagnostic(&self) -> bool {
+        matches!(
+            self.kind,
+            InstanceValidationErrorKind::ReferenceHasError { .. }
+        )
     }
 }
 

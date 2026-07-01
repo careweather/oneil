@@ -259,6 +259,15 @@ fn resolve_extracted_submodels<E>(
                 );
             }
             Err(error) => {
+                if matches!(
+                    *error,
+                    ModelImportResolutionError::ParentModelHasError { .. }
+                        | ModelImportResolutionError::ModelHasError { .. }
+                ) {
+                    resolution_context
+                        .add_reference_with_error_to_active_model(reference_name.clone());
+                }
+
                 resolution_context.add_model_import_resolution_error_to_active_model(
                     reference_name,
                     None,
@@ -448,6 +457,14 @@ fn handle_resolution_error<E>(
 ) where
     E: ExternalResolutionContext,
 {
+    if matches!(
+        error,
+        ModelImportResolutionError::ParentModelHasError { .. }
+            | ModelImportResolutionError::ModelHasError { .. }
+    ) {
+        resolution_context.add_reference_with_error_to_active_model(reference_name.clone());
+    }
+
     if is_submodel {
         resolution_context.add_model_import_resolution_error_to_active_model(
             reference_name,
@@ -473,6 +490,8 @@ fn handle_resolution_error<E>(
     for submodel_info in submodel_list.iter() {
         // this is a bit hacky, but it's necessary to avoid getting confusing "undefined reference" errors
         let (reference_name, reference_name_span) = get_reference_name_and_span(submodel_info);
+
+        resolution_context.add_reference_with_error_to_active_model(reference_name.clone());
 
         let error = ModelImportResolutionError::parent_model_has_error(
             parent_model_name.clone(),

@@ -326,6 +326,24 @@ fn validate_expr(
             parameter_span,
             ..
         } => {
+            let mut push_error = |kind: InstanceValidationErrorKind| {
+                errors.push(InstanceValidationError {
+                    host_path: host_path.clone(),
+                    host_location: location.clone(),
+                    kind,
+                });
+            };
+
+            if instance.reference_has_error(reference_name) {
+                push_error(InstanceValidationErrorKind::ReferenceHasError {
+                    reference_name: reference_name.clone(),
+                    reference_span: reference_span.clone(),
+                    design_info: design_info.cloned(),
+                });
+
+                return;
+            }
+
             // Resolve the reference name. It can appear in any of the three maps:
             //  • `references` — cross-file reference declarations
             //  • `submodels`  — owned child subtrees
@@ -347,15 +365,11 @@ fn validate_expr(
 
             let Some(target_path) = target_model else {
                 let best_match = best_match_reference_all(instance, reference_name);
-                errors.push(InstanceValidationError {
-                    host_path: host_path.clone(),
-                    host_location: location.clone(),
-                    kind: InstanceValidationErrorKind::UndefinedReference {
-                        reference_name: reference_name.clone(),
-                        reference_span: reference_span.clone(),
-                        best_match,
-                        design_info: design_info.cloned(),
-                    },
+                push_error(InstanceValidationErrorKind::UndefinedReference {
+                    reference_name: reference_name.clone(),
+                    reference_span: reference_span.clone(),
+                    best_match,
+                    design_info: design_info.cloned(),
                 });
                 return;
             };
@@ -395,18 +409,14 @@ fn validate_expr(
                 return;
             }
             let best_match = best_match_parameter(target_instance.parameters(), parameter_name);
-            errors.push(InstanceValidationError {
-                host_path: host_path.clone(),
-                host_location: location.clone(),
-                kind: InstanceValidationErrorKind::UndefinedReferenceParameter {
-                    reference_name: reference_name.clone(),
-                    reference_span: reference_span.clone(),
-                    parameter_name: parameter_name.clone(),
-                    parameter_span: parameter_span.clone(),
-                    target_model: target_path,
-                    best_match,
-                    design_info: design_info.cloned(),
-                },
+            push_error(InstanceValidationErrorKind::UndefinedReferenceParameter {
+                reference_name: reference_name.clone(),
+                reference_span: reference_span.clone(),
+                parameter_name: parameter_name.clone(),
+                parameter_span: parameter_span.clone(),
+                target_model: target_path,
+                best_match,
+                design_info: design_info.cloned(),
             });
         }
         ir::Variable::Builtin { .. } => {}

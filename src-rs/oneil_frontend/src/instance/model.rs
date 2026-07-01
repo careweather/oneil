@@ -17,7 +17,7 @@
 //! `InstancedModel`s, so the per-file template stays a clean content
 //! carrier in both states.
 
-use indexmap::{IndexMap, map::Entry};
+use indexmap::{IndexMap, IndexSet, map::Entry};
 use oneil_ir as ir;
 use oneil_shared::{
     InstancePath,
@@ -97,6 +97,8 @@ pub struct InstancedModel {
     /// Named sections in source order. Each section carries an optional note and an
     /// ordered item list referencing parameters/tests by ID.
     sections: IndexMap<SectionLabel, ir::Section>,
+    /// References that have errors internally
+    references_with_errors: IndexSet<ReferenceName>,
 }
 
 impl InstancedModel {
@@ -126,6 +128,7 @@ impl InstancedModel {
             tests,
             note,
             sections: IndexMap::new(),
+            references_with_errors: IndexSet::new(),
         }
     }
 
@@ -144,6 +147,7 @@ impl InstancedModel {
             tests: IndexMap::new(),
             note: None,
             sections: IndexMap::new(),
+            references_with_errors: IndexSet::new(),
         }
     }
 
@@ -194,6 +198,18 @@ impl InstancedModel {
     #[expect(dead_code, reason = "mutation accessor for future graph-level passes")]
     pub(crate) const fn references_mut(&mut self) -> &mut IndexMap<ReferenceName, ReferenceImport> {
         &mut self.references
+    }
+
+    /// Returns all references that have errors.
+    #[must_use]
+    pub const fn references_with_errors(&self) -> &IndexSet<ReferenceName> {
+        &self.references_with_errors
+    }
+
+    /// Returns whether the named import points at a target with resolution errors.
+    #[must_use]
+    pub fn reference_has_error(&self, name: &ReferenceName) -> bool {
+        self.references_with_errors.contains(name)
     }
 
     /// Looks up an alias by name.
@@ -316,6 +332,11 @@ impl InstancedModel {
     /// Adds a reference declaration.
     pub fn add_reference(&mut self, name: ReferenceName, import: ReferenceImport) {
         self.references.insert(name, import);
+    }
+
+    /// Records that the named import target has resolution errors.
+    pub fn add_reference_with_error(&mut self, name: ReferenceName) {
+        self.references_with_errors.insert(name);
     }
 
     /// Adds a submodel declaration.

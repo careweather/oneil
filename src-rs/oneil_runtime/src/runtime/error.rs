@@ -1197,6 +1197,7 @@ fn parameter_cycle_names(errors: &[InstanceValidationError]) -> IndexSet<Paramet
             }
             InstanceValidationErrorKind::UndefinedParameter { .. }
             | InstanceValidationErrorKind::UndefinedReference { .. }
+            | InstanceValidationErrorKind::ReferenceHasError { .. }
             | InstanceValidationErrorKind::UndefinedReferenceParameter { .. } => None,
         })
         .collect()
@@ -1227,7 +1228,8 @@ fn build_validation_oneil_error(
         InstanceValidationErrorKind::ParameterCycle { design_info, .. }
         | InstanceValidationErrorKind::UndefinedParameter { design_info, .. }
         | InstanceValidationErrorKind::UndefinedReference { design_info, .. }
-        | InstanceValidationErrorKind::UndefinedReferenceParameter { design_info, .. } => {
+        | InstanceValidationErrorKind::UndefinedReferenceParameter { design_info, .. }
+        | InstanceValidationErrorKind::ReferenceHasError { design_info, .. } => {
             design_info.as_ref()
         }
     };
@@ -1243,9 +1245,8 @@ fn build_validation_oneil_error(
                 InstanceValidationErrorKind::ParameterCycle { .. } => assignment_span.clone(),
                 InstanceValidationErrorKind::UndefinedParameter { .. }
                 | InstanceValidationErrorKind::UndefinedReference { .. }
-                | InstanceValidationErrorKind::UndefinedReferenceParameter { .. } => {
-                    error.primary_span()
-                }
+                | InstanceValidationErrorKind::UndefinedReferenceParameter { .. }
+                | InstanceValidationErrorKind::ReferenceHasError { .. } => error.primary_span(),
             };
             let design_location = ErrorLocation::from_span(&span_in_design);
 
@@ -1372,7 +1373,8 @@ fn validation_error_is_duplicate(
         // file-time counterpart to deduplicate against.
         InstanceValidationErrorKind::UndefinedReference { .. }
         | InstanceValidationErrorKind::UndefinedReferenceParameter { .. }
-        | InstanceValidationErrorKind::ParameterCycle { .. } => false,
+        | InstanceValidationErrorKind::ParameterCycle { .. }
+        | InstanceValidationErrorKind::ReferenceHasError { .. } => false,
     }
 }
 
