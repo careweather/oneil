@@ -251,8 +251,9 @@ impl ImportTracker {
         // try to get the file path of the imported module
         //
         // built-in modules do not have a __file__ attribute, so we skip them
-        if let Ok(file_path) = result_module.getattr("__file__") {
-            let file_path = file_path.extract::<String>()?;
+        if let Ok(file_path) = result_module.getattr("__file__")
+            && let Ok(file_path) = file_path.extract::<String>()
+        {
             let file_path = PathBuf::from(file_path);
 
             // if the file path starts with the module directory, add it to the
