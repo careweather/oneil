@@ -1,11 +1,11 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-expression: output
+expression: "run_fixture(\"design_overlay/shared_ref.on\")"
 ---
 Model: fixtures/design_overlay/shared_ref.on
 Tests: 0/0
 Parameters:
-  mass = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(100.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
-  w_a = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(372.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "N", exponent: 1.0 } } })
-  w_b = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(372.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "N", exponent: 1.0 } } })
-  total = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(744.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "N", exponent: 1.0 } } })
+  mass = 100 :kg
+  w_a = 372 :N
+  w_b = 372 :N
+  total = 744 :N

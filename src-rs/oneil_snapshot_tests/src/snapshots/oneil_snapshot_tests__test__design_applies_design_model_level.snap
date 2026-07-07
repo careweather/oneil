@@ -5,4 +5,4 @@ expression: "run_fixture(\"design_applies_design/parent.on\")"
 Model: fixtures/design_applies_design/parent.on
 Tests: 0/0
 Parameters:
-  y = Number(Scalar(16.0))
+  y = 16

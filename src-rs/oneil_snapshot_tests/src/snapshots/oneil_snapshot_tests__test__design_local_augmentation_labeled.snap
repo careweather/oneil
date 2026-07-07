@@ -1,11 +1,10 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 189
-expression: "run_fixture_with_design(\"design_local/target.on\",\n\"design_local/augment_labeled.one\",)"
+expression: "run_fixture(\"design_local/augment_labeled.one\")"
 ---
 Model: fixtures/design_local/target.on
 Tests: 0/0
 Parameters:
-  radius = Number(Scalar(10.0))
-  diameter = Number(Scalar(20.0))
-  area = Number(Scalar(314.1592653589793))
+  radius = 10
+  diameter = 20
+  area = 314.2

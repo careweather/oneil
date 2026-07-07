@@ -1,9 +1,9 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-expression: "run_fixture_with_design(\"overlay_anchor_scope/parent_transitive.on\",\n\"overlay_anchor_scope/anchor_scope_transitive.one\",)"
+expression: "run_fixture(\"overlay_anchor_scope/anchor_scope_transitive.one\")"
 ---
 Model: fixtures/overlay_anchor_scope/parent_transitive.on
 Tests: 0/0
 Parameters:
-  multiplier = Number(Scalar(6.0))
-  x = Number(Scalar(12.0))
+  multiplier = 6
+  x = 12

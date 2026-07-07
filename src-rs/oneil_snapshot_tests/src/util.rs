@@ -1,5 +1,6 @@
 use std::{fmt::Write, path::Path};
 
+use oneil_output::util::{DEFAULT_SIG_FIGS, format_value_for_display};
 use oneil_runtime::{
     CacheReadPolicy, CacheWritePolicy, Runtime,
     output::{self, OneilDiagnostic},
@@ -157,15 +158,10 @@ fn format_model(
                 output::PrintLevel::Trace => "* ",
                 output::PrintLevel::None => "",
             };
-            let value_str = format_value(&param.value);
+            let value_str = format_value_for_display(&param.value, DEFAULT_SIG_FIGS);
             writeln!(out, "  {prefix}{name} = {value_str}").unwrap();
         }
     }
 
     out
-}
-
-/// Formats a value for snapshot output (deterministic, no colors).
-fn format_value(value: &output::Value) -> String {
-    format!("{value:?}")
 }

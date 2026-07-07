@@ -1,8 +1,8 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-expression: "run_fixture_with_design(\"design_applies_design/host.on\",\n\"design_applies_design/outer.one\",)"
+expression: "run_fixture(\"design_applies_design/outer.one\")"
 ---
 Model: fixtures/design_applies_design/host.on
 Tests: 0/0
 Parameters:
-  result = Number(Scalar(16.0))
+  result = 16

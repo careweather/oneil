@@ -1,10 +1,10 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-expression: output
+expression: "run_fixture(\"overlay_anchor_scope/anchor_scope.one\")"
 ---
 Model: fixtures/overlay_anchor_scope/parent.on
 Tests: 0/0
 Parameters:
-  multiplier = Number(Scalar(10.0))
-  x = Number(Scalar(20.0))
-  y = Number(Scalar(5.0))
+  multiplier = 10
+  x = 20
+  y = 5

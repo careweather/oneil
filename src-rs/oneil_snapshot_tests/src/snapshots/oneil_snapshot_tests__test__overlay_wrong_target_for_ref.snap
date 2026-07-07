@@ -1,6 +1,6 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-expression: output
+expression: "run_fixture(\"design_overlay/wrong_target/parent.on\")"
 ---
 error: `apply wrong_target_design.one to planet`: design `wrong_target_design.one` targets `gravity_mars.on`, but `planet` resolves to `gravity_earth.on`. Use a design whose `design <model>` matches `gravity_earth.on`.
   at fixtures/design_overlay/wrong_target/parent.on:7:7
@@ -9,5 +9,5 @@ error: `apply wrong_target_design.one to planet`: design `wrong_target_design.on
 Model: fixtures/design_overlay/wrong_target/parent.on
 Tests: 0/0
 Parameters:
-  m = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(100.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
-  w = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(981.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "N", exponent: 1.0 } } })
+  m = 100 :kg
+  w = 981 :N

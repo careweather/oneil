@@ -1,12 +1,11 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 208
-expression: output
+expression: "run_fixture(\"augmented_refs/override_augmented.one\")"
 ---
 Model: fixtures/augmented_refs/parent.on
 Tests: 0/0
 Parameters:
-  x = Number(Scalar(50.0))
-  y = Number(Scalar(100.0))
-  z = Number(Scalar(42.0))
-  total = Number(Scalar(192.0))
+  x = 50
+  y = 100
+  z = 42
+  total = 192

@@ -5,4 +5,4 @@ expression: "run_fixture(\"multi_seg_apply/parent.on\")"
 Model: fixtures/multi_seg_apply/parent.on
 Tests: 0/0
 Parameters:
-  result = Number(Scalar(10.0))
+  result = 10

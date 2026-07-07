@@ -5,5 +5,5 @@ expression: "run_fixture(\"multi_seg_apply/parent_nested.on\")"
 Model: fixtures/multi_seg_apply/parent_nested.on
 Tests: 0/0
 Parameters:
-  result = Number(Scalar(10.0))
-  mid_z = Number(Scalar(42.0))
+  result = 10
+  mid_z = 42

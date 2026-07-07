@@ -842,6 +842,7 @@ name = "oneil_snapshot_tests"
 version = "0.16.1"
 dependencies = [
  "insta",
+ "oneil_output",
  "oneil_runtime",
  "oneil_shared",
 ]

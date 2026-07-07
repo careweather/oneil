@@ -1,9 +1,8 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 250
-expression: output
+expression: "run_fixture(\"deep_apply_additions/parent.on\")"
 ---
 Model: fixtures/deep_apply_additions/parent.on
 Tests: 0/0
 Parameters:
-  y = Number(Scalar(16.0))
+  y = 16

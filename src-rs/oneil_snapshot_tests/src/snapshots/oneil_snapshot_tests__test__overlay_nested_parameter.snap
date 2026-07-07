@@ -1,9 +1,8 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 78
-expression: output
+expression: "run_fixture(\"design_overlay/nested_param/nested_param_design.one\")"
 ---
 Model: fixtures/design_overlay/nested_param/nested_param_parent.on
 Tests: 0/0
 Parameters:
-  total = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(1000.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "N", exponent: 1.0 } } })
+  total = 1e3 :N

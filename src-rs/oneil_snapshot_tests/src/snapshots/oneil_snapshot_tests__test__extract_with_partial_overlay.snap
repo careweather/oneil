@@ -1,11 +1,11 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-expression: "run_fixture_with_design(\"with_clause/with_extract_through_mid.on\",\n\"with_clause/mars_override.one\",)"
+expression: "run_fixture(\"with_clause/mars_override.one\")"
 ---
 Model: fixtures/with_clause/with_extract_through_mid.on
 Tests: 0/0
 Parameters:
-  result = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(2.6881720430107525)), unit: Unit { dimension_map: DimensionMap({}), magnitude: 1.0, is_db: false, display_unit: One } })
-  g_ref = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(3.72)), unit: Unit { dimension_map: DimensionMap({Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Divide(Unit { name: "m", exponent: 1.0 }, Unit { name: "s", exponent: 2.0 }) } })
-  thrust_out = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(1000.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "N", exponent: 1.0 } } })
-  mass_out = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(100.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
+  result = 2.688
+  g_ref = 3.72 :m/s^2
+  thrust_out = 1e3 :N
+  mass_out = 100 :kg

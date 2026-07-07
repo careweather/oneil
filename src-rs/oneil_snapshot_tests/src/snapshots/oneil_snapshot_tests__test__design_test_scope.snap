@@ -1,13 +1,12 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 236
-expression: "run_fixture_with_design(\"design_test_scope/target.on\",\n\"design_test_scope/test_only.one\",)"
+expression: "run_fixture(\"design_test_scope/test_only.one\")"
 ---
 Model: fixtures/design_test_scope/target.on
 Tests: 1/2
   test 1: FAIL
   test 2: PASS
 Parameters:
-  width = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(15.0)), unit: Unit { dimension_map: DimensionMap({Distance: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "m", exponent: 1.0 } } })
-  height = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(5.0)), unit: Unit { dimension_map: DimensionMap({Distance: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "m", exponent: 1.0 } } })
-  $ ratio = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(3.0)), unit: Unit { dimension_map: DimensionMap({}), magnitude: 1.0, is_db: false, display_unit: One } })
+  width = 15 :m
+  height = 5 :m
+  $ ratio = 3

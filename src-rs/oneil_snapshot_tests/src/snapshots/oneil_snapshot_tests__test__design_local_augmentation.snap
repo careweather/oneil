@@ -1,11 +1,10 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 183
-expression: output
+expression: "run_fixture(\"design_local/augment.one\")"
 ---
 Model: fixtures/design_local/target.on
 Tests: 0/0
 Parameters:
-  radius = Number(Scalar(10.0))
-  diameter = Number(Scalar(20.0))
-  circumference = Number(Scalar(62.83185307179586))
+  radius = 10
+  diameter = 20
+  circumference = 62.83

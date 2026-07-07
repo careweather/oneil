@@ -1,12 +1,11 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 115
-expression: "run_fixture_with_design(\"design_overlay/scoped_ref_override/budget.on\",\n\"design_overlay/scoped_ref_override/far_distance.one\",)"
+expression: "run_fixture(\"design_overlay/scoped_ref_override/far_distance.one\")"
 ---
 Model: fixtures/design_overlay/scoped_ref_override/budget.on
 Tests: 0/0
 Parameters:
-  k = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(5.0000000000000004e-8)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: -1.0}), magnitude: 0.001, is_db: false, display_unit: Divide(Unit { name: "kg", exponent: 1.0 }, Unit { name: "km", exponent: 1.0 }) } })
-  m0 = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(15000.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
-  m_req = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(20000.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
-  m_margin = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(-5000.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
+  k = 5e-5 :kg/km
+  m0 = 15000 :kg
+  m_req = 2e4 :kg
+  m_margin = -5e3 :kg

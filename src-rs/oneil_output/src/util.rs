@@ -1,6 +1,6 @@
 //! Utility functions for the value module.
 
-use crate::Number;
+use crate::{Number, Unit, Value};
 
 /// The default number of significant figures to use when displaying a number.
 ///
@@ -125,6 +125,48 @@ fn number_of_digits_after_decimal(value: f64, sig_figs: usize) -> usize {
     }
 }
 
+/// Formats a [`Value`] for human-readable display, matching CLI output without colors.
+#[must_use]
+pub fn format_value_for_display(value: &Value, sig_figs: usize) -> String {
+    match value {
+        Value::String(string) => format!("'{string}'"),
+        Value::Boolean(boolean) => boolean.to_string(),
+        Value::Number(number) => format_number_for_display(number, sig_figs),
+        Value::MeasuredNumber(number) => {
+            let (number, unit) = number.clone().into_number_and_unit();
+            let mut out = format_number_for_display(&number, sig_figs);
+            if let Some(suffix) = format_unit_suffix_for_display(&unit) {
+                out.push_str(&suffix);
+            }
+            out
+        }
+    }
+}
+
+/// Formats a [`Number`] for human-readable display.
+#[must_use]
+pub fn format_number_for_display(number: &Number, sig_figs: usize) -> String {
+    match number {
+        Number::Scalar(scalar) => float_to_string(*scalar, sig_figs),
+        Number::Interval(interval) if interval.is_empty() => "<empty>".to_string(),
+        Number::Interval(interval) => {
+            let min = float_to_string(interval.min(), sig_figs);
+            let max = float_to_string(interval.max(), sig_figs);
+            format!("{min} | {max}")
+        }
+    }
+}
+
+/// Formats a unit suffix for display (e.g. ` :kg`), if the unit is not effectively unitless.
+#[must_use]
+pub fn format_unit_suffix_for_display(unit: &Unit) -> Option<String> {
+    if unit.is_effectively_unitless() {
+        None
+    } else {
+        Some(format!(" :{unit}"))
+    }
+}
+
 /// Trims the trailing zeros from a float string.
 fn trim_trailing_zeros(value: String) -> String {
     // if there isn't a decimal point,
@@ -148,5 +190,65 @@ fn trim_trailing_zeros(value: String) -> String {
             .trim_end_matches('0')
             .trim_end_matches('.')
             .to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use crate::{Dimension, DimensionMap, DisplayUnit, MeasuredNumber, Value};
+
+    use super::*;
+
+    fn sample_mass_unit() -> Unit {
+        Unit {
+            dimension_map: DimensionMap::new(BTreeMap::from([(Dimension::Mass, 1.0)])),
+            magnitude: 1.0,
+            is_db: false,
+            display_unit: DisplayUnit::Unit {
+                name: "kg".to_string(),
+                exponent: 1.0,
+            },
+        }
+    }
+
+    #[test]
+    fn format_value_for_display_matches_cli_style() {
+        let unit = sample_mass_unit();
+        let measured = Value::MeasuredNumber(MeasuredNumber::from_number_and_unit(
+            Number::Scalar(10.0),
+            unit,
+        ));
+
+        assert_eq!(
+            format_value_for_display(&measured, DEFAULT_SIG_FIGS),
+            "10 :kg"
+        );
+        assert_eq!(
+            format_value_for_display(&Value::String("array".into()), DEFAULT_SIG_FIGS),
+            "'array'"
+        );
+        assert_eq!(
+            format_value_for_display(&Value::Boolean(true), DEFAULT_SIG_FIGS),
+            "true"
+        );
+        assert_eq!(
+            format_number_for_display(&Number::new_interval(1.0, 2.0), DEFAULT_SIG_FIGS),
+            "1 | 2"
+        );
+        assert_eq!(
+            format_number_for_display(&Number::new_empty(), DEFAULT_SIG_FIGS),
+            "<empty>"
+        );
+    }
+
+    #[test]
+    fn format_unit_suffix_for_display_omits_unitless_units() {
+        assert_eq!(format_unit_suffix_for_display(&Unit::one()), None);
+        assert_eq!(
+            format_unit_suffix_for_display(&sample_mass_unit()),
+            Some(" :kg".to_string())
+        );
     }
 }

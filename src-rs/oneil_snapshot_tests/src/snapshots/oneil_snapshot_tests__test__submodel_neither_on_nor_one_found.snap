@@ -1,6 +1,5 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 95
 expression: "run_fixture(\"design_overlay/missing_model/parent.on\")"
 ---
 error: no model or design file found (looked for `fixtures/design_overlay/missing_model/nonexistent.on` and `fixtures/design_overlay/missing_model/nonexistent.one`)
@@ -10,4 +9,4 @@ error: no model or design file found (looked for `fixtures/design_overlay/missin
 Model: fixtures/design_overlay/missing_model/parent.on
 Tests: 0/0
 Parameters:
-  m = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(5.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
+  m = 5 :kg

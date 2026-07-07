@@ -14,6 +14,7 @@ categories.workspace = true
 [dependencies]
 
 [dev-dependencies]
+oneil_output = { path = "../oneil_output" }
 oneil_runtime = { path = "../oneil_runtime" }
 oneil_shared = { path = "../oneil_shared" }
 insta = "1.40"

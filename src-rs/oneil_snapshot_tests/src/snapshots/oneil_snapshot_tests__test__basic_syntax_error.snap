@@ -1,7 +1,6 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 38
-expression: output
+expression: "run_fixture(\"basic/syntax_error.on\")"
 ---
 error: expected parameter or test
   at fixtures/basic/syntax_error.on:3:18
@@ -10,4 +9,4 @@ error: expected parameter or test
 Model: fixtures/basic/syntax_error.on
 Tests: 0/0
 Parameters:
-  m = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(10.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
+  m = 10 :kg

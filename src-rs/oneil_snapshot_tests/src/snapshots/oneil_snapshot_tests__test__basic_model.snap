@@ -1,13 +1,12 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 31
-expression: output
+expression: "run_fixture(\"basic/basic.on\")"
 ---
 Model: fixtures/basic/basic.on
 Tests: 1/1
   test 1: PASS
 Parameters:
-  m = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(10.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
-  a = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(9.81)), unit: Unit { dimension_map: DimensionMap({Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Divide(Unit { name: "m", exponent: 1.0 }, Unit { name: "s", exponent: 2.0 }) } })
-  f = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(98.10000000000001)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "N", exponent: 1.0 } } })
-  t = MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Scalar(90.0)), unit: Unit { dimension_map: DimensionMap({Mass: 1.0, Distance: 1.0, Time: -2.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "N", exponent: 1.0 } } })
+  m = 10 :kg
+  a = 9.81 :m/s^2
+  f = 98.1 :N
+  t = 90 :N

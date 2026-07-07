@@ -1,12 +1,11 @@
 ---
 source: src-rs/oneil_snapshot_tests/src/test.rs
-assertion_line: 195
-expression: output
+expression: "run_fixture(\"augmented_refs/parent.on\")"
 ---
 Model: fixtures/augmented_refs/parent.on
 Tests: 0/0
 Parameters:
-  x = Number(Scalar(10.0))
-  y = Number(Scalar(20.0))
-  z = Number(Scalar(42.0))
-  total = Number(Scalar(72.0))
+  x = 10
+  y = 20
+  z = 42
+  total = 72
