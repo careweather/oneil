@@ -79,10 +79,6 @@ settings](https://users.rust-lang.org/t/how-to-use-clippy-in-vs-code-with-rust-a
 6. Press the `F5` key to launch VSCode's Extension Development Host (should open a separate window)
 7. Open any `.on` file you want to try the LSP on! Have a look at [the `test` directory](./test) for some example files
 
-## Test Oneil Files
-
-Test Oneil files are found in [the `test` directory](./test). These files are mainly used for manual testing and experimentation and are not automatically tested.
-
 ## System Architecture
 
 The architecture of the system is described in [`docs/architecture/README.md`](docs/architecture/README.md). The code itself is found in [`src-rs/`](src-rs/).

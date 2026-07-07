@@ -1,10 +1,10 @@
-# Principles
+# Coding Standards
 
 ## Error Handling
 
-In general, we follow the [Midori Error
-Model](https://joeduffyblog.com/2016/02/07/the-error-model/). There are
-*recoverable* and *unrecoverable* errors.
+In general, follow the
+[Midori Error Model](https://joeduffyblog.com/2016/02/07/the-error-model/).
+There are *recoverable* and *unrecoverable* errors.
 
 ### Recoverable Errors
 
@@ -30,6 +30,7 @@ the invalid state rather than fail silently and learn about the invalid state
 much later in the program.
 
 To handle unrecoverable errors:
+
 - use `Result::expect` and `Option::expect` to unwrap `Result`s/`Option`s that
   should succeed
 - use `assert!(<condition>, <message>)` if you want to ensure that a condition
@@ -48,12 +49,11 @@ Make sure that you *include an informative error message* no matter which option
 you decide to use. Note that the messages for the macros can be formatted in the
 same way as `println!`.
 
-
 ## Mark TODOs And Unimplemented Features
 
 When implementing a feature, you may think of future improvements that could be
 made to the code. In addition, you often don't have time to handle every path or
-edge case. 
+edge case.
 
 If the code works as is but could be improved in the future, use a `// TODO`
 comment. This makes these tasks easier to find.
@@ -68,7 +68,7 @@ change the `todo!` macro to `unimplemented!`.
 
 > Note that the `todo!` and `unimplemented!` macros returns a type that coerces
 > to any other type. So the following code is valid.
-> 
+>
 > ```rust
 > let my_number =
 >   if some_condition {
@@ -77,7 +77,6 @@ change the `todo!` macro to `unimplemented!`.
 >     todo!("handle when `some_condition` is not true")
 >   };
 > ```
-
 
 ## Use Tools
 
@@ -126,12 +125,11 @@ keep the scope of the exception as limited as possible.
 > In your issue, please include reasoning behind why a lint should be disabled.
 > You could also include examples of how it is harmful.
 
-
 ## Prefer Flat Code
 
 Nested code is harder to reason about, since you have to remember what
 information each level of nesting introduces. Whenever possible, keep the
-nesting down to a minimum. 
+nesting down to a minimum.
 
 One way to do this is to use `let ... else` and `if ... let` combined with early
 returns to handle `Options`.
@@ -158,6 +156,27 @@ fn bar(key: u32) -> u32 {
 }
 ```
 
+## Prefer Readable Code Over Terse Code
+
+More people will read the code than write it, so optimize the code for reading.
+Don't try and do everything on one line, and store intermediate values instead of
+making large chains of function calls. For example,
+
+```rs
+let model = runtime.load_model(model_path);
+let reference = model.references().get(reference_name);
+let reference_path = reference.path();
+```
+
+is better than
+
+```rs
+let reference_path = runtime
+    .load_model(model_path)
+    .references()
+    .get(reference_name)
+    .path();
+```
 
 ## Avoid Writing Declarative Macros
 
@@ -166,54 +185,128 @@ boilerplate, but they come at the price of a syntax that's harder to read and
 code that's harder to debug. It's also easy to introduce a "sublanguage" that
 developers now have to learn.
 
-### `assert_...!` Macros
+## Use the type system
 
-The only exception to this rule is `assert_...!` macros in tests. Because tests
-often have assertion steps in common, these can be combined in a macro. This
-ensures that no necessary assertions are forgotten, and it can make it a lot
-more clear what a grouping of assertions does.
+Because the type system is checked at compile time rather than at run time, the
+type system can help you catch bugs earlier in the process if used correctly.
+It can also encode invariants and rules about how a value should be used (or
+*not* used).
 
-The reason for this exception is that if we were to combine the assertions into
-an `assert_...` function, then anytime an assertion in that function failed, it
-would point to code inside the function, rather than where the function was
-called. Using a macro means that the location of the assertion in the test is
-displayed, rather than the code inside the macro.
+### The newtype pattern
 
-Note, however, that these macros are written in a specific style.
+In Rust, a newtype is a struct with only one field. For example,
 
-1. Assert macros should be written in a way that makes them look equivalent to a
-   function call. Arguments are passed in as comma seperated expressions, with
-   an optional trailing comma at the end.
+```rs
+struct ParameterName(String);
+struct PythonPath(PathBuf);
+```
 
-2. There is only one macro branch, so it's always clear which code the macro is
-   using.
+Use newtypes liberally. In Rust, they cost practically nothing in terms of
+size or speed, and their use has some useful benefits.
 
-3. Macro "arguments" are immediately assigned to variables with explicit types
-   in order to ensure that each argument has the expected type.
+Newtypes are a great way to help yourself and others use a value correctly.
+For example, if we store both python paths and model paths as `PathBuf`s, we
+might accidentally use a python path where we need a model path, or vice versa.
 
-4. Assertions inside the macro have an explicit message in order to make it
-   quickly clear which assertion failed.
+```rs
+let model_path = PathBuf::from("model.on");
+let python_path = PathBuf::from("functions.on");
+    
+// ... later ...
 
-```rust
-macro_rules! assert_var_is_builtin {
-  ($variable:expr, $expected_ident:expr $(,)?) => {
-      let variable: ir::ExprWithSpan = $variable;
-      let expected_ident: &str = $expected_ident;
+// this compiles, even though a python file will fail to parse correctly
+let model = load_model(python_path);
+```
 
-      let ir::Expr::Variable(ir::Variable::Builtin(actual_ident)) = variable.value() else {
-          panic!("expected builtin variable, got {variable:?}");
-      };
+Using a newtype ensures that this kind of mistake can't happen.
 
-      assert_eq!(
-          actual_ident.as_str(),
-          expected_ident,
-          "actual ident does not match expected ident"
-      );
-  };
+```rs
+let model_path = ModelPath::from("model.on");
+let python_path = PythonPath::from("functions.on");
+    
+// ... later ...
+
+// this produces the following compiler error
+//
+// error[E0308]: mismatched types
+//   --> src/main.rs:22:28
+//    |
+// 22 |     let model = load_model(python_path);
+//    |                 ---------- ^^^^^^^^^^^ expected `ModelPath`, found `PythonPath`
+//    |                 |
+//    |                 arguments to this function are incorrect
+//    |
+let model = load_model(python_path);
+```
+
+For more details about using newtypes, see
+[Embrace the newtype pattern](https://www.lurklurk.org/effective-rust/newtype.html)
+and
+[Newtypes and contracts](https://research.texttotypes.com/newtypes-and-contracts/).
+
+### Make invalid state unrepresentable
+
+The type system can be used to verify at compile time that you can't reach an
+invalid state. There are many ways that this can be accomplished. One simple
+example of this is a reference that may or may not have an alias. It could be
+represented in the following way.
+
+```rs
+struct Reference {
+  name: ReferenceName,
+  span: Span,
+  alias_name: Option<AliasName>,
+  alias_span: Option<Span>,
 }
 ```
 
+However, using this representation means that it is possible to have an alias
+name without a span, or an alias span without a name.
+
+```rs
+Reference {
+  name: ReferenceName("foo"),
+  span: Span(7, 10),
+  // name with no span
+  alias_name: Some(AliasName("f")),
+  alias_span: None,
+}
+
+Reference {
+  name: ReferenceName("foo"),
+  span: Span(7, 10),
+  // span with no name
+  alias_name: None,
+  alias_span: Some(Span(14, 15)),
+}
+```
+
+Neither of these states make sense. To make them impossible, they can be merged
+into a single `Option`.
+
+```rs
+struct Reference {
+  name: ReferenceName,
+  span: Span,
+  alias: Option<(AliasName, Span)>,
+}
+```
+
+With this representation, it is impossible to have an alias name without a
+span, and vice versa.
+
+This also has the side effect of making code easier to write since you have to
+enforce less invariants at run time.
+
 ## Testing
+
+### Test Kinds
+
+Oneil's code can and should be tested in several different ways:
+
+- unit tests
+- snapshot tests
+- property tests
 
 ### 3-Step Unit Tests
 
@@ -256,13 +349,85 @@ match value {
 }
 ```
 
+### Snapshot Tests
+
+Snapshot tests can be a great way to track the output of tests in a way that
+is easy to observe visually. It allows a reviewer to quickly see what has
+changed.
+
+For snapshot testing in Rust, Oneil uses the `insta` crate. Snapshot tests are
+found in [`oneil_snapshot_tests`](../src-rs/oneil_snapshot_tests/).
+
+When writing a snapshot test, make the output easy to read. Don't use default
+`Debug` output. For example,
+
+```plaintext
+5 | 10 :kg
+```
+
+is a lot easier to read than
+
+```plaintext
+MeasuredNumber(MeasuredNumber { normalized_value: NormalizedNumber(Interval(Interval { min: 5.0, max: 10.0 })), unit: Unit { dimension_map: DimensionMap({Mass: 1.0}), magnitude: 1.0, is_db: false, display_unit: Unit { name: "kg", exponent: 1.0 } } })
+```
+
+For further reading on snapshot testing, check out
+[Testing can be fun, actually](https://giacomocavalieri.me/writing/testing-can-be-fun-actually)
+
+### Property Tests
+
+Property testing is a way to test that a given property holds. Property tests
+differ from unit tests in that they use semi-random input rather than fixed
+input.
+
+For example, to test the associative property of addition, a unit test might
+look like this:
+
+```rust
+#[test]
+fn associativity_property() {
+  let a = 1;
+  let b = 2;
+  assert_eq!(a + b, b + a);
+}
+```
+
+where as a property test (using `cargo fuzz`) might look like this:
+
+```rust
+use libfuzzer_sys::{arbitrary, fuzz_target};
+
+#[derive(arbitrary::Arbitrary)]
+struct AssociativityInput(i32, i32);
+
+fuzz_target!(|input: AssociativityInput| {
+  let a = input.0;
+  let b = input.1;
+  assert_eq!(a + b, b + a);
+})
+```
+
+The unit test is deterministic and only runs once, whereas the property test
+is run on many semi-random inputs. Running on many inputs enables a property
+test to discover inputs that break the property, if any exist. This can give
+you confidence that a property is probably sound.
+
+For more details on fuzz testing and `cargo fuzz`, see the
+[Rust Fuzz Book](https://rust-fuzz.github.io/book/cargo-fuzz.html).
+
+> [!NOTE]
+> Technically,
+> [there is a difference](https://www.bjaress.com/posts/2021-07-03/fuzz-testing-vs-property-based-testing.html)
+> between fuzz testing and property testing. For the purposes of documentation,
+> though, we use them interchangeably.
+
 ### Test Coverage
 
 **Testing doesn't have to have 100% coverage.** 100% coverage may be feasible
 when a program is small and simple. However, the more complex a problem gets,
 the harder it gets to cover every possible branch.
 
-Instead of trying to cover every edge case, write a unit test or two that test
+Instead of trying to cover every edge case, write several unit tests that test
 the main functionality. This ensures that the expected use case works.
 
 When you encounter a bug, write a test that proves that the bug exists. Fix the
