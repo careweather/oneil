@@ -1,0 +1,3 @@
+reference constants as c
+
+Value: v = d.c

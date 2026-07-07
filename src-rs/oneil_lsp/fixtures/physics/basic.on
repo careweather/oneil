@@ -1,0 +1,9 @@
+# Basic physics calculation
+Mass: m = 10 :kg
+Acceleration: a = 9.81 :m/s^2
+Force: f = m * a :N
+Magnitude: mag = abs(m) :kg
+Factor: k = 2 * pi
+Threshold: t = 90 :N
+
+test: f > t

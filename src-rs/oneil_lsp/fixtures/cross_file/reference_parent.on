@@ -1,0 +1,3 @@
+reference child
+
+From child: x = base.c

@@ -1,0 +1,5 @@
+submodel mid as m
+
+apply override to m.l
+
+Result: result = y.m

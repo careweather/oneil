@@ -1,0 +1,5 @@
+# Model that calls a Python function from an imported module.
+import py_helpers
+
+Side: s = 3 :m
+Area: A = square_area(s) :m^2

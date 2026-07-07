@@ -6,6 +6,9 @@
 #![allow(clippy::missing_panics_doc)]
 #![allow(dead_code)]
 
+#[cfg(test)]
+mod test;
+
 pub mod custom_requests;
 mod definition;
 mod diagnostics;

@@ -1,0 +1,3 @@
+submodel child as c
+
+From child: x = base.c
