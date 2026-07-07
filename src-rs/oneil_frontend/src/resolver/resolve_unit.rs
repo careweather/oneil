@@ -211,23 +211,30 @@ mod tests {
         )
     }
 
-    macro_rules! assert_units_match {
-        ($actual_units:expr, $expected_units:expr $(,)?) => {
-            let mut actual_units: Vec<(&str, f64)> = $actual_units
-                .into_iter()
-                .map(|u| (u.name().as_str(), u.exponent()))
-                .collect();
+    /// Asserts that resolved unit components match the expected name/exponent pairs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the actual units do not match the expected units.
+    #[track_caller]
+    fn assert_units_match(
+        actual_units: &[ir::Unit],
+        expected_units: &[(&str, f64)],
+    ) {
+        let mut actual_units: Vec<(&str, f64)> = actual_units
+            .iter()
+            .map(|unit| (unit.name().as_str(), unit.exponent()))
+            .collect();
 
-            let mut expected_units: Vec<(&str, f64)> = $expected_units.into_iter().collect();
+        let mut expected_units: Vec<(&str, f64)> = expected_units.to_vec();
 
-            actual_units.sort_by(unit_tuple_cmp);
-            expected_units.sort_by(unit_tuple_cmp);
+        actual_units.sort_by(unit_tuple_cmp);
+        expected_units.sort_by(unit_tuple_cmp);
 
-            assert_eq!(
-                actual_units, expected_units,
-                "actual units do not match expected units"
-            );
-        };
+        assert_eq!(
+            actual_units, expected_units,
+            "actual units do not match expected units"
+        );
     }
 
     fn test_external_context_with_common_units() -> TestExternalContext {
@@ -298,7 +305,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", 1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0)]);
     }
 
     #[test]
@@ -319,7 +326,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("kg", 1.0)]);
+        assert_units_match(composite.units(), &[("kg", 1.0)]);
     }
 
     #[test]
@@ -340,7 +347,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", 2.0)]);
+        assert_units_match(composite.units(), &[("m", 2.0)]);
     }
 
     #[test]
@@ -365,7 +372,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", 1.0), ("kg", 1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0), ("kg", 1.0)]);
     }
 
     #[test]
@@ -390,7 +397,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", 1.0), ("s", -1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0), ("s", -1.0)]);
     }
 
     #[test]
@@ -423,9 +430,9 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(
+        assert_units_match(
             composite.units(),
-            [("m", 1.0), ("kg", 1.0), ("s", -1.0), ("K", -1.0)],
+            &[("m", 1.0), ("kg", 1.0), ("s", -1.0), ("K", -1.0)],
         );
     }
 
@@ -455,7 +462,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", 1.0), ("s", -1.0), ("kg", 1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0), ("s", -1.0), ("kg", 1.0)]);
     }
 
     #[test]
@@ -488,9 +495,9 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(
+        assert_units_match(
             composite.units(),
-            [("m", 2.0), ("kg", 3.0), ("s", -1.0), ("K", -1.0)],
+            &[("m", 2.0), ("kg", 3.0), ("s", -1.0), ("K", -1.0)],
         );
     }
 
@@ -516,7 +523,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", -2.0), ("s", 3.0)]);
+        assert_units_match(composite.units(), &[("m", -2.0), ("s", 3.0)]);
     }
 
     #[test]
@@ -553,9 +560,9 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(
+        assert_units_match(
             composite.units(),
-            [
+            &[
                 ("m", 1.0),
                 ("kg", 1.0),
                 ("s", -1.0),
@@ -584,7 +591,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", 0.5)]);
+        assert_units_match(composite.units(), &[("m", 0.5)]);
     }
 
     #[test]
@@ -610,7 +617,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", 1.0), ("kg", 1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0), ("kg", 1.0)]);
     }
 
     #[test]
@@ -642,7 +649,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("m", 1.0), ("kg", 1.0), ("s", -1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0), ("kg", 1.0), ("s", -1.0)]);
     }
 
     #[test]
@@ -665,7 +672,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result - the unit should be resolved correctly regardless of parentheses
-        assert_units_match!(composite.units(), [("m", 1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0)]);
     }
 
     #[test]
@@ -715,7 +722,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result - UnitOne should be ignored in multiplication
-        assert_units_match!(composite.units(), [("m", 1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0)]);
     }
 
     #[test]
@@ -740,7 +747,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result - UnitOne should be ignored in division
-        assert_units_match!(composite.units(), [("m", 1.0)]);
+        assert_units_match(composite.units(), &[("m", 1.0)]);
     }
 
     #[test]
@@ -783,7 +790,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("km", 1.0)]);
+        assert_units_match(composite.units(), &[("km", 1.0)]);
 
         // check that the resolved info has the correct prefix
         let unit = &composite.units()[0];
@@ -813,7 +820,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("dB", 1.0)]);
+        assert_units_match(composite.units(), &[("dB", 1.0)]);
 
         // check that the resolved info has is_db set
         let unit = &composite.units()[0];
@@ -843,7 +850,7 @@ mod tests {
             resolve_unit(&unit_expr, &resolution_context).expect("resolve should succeed");
 
         // check the result
-        assert_units_match!(composite.units(), [("dBm", 1.0)]);
+        assert_units_match(composite.units(), &[("dBm", 1.0)]);
 
         // check that the resolved info has is_db set and the correct stripped name
         let unit = &composite.units()[0];

@@ -10,15 +10,17 @@ const ABSOLUTE_TOLERANCE: f64 = 1e-15;
 const RELATIVE_TOLERANCE: f64 = 1e-2;
 const LARGE_NUMBER_THRESHOLD: f64 = 1e300;
 
-macro_rules! assert_is_close {
-    ($expected:expr, $actual:expr) => {
-        assert!(
-            is_close_with_tolerances($expected, $actual, RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE),
-            "expected: {}, actual: {}",
-            $expected,
-            $actual
-        );
-    };
+/// Asserts that two floating point numbers are close within fuzz tolerances.
+///
+/// # Panics
+///
+/// Panics if the values are not close.
+#[track_caller]
+fn assert_is_close(expected: f64, actual: f64) {
+    assert!(
+        is_close_with_tolerances(expected, actual, RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE),
+        "expected: {expected}, actual: {actual}"
+    );
 }
 
 #[expect(
@@ -52,11 +54,11 @@ fuzz_target!(|data: FuzzData| {
             }
 
             if !(value.min().abs() > LARGE_NUMBER_THRESHOLD && back_to_linear.min().is_infinite()) {
-                assert_is_close!(value.min(), back_to_linear.min());
+                assert_is_close(value.min(), back_to_linear.min());
             }
 
             if !(value.max().abs() > LARGE_NUMBER_THRESHOLD && back_to_linear.max().is_infinite()) {
-                assert_is_close!(value.max(), back_to_linear.max());
+                assert_is_close(value.max(), back_to_linear.max());
             }
         }
         FuzzData::StartFromDbInterval { value } => {
@@ -77,8 +79,8 @@ fuzz_target!(|data: FuzzData| {
                 return;
             }
 
-            assert_is_close!(value.min(), back_to_db.min());
-            assert_is_close!(value.max(), back_to_db.max());
+            assert_is_close(value.min(), back_to_db.min());
+            assert_is_close(value.max(), back_to_db.max());
         }
         FuzzData::StartFromLinearScalar { value } => {
             if value.is_nan() || value <= 0.0 {
@@ -93,7 +95,7 @@ fuzz_target!(|data: FuzzData| {
             };
 
             if !(value.abs() > LARGE_NUMBER_THRESHOLD && back_to_linear.is_infinite()) {
-                assert_is_close!(value, back_to_linear);
+                assert_is_close(value, back_to_linear);
             }
         }
         FuzzData::StartFromDbScalar { value } => {
@@ -110,7 +112,7 @@ fuzz_target!(|data: FuzzData| {
                 panic!("expected scalar");
             };
 
-            assert_is_close!(value, back_to_db);
+            assert_is_close(value, back_to_db);
         }
     }
 });

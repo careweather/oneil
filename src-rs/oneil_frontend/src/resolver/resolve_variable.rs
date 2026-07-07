@@ -124,87 +124,93 @@ mod tests {
 
     use oneil_ir as ir;
 
-    macro_rules! assert_var_is_builtin {
-        ($variable:expr, $expected_ident:expr $(,)?) => {
-            let variable: ir::Expr = $variable;
-            let expected_ident: &str = $expected_ident;
-
-            let ir::Expr::Variable {
-                span: _,
-                variable:
-                    ir::Variable::Builtin {
-                        ident: actual_ident,
-                        ..
-                    },
-            } = variable
-            else {
-                panic!("expected builtin variable, got {variable:?}");
-            };
-
-            assert_eq!(
-                actual_ident.as_str(),
-                expected_ident,
-                "actual ident does not match expected ident"
-            );
+    /// Asserts that an expression is a builtin variable with the expected identifier.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the expression is not a builtin variable or the identifier does not match.
+    #[track_caller]
+    fn assert_var_is_builtin(variable: ir::Expr, expected_ident: &str) {
+        let ir::Expr::Variable {
+            span: _,
+            variable:
+                ir::Variable::Builtin {
+                    ident: actual_ident,
+                    ..
+                },
+        } = variable
+        else {
+            panic!("expected builtin variable, got {variable:?}");
         };
+
+        assert_eq!(
+            actual_ident.as_str(),
+            expected_ident,
+            "actual ident does not match expected ident"
+        );
     }
 
-    macro_rules! assert_var_is_parameter {
-        ($variable:expr, $expected_ident:expr $(,)?) => {
-            let variable: ir::Expr = $variable;
-            let expected_ident: &str = $expected_ident;
-
-            let ir::Expr::Variable {
-                span: _,
-                variable:
-                    ir::Variable::Parameter {
-                        parameter_name: actual_ident,
-                        ..
-                    },
-            } = variable
-            else {
-                panic!("expected parameter variable, got {variable:?}");
-            };
-
-            assert_eq!(
-                actual_ident.as_str(),
-                expected_ident,
-                "actual ident does not match expected ident"
-            );
+    /// Asserts that an expression is a parameter variable with the expected identifier.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the expression is not a parameter variable or the identifier does not match.
+    #[track_caller]
+    fn assert_var_is_parameter(variable: ir::Expr, expected_ident: &str) {
+        let ir::Expr::Variable {
+            span: _,
+            variable:
+                ir::Variable::Parameter {
+                    parameter_name: actual_ident,
+                    ..
+                },
+        } = variable
+        else {
+            panic!("expected parameter variable, got {variable:?}");
         };
+
+        assert_eq!(
+            actual_ident.as_str(),
+            expected_ident,
+            "actual ident does not match expected ident"
+        );
     }
 
-    macro_rules! assert_var_is_external {
-        ($variable:expr, $expected_reference_name:expr, $expected_parameter_name:expr $(,)?) => {
-            let variable: ir::Expr = $variable;
-            let expected_reference_name: &str = $expected_reference_name;
-            let expected_parameter_name: &str = $expected_parameter_name;
-
-            let ir::Expr::Variable {
-                span: _,
-                variable:
-                    ir::Variable::External {
-                        reference_name: actual_reference_name,
-                        parameter_name: actual_parameter_name,
-                        ..
-                    },
-            } = variable
-            else {
-                panic!("expected external variable, got {variable:?}");
-            };
-
-            assert_eq!(
-                actual_reference_name.as_str(),
-                expected_reference_name,
-                "actual reference name does not match expected reference name"
-            );
-
-            assert_eq!(
-                actual_parameter_name.as_str(),
-                expected_parameter_name,
-                "actual parameter name does not match expected parameter name"
-            );
+    /// Asserts that an expression is an external variable with the expected names.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the expression is not an external variable or the names do not match.
+    #[track_caller]
+    fn assert_var_is_external(
+        variable: ir::Expr,
+        expected_reference_name: &str,
+        expected_parameter_name: &str,
+    ) {
+        let ir::Expr::Variable {
+            span: _,
+            variable:
+                ir::Variable::External {
+                    reference_name: actual_reference_name,
+                    parameter_name: actual_parameter_name,
+                    ..
+                },
+        } = variable
+        else {
+            panic!("expected external variable, got {variable:?}");
         };
+
+        assert_eq!(
+            actual_reference_name.as_str(),
+            expected_reference_name,
+            "actual reference name does not match expected reference name"
+        );
+
+        assert_eq!(
+            actual_parameter_name.as_str(),
+            expected_parameter_name,
+            "actual parameter name does not match expected parameter name"
+        );
     }
 
     #[test]
@@ -225,7 +231,7 @@ mod tests {
 
         // check the result
         let var = result.expect("variable should be resolved");
-        assert_var_is_builtin!(var, "pi");
+        assert_var_is_builtin(var, "pi");
     }
 
     #[test]
@@ -251,7 +257,7 @@ mod tests {
 
         // check the result
         let var = result.expect("variable should be resolved");
-        assert_var_is_parameter!(var, "temperature");
+        assert_var_is_parameter(var, "temperature");
     }
 
     #[test]
@@ -298,7 +304,7 @@ mod tests {
         let result = resolve_variable(&variable, &resolution_context);
 
         let var = result.expect("variable should be resolved");
-        assert_var_is_external!(var, "reference", "parameter");
+        assert_var_is_external(var, "reference", "parameter");
     }
 
     #[test]
@@ -324,6 +330,6 @@ mod tests {
 
         // check the result
         let var = result.expect("variable should be resolved");
-        assert_var_is_parameter!(var, "conflict");
+        assert_var_is_parameter(var, "conflict");
     }
 }

@@ -237,8 +237,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -253,8 +253,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(0.001, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert_is_close(0.001, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -269,8 +269,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(0.001_f64.powi(2), unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, 2.0)], unit);
+            assert_is_close(0.001_f64.powi(2), unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, 2.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -285,8 +285,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!([], unit);
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([], &unit);
             assert!(unit.is_db);
         }
 
@@ -301,15 +301,12 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0)
-                ],
-                unit
-            );
+                ], &unit);
             assert!(unit.is_db);
         }
 
@@ -333,8 +330,8 @@ mod test {
             // Hz^-1: Time^1 (since Hz has Time^-1)
             // Result: Mass, Time^-2
             // Magnitude: 1 / (2π) because Hz has magnitude 2π, so Hz^-1 contributes 1/(2π)
-            assert_is_close!(1.0 / (2.0 * PI), unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Mass, 1.0), (Dimension::Time, -2.0)], unit);
+            assert_is_close(1.0 / (2.0 * PI), unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Mass, 1.0), (Dimension::Time, -2.0)], &unit);
             assert!(unit.is_db);
         }
 
@@ -349,8 +346,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1000.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Distance, 1.0)], unit);
+            assert_is_close(1000.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Distance, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -365,8 +362,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1000.0_f64.powi(2), unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Distance, 2.0)], unit);
+            assert_is_close(1000.0_f64.powi(2), unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Distance, 2.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -382,8 +379,8 @@ mod test {
 
             // check sized unit
             // Hz has magnitude 2π, so GHz = 1e9 * 2π
-            assert_is_close!(1e9 * (2.0 * PI), unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, -1.0)], unit);
+            assert_is_close(1e9 * (2.0 * PI), unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, -1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -399,8 +396,8 @@ mod test {
 
             // check sized unit
             // Hz has magnitude 2π, so kHz = 1e3 * 2π
-            assert_is_close!(1e3 * (2.0 * PI), unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, -1.0)], unit);
+            assert_is_close(1e3 * (2.0 * PI), unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, -1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -416,8 +413,8 @@ mod test {
 
             // check sized unit
             // Hz has magnitude 2π, so MHz = 1e6 * 2π
-            assert_is_close!(1e6 * (2.0 * PI), unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, -1.0)], unit);
+            assert_is_close(1e6 * (2.0 * PI), unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, -1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -432,8 +429,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1e-6, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert_is_close(1e-6, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -448,16 +445,13 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
                     (Dimension::Current, -1.0)
-                ],
-                unit
-            );
+                ], &unit);
             assert!(!unit.is_db);
         }
 
@@ -472,16 +466,13 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(0.001, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [
+            assert_is_close(0.001, unit.magnitude);
+            assert_units_dimensionally_eq([
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
                     (Dimension::Current, -1.0)
-                ],
-                unit
-            );
+                ], &unit);
             assert!(!unit.is_db);
         }
 
@@ -496,16 +487,13 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
                     (Dimension::Current, -2.0)
-                ],
-                unit
-            );
+                ], &unit);
             assert!(!unit.is_db);
         }
 
@@ -520,15 +508,12 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0)
-                ],
-                unit
-            );
+                ], &unit);
             assert!(!unit.is_db);
         }
 
@@ -546,8 +531,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Mass, 1.0), (Dimension::Time, -3.0)], unit);
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Mass, 1.0), (Dimension::Time, -3.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -562,8 +547,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Temperature, 1.0)], unit);
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Temperature, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -578,8 +563,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Current, 1.0)], unit);
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Current, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -595,11 +580,8 @@ mod test {
 
             // check sized unit
             // mAh = 0.001 A * 3600 s = 3.6 A*s
-            assert_is_close!(3.6, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [(Dimension::Current, 1.0), (Dimension::Time, 1.0)],
-                unit
-            );
+            assert_is_close(3.6, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Current, 1.0), (Dimension::Time, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -614,15 +596,12 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -2.0)
-                ],
-                unit
-            );
+                ], &unit);
             assert!(!unit.is_db);
         }
 
@@ -638,8 +617,8 @@ mod test {
 
             // check sized unit
             // hr = 3600 s
-            assert_is_close!(3600.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert_is_close(3600.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -655,8 +634,8 @@ mod test {
 
             // check sized unit
             // min = 60 s
-            assert_is_close!(60.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, 1.0)], unit);
+            assert_is_close(60.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -672,8 +651,8 @@ mod test {
 
             // check sized unit
             // rpm has magnitude 2π/60 (radians per second)
-            assert_is_close!(2.0 * PI / 60.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Time, -1.0)], unit);
+            assert_is_close(2.0 * PI / 60.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Time, -1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -689,8 +668,8 @@ mod test {
 
             // check sized unit
             // deg is dimensionless with magnitude π/180 (conversion to radians)
-            assert_is_close!(PI / 180.0, unit.magnitude);
-            assert_units_dimensionally_eq!([], unit);
+            assert_is_close(PI / 180.0, unit.magnitude);
+            assert_units_dimensionally_eq([], &unit);
             assert!(!unit.is_db);
         }
 
@@ -706,8 +685,8 @@ mod test {
 
             // check sized unit
             // % is dimensionless with magnitude 0.01
-            assert_is_close!(0.01, unit.magnitude);
-            assert_units_dimensionally_eq!([], unit);
+            assert_is_close(0.01, unit.magnitude);
+            assert_units_dimensionally_eq([], &unit);
             assert!(!unit.is_db);
         }
 
@@ -723,11 +702,8 @@ mod test {
 
             // check sized unit
             // Mbps = 1e6 * bps, and bps has Information*Time^-1 dimension
-            assert_is_close!(1e6, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [(Dimension::Information, 1.0), (Dimension::Time, -1.0)],
-                unit
-            );
+            assert_is_close(1e6, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Information, 1.0), (Dimension::Time, -1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -743,8 +719,8 @@ mod test {
 
             // check sized unit
             // B has magnitude 8 (bits), so kB = 1000 * 8 = 8000 bits
-            assert_is_close!(8000.0, unit.magnitude);
-            assert_units_dimensionally_eq!([(Dimension::Information, 1.0)], unit);
+            assert_is_close(8000.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Information, 1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -766,16 +742,13 @@ mod test {
 
             // check sized unit
             // kg is the base unit (magnitude 1), not g
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([
                     (Dimension::Distance, 2.0),
                     (Dimension::Mass, 1.0),
                     (Dimension::Time, -2.0),
                     (Dimension::Temperature, -1.0)
-                ],
-                unit
-            );
+                ], &unit);
             assert!(!unit.is_db);
         }
 
@@ -793,11 +766,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [(Dimension::Distance, 1.0), (Dimension::Time, -1.0)],
-                unit
-            );
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Distance, 1.0), (Dimension::Time, -1.0)], &unit);
             assert!(!unit.is_db);
         }
 
@@ -815,11 +785,8 @@ mod test {
             let (unit, _unit_span) = eval_unit(&ir_unit, &context);
 
             // check sized unit
-            assert_is_close!(1.0, unit.magnitude);
-            assert_units_dimensionally_eq!(
-                [(Dimension::Distance, 1.0), (Dimension::Time, -2.0)],
-                unit
-            );
+            assert_is_close(1.0, unit.magnitude);
+            assert_units_dimensionally_eq([(Dimension::Distance, 1.0), (Dimension::Time, -2.0)], &unit);
             assert!(!unit.is_db);
         }
     }
@@ -1089,7 +1056,7 @@ mod test {
             let (hertz_unit, _) = eval_unit(&hertz_unit, &context);
             let (per_second_unit, _) = eval_unit(&per_second_unit, &context);
 
-            assert_is_close!(per_second_unit.magnitude, hertz_unit.magnitude / (2.0 * PI));
+            assert_is_close(per_second_unit.magnitude, hertz_unit.magnitude / (2.0 * PI));
             assert!(hertz_unit.dimensionally_eq(&per_second_unit));
             assert!(!hertz_unit.is_db);
             assert!(!per_second_unit.is_db);

@@ -967,7 +967,7 @@ mod tests {
         };
 
         // check the value
-        assert_is_close!(1.0, value);
+        assert_is_close(1.0, value);
     }
 
     #[test]
@@ -1000,11 +1000,11 @@ mod tests {
         };
 
         // check the value
-        assert_is_close!(1.0, value);
+        assert_is_close(1.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1039,10 +1039,10 @@ mod tests {
 
         // check the value
         // 1.0 km = 1000.0 m
-        assert_is_close!(1000.0, value);
+        assert_is_close(1000.0, value);
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1000.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1000.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1080,11 +1080,11 @@ mod tests {
 
         // check the value
         // 1.0 km/hr = 1000.0 m / 3600.0 s = 0.277777... m/s
-        assert_is_close!(1000.0 / 3600.0, value);
+        assert_is_close(1000.0 / 3600.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1000.0 / 3600.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1000.0 / 3600.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1119,11 +1119,11 @@ mod tests {
 
         // check the value
         // 1.0 dB = 10^(1.0/10.0) = 10^0.1 = 1.258925...
-        assert_is_close!(10.0_f64.powf(0.1), value);
+        assert_is_close(10.0_f64.powf(0.1), value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(unit.is_db);
     }
 
@@ -1161,11 +1161,11 @@ mod tests {
         };
 
         // 1.0 dBW = 10^(1.0/10.0) = 10^0.1 = 1.258925...
-        assert_is_close!(10.0_f64.powf(0.1), value);
+        assert_is_close(10.0_f64.powf(0.1), value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(unit.is_db);
     }
 
@@ -1218,11 +1218,11 @@ mod tests {
 
         // x + y = 1.0 m + 1000.0 m = 1001.0 m
         // The value is stored in base units (meters)
-        assert_is_close!(1001.0, value);
+        assert_is_close(1001.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1000.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1000.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1283,11 +1283,11 @@ mod tests {
 
         // x + y = 1.0 N + 1.0 N = 2.0 N
         // The value is stored in base units
-        assert_is_close!(2.0, value);
+        assert_is_close(2.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1345,11 +1345,11 @@ mod tests {
         // x = 1.0 dBW = 10^(1.0/10.0) = 10^0.1 = 1.258925... W
         // y = 1.0 W
         // x + y = 1.258925... W + 1.0 W = 2.258925... W
-        assert_is_close!(10.0_f64.powf(0.1) + 1.0, value);
+        assert_is_close(10.0_f64.powf(0.1) + 1.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1398,11 +1398,11 @@ mod tests {
         };
 
         // y = x^2 = (1.0 W)^2 = 1.0 W^2
-        assert_is_close!(1.0, value);
+        assert_is_close(1.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1454,11 +1454,11 @@ mod tests {
         };
 
         // z = x * y = 3.0 m * 2.0 m = 6.0 m^2
-        assert_is_close!(6.0, value);
+        assert_is_close(6.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1510,11 +1510,11 @@ mod tests {
         };
 
         // z = x / y = 6.0 m^2 / 2.0 m = 3.0 m
-        assert_is_close!(3.0, value);
+        assert_is_close(3.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1571,11 +1571,11 @@ mod tests {
 
         // z = x // y = 6.0 m // 2.0 m = 3.0
         // For scalars, escaped division behaves the same as regular division
-        assert_is_close!(3.0, value);
+        assert_is_close(3.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1629,11 +1629,11 @@ mod tests {
 
         // z = x -- y = 6.0 m -- 2.0 m = 4.0 m
         // For scalars, escaped subtraction behaves the same as regular subtraction
-        assert_is_close!(4.0, value);
+        assert_is_close(4.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 
@@ -1685,11 +1685,11 @@ mod tests {
         };
 
         // z = x % y = 7.0 m % 3.0 m = 1.0 m
-        assert_is_close!(1.0, value);
+        assert_is_close(1.0, value);
 
         // check the unit
-        assert_units_dimensionally_eq!(expected_dimensions, unit);
-        assert_is_close!(1.0, unit.magnitude);
+        assert_units_dimensionally_eq(expected_dimensions, unit);
+        assert_is_close(1.0, unit.magnitude);
         assert!(!unit.is_db);
     }
 

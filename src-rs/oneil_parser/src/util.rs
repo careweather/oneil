@@ -58,17 +58,22 @@ impl<'a, O, E, P> Parser<'a, O, E> for P where P: NomParser<InputSpan<'a>, Outpu
 
 #[cfg(test)]
 pub mod test {
-    macro_rules! assert_node_contains {
-        ($node:expr, $value:expr, start_offset: $start_offset:expr, end_offset: $end_offset:expr) => {
-            use oneil_ast::Node;
+    use oneil_ast::Node;
 
-            let node: &Node<_> = $node;
-
-            assert_eq!(**node, $value);
-            assert_eq!(node.span().start().offset, $start_offset);
-            assert_eq!(node.span().end().offset, $end_offset);
-        };
+    /// Asserts that a node contains the expected value and span offsets.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node value or span offsets do not match.
+    #[track_caller]
+    pub fn assert_node_contains<T: PartialEq + std::fmt::Debug>(
+        node: &Node<T>,
+        value: &T,
+        start_offset: usize,
+        end_offset: usize,
+    ) {
+        assert_eq!(&**node, value);
+        assert_eq!(node.span().start().offset, start_offset);
+        assert_eq!(node.span().end().offset, end_offset);
     }
-
-    pub(crate) use assert_node_contains;
 }
