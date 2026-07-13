@@ -181,7 +181,7 @@ fn get_piecewise_result<'a, E: ExternalEvaluationContext>(
 
     // then, check if there are multiple matching branches
     if matching_branches.len() > 1 {
-        let matching_branche_spans = matching_branches
+        let matching_branch_spans = matching_branches
             .into_iter()
             .map(|(_, _, if_expr_span)| if_expr_span.clone())
             .collect();
@@ -189,7 +189,7 @@ fn get_piecewise_result<'a, E: ExternalEvaluationContext>(
         return Err(vec![EvalError::MultiplePiecewiseBranchesMatch {
             param_ident,
             param_ident_span,
-            matching_branche_spans,
+            matching_branch_spans,
         }]);
     }
 
@@ -2028,9 +2028,9 @@ mod tests {
                 &errors[0],
                 EvalError::MultiplePiecewiseBranchesMatch {
                     param_ident,
-                    matching_branche_spans,
+                    matching_branch_spans,
                     ..
-                } if param_ident.as_str() == "x" && matching_branche_spans.len() == 2
+                } if param_ident.as_str() == "x" && matching_branch_spans.len() == 2
             ),
             "expected MultiplePiecewiseBranchesMatch with 2 spans, got {:?}",
             errors[0]

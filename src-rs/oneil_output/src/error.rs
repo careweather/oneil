@@ -417,7 +417,7 @@ pub enum EvalError {
         /// The source span of the parameter identifier.
         param_ident_span: Span,
         /// The source spans of all matching branch conditions.
-        matching_branche_spans: Vec<Span>,
+        matching_branch_spans: Vec<Span>,
     },
     /// An error indicating that no piecewise branch matches for a parameter.
     NoPiecewiseBranchMatch {
@@ -794,13 +794,13 @@ impl fmt::Display for EvalError {
             Self::MultiplePiecewiseBranchesMatch {
                 param_ident,
                 param_ident_span: _,
-                matching_branche_spans,
+                matching_branch_spans,
             } => {
                 let param_ident = param_ident.as_str();
                 write!(
                     f,
                     "parameter `{param_ident}` has {} matching piecewise branches",
-                    matching_branche_spans.len()
+                    matching_branch_spans.len()
                 )
             }
             Self::NoPiecewiseBranchMatch {
@@ -1078,7 +1078,7 @@ impl AsOneilDiagnostic for EvalError {
             | Self::MultiplePiecewiseBranchesMatch {
                 param_ident: _,
                 param_ident_span: location_span,
-                matching_branche_spans: _,
+                matching_branch_spans: _,
             }
             | Self::NoPiecewiseBranchMatch {
                 param_ident: _,
@@ -1329,7 +1329,7 @@ impl AsOneilDiagnostic for EvalError {
             Self::MultiplePiecewiseBranchesMatch {
                 param_ident: _,
                 param_ident_span: _,
-                matching_branche_spans: _,
+                matching_branch_spans: _,
             } => Vec::new(),
             Self::NoPiecewiseBranchMatch {
                 param_ident: _,
@@ -1609,8 +1609,8 @@ impl AsOneilDiagnostic for EvalError {
             Self::MultiplePiecewiseBranchesMatch {
                 param_ident: _,
                 param_ident_span: _,
-                matching_branche_spans,
-            } => matching_branche_spans
+                matching_branch_spans,
+            } => matching_branch_spans
                 .iter()
                 .map(|branch_span| {
                     (
