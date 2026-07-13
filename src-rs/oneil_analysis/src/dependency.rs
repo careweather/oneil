@@ -547,3 +547,558 @@ fn resolve_external_instance_key(
 
     Some(current_key)
 }
+
+#[cfg(test)]
+mod tests {
+    use indexmap::IndexMap;
+    use oneil_frontend::ReferenceImport;
+    use oneil_ir as ir;
+    use oneil_output::Value;
+    use oneil_shared::{
+        EvalInstanceKey,
+        span::Span,
+        symbols::{BuiltinValueName, ParameterName, ReferenceName, TestIndex},
+    };
+
+    use super::{get_dependency_tree, get_reference_tree};
+    use crate::{
+        output::{DependencyName, ReferenceTreeValue, Tree, error::GetValueError},
+        test_context::{
+            TestAnalysisContext, evaluated_parameter, evaluated_test_failed, evaluated_test_passed,
+            instanced_model, ir_parameter, ir_test, test_model_path,
+        },
+    };
+
+    /// Asserts that a tree-errors collection is empty.
+    #[track_caller]
+    fn assert_no_tree_errors(errors: &crate::output::error::TreeErrors) {
+        assert!(
+            errors.model_paths().next().is_none(),
+            "expected no tree errors, got {errors:?}"
+        );
+    }
+
+    /// Returns the dependency names of direct children, in tree order.
+    fn child_dependency_names(
+        tree: &Tree<crate::output::DependencyTreeValue>,
+    ) -> Vec<&DependencyName> {
+        tree.children()
+            .iter()
+            .map(|child| &child.value().dependency_name)
+            .collect()
+    }
+
+    /// Builds dependencies that name same-model parameters.
+    fn deps_on_parameters(names: &[&str]) -> ir::Dependencies {
+        let mut deps = ir::Dependencies::new();
+        for name in names {
+            deps.insert_parameter(ParameterName::from(*name), Span::synthetic());
+        }
+        deps
+    }
+
+    /// Builds dependencies that name a single builtin.
+    fn deps_on_builtin(name: &str) -> ir::Dependencies {
+        let mut deps = ir::Dependencies::new();
+        deps.insert_builtin(BuiltinValueName::from(name), Span::synthetic());
+        deps
+    }
+
+    /// Builds dependencies that name one external `(reference, parameter)`.
+    fn deps_on_external(reference: &str, parameter: &str) -> ir::Dependencies {
+        let mut deps = ir::Dependencies::new();
+        deps.insert_external(
+            ReferenceName::from(reference),
+            ParameterName::from(parameter),
+            Span::synthetic(),
+        );
+        deps
+    }
+
+    #[test]
+    fn dependency_tree_leaf_has_no_children() {
+        let path = test_model_path("leaf");
+        let key = EvalInstanceKey::root(path.clone());
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, IndexMap::new(), IndexMap::new()),
+        );
+        context.insert_evaluated_parameter(&key, evaluated_parameter("x", 1.0));
+
+        let (tree, errors) = get_dependency_tree(&path, &ParameterName::from("x"), &mut context);
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        assert_eq!(
+            tree.value().dependency_name,
+            DependencyName::Parameter(ParameterName::from("x"))
+        );
+        assert_eq!(tree.value().parameter_value, Value::from(1.0));
+        assert!(tree.children().is_empty());
+    }
+
+    #[test]
+    fn dependency_tree_includes_parameter_and_builtin_children() {
+        let path = test_model_path("deps");
+        let key = EvalInstanceKey::root(path.clone());
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+        parameters.insert(
+            ParameterName::from("y"),
+            ir_parameter("y", {
+                let mut deps = deps_on_parameters(&["x"]);
+                deps.extend(deps_on_builtin("pi"));
+                deps
+            }),
+        );
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, IndexMap::new(), IndexMap::new()),
+        );
+        context.insert_evaluated_parameter(&key, evaluated_parameter("x", 2.0));
+        context.insert_evaluated_parameter(&key, evaluated_parameter("y", 5.0));
+        context.insert_builtin(
+            BuiltinValueName::from("pi"),
+            Value::from(std::f64::consts::PI),
+        );
+
+        let (tree, errors) = get_dependency_tree(&path, &ParameterName::from("y"), &mut context);
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        assert_eq!(
+            tree.value().dependency_name,
+            DependencyName::Parameter(ParameterName::from("y"))
+        );
+
+        let child_names = child_dependency_names(&tree);
+        assert_eq!(
+            child_names,
+            vec![
+                &DependencyName::Builtin(BuiltinValueName::from("pi")),
+                &DependencyName::Parameter(ParameterName::from("x")),
+            ]
+        );
+
+        let builtin_child = &tree.children()[0];
+        assert_eq!(
+            builtin_child.value().parameter_value,
+            Value::from(std::f64::consts::PI)
+        );
+        assert!(builtin_child.children().is_empty());
+        assert!(builtin_child.value().display_info.is_none());
+
+        let param_child = &tree.children()[1];
+        assert_eq!(param_child.value().parameter_value, Value::from(2.0));
+        assert!(param_child.children().is_empty());
+    }
+
+    #[test]
+    fn dependency_tree_nests_transitive_parameter_dependencies() {
+        let path = test_model_path("chain");
+        let key = EvalInstanceKey::root(path.clone());
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("a"),
+            ir_parameter("a", ir::Dependencies::new()),
+        );
+        parameters.insert(
+            ParameterName::from("b"),
+            ir_parameter("b", deps_on_parameters(&["a"])),
+        );
+        parameters.insert(
+            ParameterName::from("c"),
+            ir_parameter("c", deps_on_parameters(&["b"])),
+        );
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, IndexMap::new(), IndexMap::new()),
+        );
+        context.insert_evaluated_parameter(&key, evaluated_parameter("a", 1.0));
+        context.insert_evaluated_parameter(&key, evaluated_parameter("b", 2.0));
+        context.insert_evaluated_parameter(&key, evaluated_parameter("c", 3.0));
+
+        let (tree, errors) = get_dependency_tree(&path, &ParameterName::from("c"), &mut context);
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        assert_eq!(
+            child_dependency_names(&tree),
+            vec![&DependencyName::Parameter(ParameterName::from("b"))]
+        );
+
+        let b = &tree.children()[0];
+        assert_eq!(
+            child_dependency_names(b),
+            vec![&DependencyName::Parameter(ParameterName::from("a"))]
+        );
+        assert!(b.children()[0].children().is_empty());
+    }
+
+    #[test]
+    fn dependency_tree_includes_external_children() {
+        let root_path = test_model_path("root");
+        let other_path = test_model_path("other");
+        let root_key = EvalInstanceKey::root(root_path.clone());
+        let other_key = EvalInstanceKey::root(other_path.clone());
+
+        let mut root_parameters = IndexMap::new();
+        root_parameters.insert(
+            ParameterName::from("y"),
+            ir_parameter("y", deps_on_external("other", "x")),
+        );
+
+        let mut other_parameters = IndexMap::new();
+        other_parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+
+        let mut references = IndexMap::new();
+        references.insert(
+            ReferenceName::from("other"),
+            ReferenceImport::new(
+                ReferenceName::from("other"),
+                Span::synthetic(),
+                None,
+                None,
+                other_path.clone(),
+            ),
+        );
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            root_key.clone(),
+            instanced_model(&root_path, root_parameters, IndexMap::new(), references),
+        );
+        context.insert_model_ir(
+            other_key.clone(),
+            instanced_model(
+                &other_path,
+                other_parameters,
+                IndexMap::new(),
+                IndexMap::new(),
+            ),
+        );
+        context.insert_evaluated_parameter(&root_key, evaluated_parameter("y", 10.0));
+        context.insert_evaluated_parameter(&other_key, evaluated_parameter("x", 4.0));
+
+        let (tree, errors) =
+            get_dependency_tree(&root_path, &ParameterName::from("y"), &mut context);
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        assert_eq!(
+            child_dependency_names(&tree),
+            vec![&DependencyName::External(
+                ReferenceName::from("other"),
+                ParameterName::from("x"),
+            )]
+        );
+
+        let external = &tree.children()[0];
+        assert_eq!(external.value().parameter_value, Value::from(4.0));
+        assert!(external.children().is_empty());
+    }
+
+    #[test]
+    fn dependency_tree_missing_parameter_returns_none() {
+        let path = test_model_path("missing");
+        let key = EvalInstanceKey::root(path.clone());
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key,
+            instanced_model(&path, IndexMap::new(), IndexMap::new(), IndexMap::new()),
+        );
+
+        let (tree, errors) =
+            get_dependency_tree(&path, &ParameterName::from("absent"), &mut context);
+
+        assert!(tree.is_none());
+        assert_no_tree_errors(&errors);
+    }
+
+    #[test]
+    fn dependency_tree_parameter_error_is_reported() {
+        let path = test_model_path("err");
+        let key = EvalInstanceKey::root(path.clone());
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, IndexMap::new(), IndexMap::new()),
+        );
+        context.insert_parameter_error(&key, ParameterName::from("x"), GetValueError::Parameter);
+
+        let (tree, errors) = get_dependency_tree(&path, &ParameterName::from("x"), &mut context);
+
+        assert!(tree.is_none());
+        assert_eq!(errors.model_paths().collect::<Vec<_>>(), vec![&path]);
+    }
+
+    #[test]
+    fn reference_tree_leaf_has_no_children() {
+        let path = test_model_path("ref_leaf");
+        let key = EvalInstanceKey::root(path.clone());
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, IndexMap::new(), IndexMap::new()),
+        );
+        context.insert_evaluated_parameter(&key, evaluated_parameter("x", 1.0));
+
+        let (tree, errors) = get_reference_tree(&mut context, &path, &ParameterName::from("x"));
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        match tree.value() {
+            ReferenceTreeValue::Parameter {
+                parameter_name,
+                parameter_value,
+                ..
+            } => {
+                assert_eq!(*parameter_name, ParameterName::from("x"));
+                assert_eq!(*parameter_value, Value::from(1.0));
+            }
+            ReferenceTreeValue::Test { .. } => panic!("expected parameter node"),
+        }
+        assert!(tree.children().is_empty());
+    }
+
+    #[test]
+    fn reference_tree_includes_dependent_parameters() {
+        let path = test_model_path("ref_chain");
+        let key = EvalInstanceKey::root(path.clone());
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("a"),
+            ir_parameter("a", ir::Dependencies::new()),
+        );
+        parameters.insert(
+            ParameterName::from("b"),
+            ir_parameter("b", deps_on_parameters(&["a"])),
+        );
+        parameters.insert(
+            ParameterName::from("c"),
+            ir_parameter("c", deps_on_parameters(&["b"])),
+        );
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, IndexMap::new(), IndexMap::new()),
+        );
+        context.insert_evaluated_parameter(&key, evaluated_parameter("a", 1.0));
+        context.insert_evaluated_parameter(&key, evaluated_parameter("b", 2.0));
+        context.insert_evaluated_parameter(&key, evaluated_parameter("c", 3.0));
+
+        let (tree, errors) = get_reference_tree(&mut context, &path, &ParameterName::from("a"));
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        assert_eq!(tree.children().len(), 1);
+
+        let b = &tree.children()[0];
+        match b.value() {
+            ReferenceTreeValue::Parameter {
+                parameter_name,
+                parameter_value,
+                ..
+            } => {
+                assert_eq!(*parameter_name, ParameterName::from("b"));
+                assert_eq!(*parameter_value, Value::from(2.0));
+            }
+            ReferenceTreeValue::Test { .. } => panic!("expected parameter node"),
+        }
+
+        assert_eq!(b.children().len(), 1);
+        match b.children()[0].value() {
+            ReferenceTreeValue::Parameter {
+                parameter_name,
+                parameter_value,
+                ..
+            } => {
+                assert_eq!(*parameter_name, ParameterName::from("c"));
+                assert_eq!(*parameter_value, Value::from(3.0));
+            }
+            ReferenceTreeValue::Test { .. } => panic!("expected parameter node"),
+        }
+    }
+
+    #[test]
+    fn reference_tree_includes_tests_that_depend_on_parameter() {
+        let path = test_model_path("ref_test");
+        let key = EvalInstanceKey::root(path.clone());
+        let test_index = TestIndex::new(0);
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+
+        let mut tests = IndexMap::new();
+        tests.insert(test_index, ir_test(deps_on_parameters(&["x"])));
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, tests, IndexMap::new()),
+        );
+        context.insert_evaluated_parameter(&key, evaluated_parameter("x", 1.0));
+        context.insert_evaluated_test(&key, test_index, evaluated_test_passed());
+
+        let (tree, errors) = get_reference_tree(&mut context, &path, &ParameterName::from("x"));
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        assert_eq!(tree.children().len(), 1);
+        match tree.children()[0].value() {
+            ReferenceTreeValue::Test {
+                test_index: index,
+                test_passed,
+                model_path,
+                ..
+            } => {
+                assert_eq!(*index, test_index);
+                assert!(*test_passed);
+                assert_eq!(*model_path, path);
+            }
+            ReferenceTreeValue::Parameter { .. } => panic!("expected test node"),
+        }
+    }
+
+    #[test]
+    fn reference_tree_includes_external_parameter_referees() {
+        let root_path = test_model_path("ref_root");
+        let other_path = test_model_path("ref_other");
+        let root_key = EvalInstanceKey::root(root_path.clone());
+        let other_key = EvalInstanceKey::root(other_path.clone());
+
+        let mut root_parameters = IndexMap::new();
+        root_parameters.insert(
+            ParameterName::from("y"),
+            ir_parameter("y", deps_on_external("other", "x")),
+        );
+
+        let mut other_parameters = IndexMap::new();
+        other_parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+
+        let mut references = IndexMap::new();
+        references.insert(
+            ReferenceName::from("other"),
+            ReferenceImport::new(
+                ReferenceName::from("other"),
+                Span::synthetic(),
+                None,
+                None,
+                other_path.clone(),
+            ),
+        );
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            root_key.clone(),
+            instanced_model(&root_path, root_parameters, IndexMap::new(), references),
+        );
+        context.insert_model_ir(
+            other_key.clone(),
+            instanced_model(
+                &other_path,
+                other_parameters,
+                IndexMap::new(),
+                IndexMap::new(),
+            ),
+        );
+        context.insert_evaluated_parameter(&root_key, evaluated_parameter("y", 10.0));
+        context.insert_evaluated_parameter(&other_key, evaluated_parameter("x", 4.0));
+
+        let (tree, errors) =
+            get_reference_tree(&mut context, &other_path, &ParameterName::from("x"));
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        assert_eq!(tree.children().len(), 1);
+        match tree.children()[0].value() {
+            ReferenceTreeValue::Parameter {
+                model_path,
+                parameter_name,
+                parameter_value,
+                ..
+            } => {
+                assert_eq!(*model_path, root_path);
+                assert_eq!(*parameter_name, ParameterName::from("y"));
+                assert_eq!(*parameter_value, Value::from(10.0));
+            }
+            ReferenceTreeValue::Test { .. } => panic!("expected parameter node"),
+        }
+    }
+
+    #[test]
+    fn reference_tree_records_failed_test_status() {
+        let path = test_model_path("failed_test");
+        let key = EvalInstanceKey::root(path.clone());
+        let test_index = TestIndex::new(1);
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+
+        let mut tests = IndexMap::new();
+        tests.insert(test_index, ir_test(deps_on_parameters(&["x"])));
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, tests, IndexMap::new()),
+        );
+        context.insert_evaluated_parameter(&key, evaluated_parameter("x", 1.0));
+        context.insert_evaluated_test(&key, test_index, evaluated_test_failed());
+
+        let (tree, errors) = get_reference_tree(&mut context, &path, &ParameterName::from("x"));
+
+        assert_no_tree_errors(&errors);
+        let tree = tree.expect("tree should exist");
+        match tree.children()[0].value() {
+            ReferenceTreeValue::Test { test_passed, .. } => assert!(!test_passed),
+            ReferenceTreeValue::Parameter { .. } => panic!("expected test node"),
+        }
+    }
+}
