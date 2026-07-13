@@ -16,6 +16,7 @@ use crate::{
     eval_expr, eval_unit,
 };
 
+#[derive(Debug)]
 pub struct EvalParameterResult {
     pub value: Value,
     pub expr_span: Span,
@@ -35,9 +36,6 @@ pub fn eval_parameter<E: ExternalEvaluationContext>(
     parameter: &ir::Parameter,
     context: &mut EvalContext<'_, E>,
 ) -> Result<EvalParameterResult, Vec<EvalError>> {
-    // TODO: this is about where we would use `trace_level`, but I'm not yet sure
-    //       how to handle it.
-
     // Overlay RHSes have already been applied to `parameter.value()` by
     // the design composition step, and any anchor-scope handling is
     // expressed through [`ir::DesignProvenance::anchor_path`] which the
@@ -935,8 +933,8 @@ pub fn get_external_dependency_values<E: ExternalEvaluationContext>(
 
 #[cfg(test)]
 mod tests {
-    use oneil_output::Dimension;
-    use oneil_shared::EvalInstanceKey;
+    use oneil_output::{Dimension, util::is_close};
+    use oneil_shared::{EvalInstanceKey, span::Span, symbols::ParameterName};
 
     use crate::{
         assert_is_close, assert_units_dimensionally_eq,
@@ -1693,6 +1691,445 @@ mod tests {
         assert!(!unit.is_db);
     }
 
+    fn lit_number(value: f64) -> ir::Expr {
+        ir::Expr::literal(Span::synthetic(), ir::Literal::number(value))
+    }
+
+    fn lit_bool(value: bool) -> ir::Expr {
+        ir::Expr::literal(Span::synthetic(), ir::Literal::boolean(value))
+    }
+
+    fn lit_string(value: &str) -> ir::Expr {
+        ir::Expr::literal(Span::synthetic(), ir::Literal::string(value.to_string()))
+    }
+
+    #[test]
+    fn eval_boolean_literal() {
+        let parameter = helper::build_literal_parameter(
+            "flag",
+            ir::Literal::boolean(true),
+            [],
+            ir::Limits::default(),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let result = eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        assert_eq!(result.value, Value::Boolean(true));
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn eval_string_literal() {
+        let parameter = helper::build_literal_parameter(
+            "name",
+            ir::Literal::string("alpha".to_string()),
+            [],
+            ir::Limits::default(),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let result = eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        assert_eq!(result.value, Value::String("alpha".to_string()));
+    }
+
+    #[test]
+    fn eval_boolean_cannot_have_unit() {
+        let parameter = helper::build_literal_parameter(
+            "flag",
+            ir::Literal::boolean(true),
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+            ir::Limits::default(),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(&errors[0], EvalError::BooleanCannotHaveUnit { .. }),
+            "expected BooleanCannotHaveUnit, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_string_cannot_have_unit() {
+        let parameter = helper::build_literal_parameter(
+            "name",
+            ir::Literal::string("alpha".to_string()),
+            [helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+            ir::Limits::default(),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(&errors[0], EvalError::StringCannotHaveUnit { .. }),
+            "expected StringCannotHaveUnit, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_rejects_negative_under_default_limits() {
+        let parameter = helper::build_simple_parameter("x", -1.0, []);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(
+                &errors[0],
+                EvalError::ParameterValueBelowDefaultLimits {
+                    param_value: Value::Number(Number::Scalar(v)),
+                    ..
+                } if (*v - -1.0).abs() < f64::EPSILON
+            ),
+            "expected ParameterValueBelowDefaultLimits for -1, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_within_continuous_limits() {
+        let parameter = helper::build_literal_parameter(
+            "x",
+            ir::Literal::number(5.0),
+            [],
+            ir::Limits::continuous(lit_number(0.0), lit_number(10.0), Span::synthetic()),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let result = eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        let Value::Number(Number::Scalar(v)) = result.value else {
+            panic!("expected scalar, got {:?}", result.value);
+        };
+        assert_is_close(5.0, v);
+    }
+
+    #[test]
+    fn eval_below_continuous_limits() {
+        let parameter = helper::build_literal_parameter(
+            "x",
+            ir::Literal::number(0.0),
+            [],
+            ir::Limits::continuous(lit_number(1.0), lit_number(10.0), Span::synthetic()),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(
+                &errors[0],
+                EvalError::ParameterValueBelowContinuousLimits { .. }
+            ),
+            "expected ParameterValueBelowContinuousLimits, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_above_continuous_limits() {
+        let parameter = helper::build_literal_parameter(
+            "x",
+            ir::Literal::number(11.0),
+            [],
+            ir::Limits::continuous(lit_number(1.0), lit_number(10.0), Span::synthetic()),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(
+                &errors[0],
+                EvalError::ParameterValueAboveContinuousLimits { .. }
+            ),
+            "expected ParameterValueAboveContinuousLimits, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_within_number_discrete_limits() {
+        let parameter = helper::build_literal_parameter(
+            "x",
+            ir::Literal::number(2.0),
+            [],
+            ir::Limits::discrete(
+                vec![lit_number(1.0), lit_number(2.0), lit_number(3.0)],
+                Span::synthetic(),
+            ),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let result = eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        assert_eq!(result.value, Value::Number(Number::Scalar(2.0)));
+    }
+
+    #[test]
+    fn eval_not_in_number_discrete_limits() {
+        let parameter = helper::build_literal_parameter(
+            "x",
+            ir::Literal::number(4.0),
+            [],
+            ir::Limits::discrete(
+                vec![lit_number(1.0), lit_number(2.0), lit_number(3.0)],
+                Span::synthetic(),
+            ),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(
+                &errors[0],
+                EvalError::ParameterValueNotInDiscreteLimits { .. }
+            ),
+            "expected ParameterValueNotInDiscreteLimits, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_within_string_discrete_limits() {
+        let parameter = helper::build_literal_parameter(
+            "mode",
+            ir::Literal::string("b".to_string()),
+            [],
+            ir::Limits::discrete(
+                vec![lit_string("a"), lit_string("b"), lit_string("c")],
+                Span::synthetic(),
+            ),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let result = eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        assert_eq!(result.value, Value::String("b".to_string()));
+    }
+
+    #[test]
+    fn eval_not_in_string_discrete_limits() {
+        let parameter = helper::build_literal_parameter(
+            "mode",
+            ir::Literal::string("z".to_string()),
+            [],
+            ir::Limits::discrete(
+                vec![lit_string("a"), lit_string("b"), lit_string("c")],
+                Span::synthetic(),
+            ),
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(
+                &errors[0],
+                EvalError::ParameterValueNotInDiscreteLimits { .. }
+            ),
+            "expected ParameterValueNotInDiscreteLimits, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_piecewise_selects_matching_branch() {
+        let parameter = helper::build_piecewise_parameter(
+            "x",
+            [
+                (lit_number(1.0), lit_bool(false)),
+                (lit_number(2.0), lit_bool(true)),
+                (lit_number(3.0), lit_bool(false)),
+            ],
+            [],
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let result = eval_parameter(&parameter, &mut context).expect("eval should succeed");
+        assert_eq!(result.value, Value::Number(Number::Scalar(2.0)));
+    }
+
+    #[test]
+    fn eval_piecewise_no_matching_branch() {
+        let parameter = helper::build_piecewise_parameter(
+            "x",
+            [
+                (lit_number(1.0), lit_bool(false)),
+                (lit_number(2.0), lit_bool(false)),
+            ],
+            [],
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(
+                &errors[0],
+                EvalError::NoPiecewiseBranchMatch {
+                    param_ident,
+                    ..
+                } if param_ident.as_str() == "x"
+            ),
+            "expected NoPiecewiseBranchMatch for x, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_piecewise_multiple_matching_branches() {
+        let parameter = helper::build_piecewise_parameter(
+            "x",
+            [
+                (lit_number(1.0), lit_bool(true)),
+                (lit_number(2.0), lit_bool(true)),
+            ],
+            [],
+        );
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(
+                &errors[0],
+                EvalError::MultiplePiecewiseBranchesMatch {
+                    param_ident,
+                    matching_branche_spans,
+                    ..
+                } if param_ident.as_str() == "x" && matching_branche_spans.len() == 2
+            ),
+            "expected MultiplePiecewiseBranchesMatch with 2 spans, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_piecewise_invalid_if_type() {
+        let parameter =
+            helper::build_piecewise_parameter("x", [(lit_number(1.0), lit_number(0.0))], []);
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(
+                &errors[0],
+                EvalError::InvalidIfExpressionType {
+                    found_value: Value::Number(Number::Scalar(v)),
+                    ..
+                } if is_close(*v, 0.0)
+            ),
+            "expected InvalidIfExpressionType, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_measured_value_missing_unit_annotation() {
+        // Seed a measured parameter, then reference it without a unit annotation.
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [(
+                "src",
+                1.0,
+                vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+            )],
+        );
+
+        let parameter = helper::build_parameter_from_expr(
+            "dst",
+            ir::Expr::parameter_variable(
+                Span::synthetic(),
+                Span::synthetic(),
+                ParameterName::from("src"),
+            ),
+            None,
+            ir::Limits::default(),
+        );
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(&errors[0], EvalError::ParameterMissingUnitAnnotation { .. }),
+            "expected ParameterMissingUnitAnnotation, got {:?}",
+            errors[0]
+        );
+    }
+
+    #[test]
+    fn eval_parameter_unit_mismatch() {
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+        helper::setup_context_with_parameters(
+            &mut context,
+            [(
+                "src",
+                1.0,
+                vec![helper::UnitSpec::new(Some("m"), None, false, 1.0)],
+            )],
+        );
+
+        // Annotate as seconds while the value is in meters.
+        let parameter = helper::build_parameter_from_expr(
+            "dst",
+            ir::Expr::parameter_variable(
+                Span::synthetic(),
+                Span::synthetic(),
+                ParameterName::from("src"),
+            ),
+            helper::build_resolved_units([helper::UnitSpec::new(Some("s"), None, false, 1.0)]),
+            ir::Limits::default(),
+        );
+
+        let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
+        assert_eq!(errors.len(), 1);
+        assert!(
+            matches!(&errors[0], EvalError::ParameterUnitMismatch { .. }),
+            "expected ParameterUnitMismatch, got {:?}",
+            errors[0]
+        );
+    }
+
     mod helper {
         use super::*;
 
@@ -1778,7 +2215,7 @@ mod tests {
             }
         }
 
-        fn build_resolved_units(
+        pub fn build_resolved_units(
             units: impl IntoIterator<Item = UnitSpec>,
         ) -> Option<ir::CompositeUnit> {
             let units: Vec<_> = units
@@ -1809,6 +2246,71 @@ mod tests {
             }
         }
 
+        /// Builds a parameter from an explicit value expression, optional units, and limits.
+        pub fn build_parameter_from_expr(
+            name: &str,
+            expr: ir::Expr,
+            units: Option<ir::CompositeUnit>,
+            limits: ir::Limits,
+        ) -> ir::Parameter {
+            ir::Parameter::new(
+                ir::Dependencies::new(),
+                ParameterName::from(name),
+                random_span(),
+                random_span(),
+                ParameterLabel::from(name),
+                None,
+                None,
+                ir::ParameterValue::simple(expr, units),
+                limits,
+                false,
+                ir::TraceLevel::None,
+                None,
+            )
+        }
+
+        /// Builds a parameter with a literal value, optional units, and limits.
+        pub fn build_literal_parameter(
+            name: &str,
+            value: ir::Literal,
+            units: impl IntoIterator<Item = UnitSpec>,
+            limits: ir::Limits,
+        ) -> ir::Parameter {
+            build_parameter_from_expr(
+                name,
+                ir::Expr::literal(random_span(), value),
+                build_resolved_units(units),
+                limits,
+            )
+        }
+
+        /// Builds a piecewise parameter from `(value, condition)` branches.
+        pub fn build_piecewise_parameter(
+            name: &str,
+            branches: impl IntoIterator<Item = (ir::Expr, ir::Expr)>,
+            units: impl IntoIterator<Item = UnitSpec>,
+        ) -> ir::Parameter {
+            let piecewise = branches
+                .into_iter()
+                .map(|(value, condition)| ir::PiecewiseExpr::new(value, condition))
+                .collect();
+
+            ir::Parameter::new(
+                ir::Dependencies::new(),
+                ParameterName::from(name),
+                random_span(),
+                random_span(),
+                ParameterLabel::from(name),
+                None,
+                None,
+                ir::ParameterValue::piecewise(piecewise, build_resolved_units(units)),
+                ir::Limits::default(),
+                false,
+                ir::TraceLevel::None,
+                None,
+            )
+        }
+
         /// Builds a simple parameter with a literal numeric value.
         ///
         /// # Arguments
@@ -1825,26 +2327,11 @@ mod tests {
             value: f64,
             units: impl IntoIterator<Item = UnitSpec>,
         ) -> ir::Parameter {
-            let expr = ir::Expr::Literal {
-                span: random_span(),
-                value: ir::Literal::Number(value),
-            };
-
-            let units = build_resolved_units(units);
-
-            ir::Parameter::new(
-                ir::Dependencies::new(),
-                ParameterName::from(name),
-                random_span(),
-                random_span(),
-                ParameterLabel::from(name),
-                None,
-                None,
-                ir::ParameterValue::simple(expr, units),
+            build_literal_parameter(
+                name,
+                ir::Literal::Number(value),
+                units,
                 ir::Limits::default(),
-                false,
-                ir::TraceLevel::None,
-                None,
             )
         }
 
