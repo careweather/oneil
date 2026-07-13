@@ -885,18 +885,48 @@ impl<'external, E: ExternalEvaluationContext> EvalContext<'external, E> {
         parameter_name: ParameterName,
         result: Result<output::Parameter, Vec<EvalError>>,
     ) {
-        let Some(current_key) = self.eval_scope.last() else {
+        let Some(current_key) = self.eval_scope.last().cloned() else {
             panic!("current model should be set when adding a parameter result");
         };
 
-        let model = self
-            .models
-            .get_mut(current_key)
-            .expect("current model should be created when set");
+        self.add_parameter_result_to(&current_key, parameter_name, result);
+    }
 
+    /// Adds a parameter evaluation result to the model identified by `model_key`.
+    ///
+    /// Creates an empty [`ModelInProgress`] entry if `model_key` has not been seeded yet.
+    #[cfg(test)]
+    pub fn add_parameter_result_to(
+        &mut self,
+        model_key: &EvalInstanceKey,
+        parameter_name: ParameterName,
+        result: Result<output::Parameter, Vec<EvalError>>,
+    ) {
+        let model = self.models.entry(model_key.clone()).or_default();
         model
             .parameters
             .insert(parameter_name, ParamSlot::Done(result));
+    }
+
+    /// Registers a named reference from the current model to `target_key`.
+    ///
+    /// Used by tests that exercise external parameter lookup (`parameter.reference`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if no current model is set.
+    #[cfg(test)]
+    pub fn add_reference(&mut self, reference_name: ReferenceName, target_key: EvalInstanceKey) {
+        let Some(current_key) = self.eval_scope.last().cloned() else {
+            panic!("current model should be set when adding a reference");
+        };
+
+        self.models.entry(target_key.clone()).or_default();
+        let model = self
+            .models
+            .get_mut(&current_key)
+            .expect("current model should be created when set");
+        model.references.insert(reference_name, target_key);
     }
 
     /// Returns whether the evaluated instance at `key` has any evaluation errors.

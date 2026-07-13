@@ -517,18 +517,24 @@ mod tests {
 
     use oneil_ir as ir;
     use oneil_output::{
-        Dimension, DimensionMap, DisplayUnit, EvalError, ExpectedType, Number, NumberType, Value,
-        ValueType,
+        self as output, Dimension, DimensionMap, DisplayUnit, EvalError, ExpectedType, Number,
+        NumberType, Value, ValueType,
     };
     use oneil_shared::{
+        EvalInstanceKey,
+        labels::ParameterLabel,
+        paths::PythonPath,
         span::Span,
-        symbols::{BuiltinValueName, UnitBaseName, UnitName, UnitPrefix},
+        symbols::{
+            BuiltinFunctionName, BuiltinValueName, ParameterName, PyFunctionName, ReferenceName,
+            UnitBaseName, UnitName, UnitPrefix,
+        },
     };
 
     use crate::{
         assert_is_close, assert_units_dimensionally_eq,
         context::EvalContext,
-        test_context::TestExternalContext,
+        test_context::{TestExternalContext, test_model_path},
     };
 
     use super::*;
@@ -728,6 +734,64 @@ mod tests {
     /// Asserts that a value is the given boolean.
     fn assert_boolean(expected: bool, value: &Value) {
         assert_eq!(value, &Value::Boolean(expected));
+    }
+
+    /// Builds a stub evaluated parameter for seeding the eval context.
+    fn parameter_result(name: &str, value: Value) -> output::Parameter {
+        output::Parameter {
+            value,
+            ident: ParameterName::from(name),
+            label: ParameterLabel::from(name),
+            print_level: output::PrintLevel::None,
+            debug_info: None,
+            dependencies: output::DependencySet::default(),
+            expr_span: random_span(),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Builds a parameter variable expression.
+    fn param_var(name: &str) -> ir::Expr {
+        ir::Expr::parameter_variable(
+            random_span(),
+            random_span(),
+            ParameterName::from(name),
+        )
+    }
+
+    /// Builds an external parameter variable expression (`name.reference`).
+    fn external_var(parameter_name: &str, reference_name: &str) -> ir::Expr {
+        ir::Expr::external_variable(
+            random_span(),
+            ReferenceName::from(reference_name),
+            random_span(),
+            ParameterName::from(parameter_name),
+            random_span(),
+        )
+    }
+
+    /// Builds a builtin function call expression.
+    fn builtin_call(name: &str, args: Vec<ir::Expr>) -> ir::Expr {
+        ir::Expr::function_call(
+            random_span(),
+            random_span(),
+            ir::FunctionName::builtin(BuiltinFunctionName::from(name), random_span()),
+            args,
+        )
+    }
+
+    /// Builds an imported function call expression.
+    fn imported_call(python_path: &str, name: &str, args: Vec<ir::Expr>) -> ir::Expr {
+        ir::Expr::function_call(
+            random_span(),
+            random_span(),
+            ir::FunctionName::imported(
+                PythonPath::from_str_no_ext(python_path),
+                PyFunctionName::from(name),
+                random_span(),
+            ),
+            args,
+        )
     }
 
     mod literals {
@@ -1149,6 +1213,229 @@ mod tests {
             );
             let value = eval(&expr).expect("eval should succeed");
             assert_scalar_close(E, &value);
+        }
+
+        #[test]
+        fn eval_parameter_lookup() {
+            let mut external = TestExternalContext::new();
+            let mut context = EvalContext::new(&mut external);
+            let model = EvalInstanceKey::root(test_model_path("test"));
+            context.push_active_model(model);
+            context.add_parameter_result(
+                ParameterName::from("x"),
+                Ok(parameter_result("x", Value::Number(Number::Scalar(10.0)))),
+            );
+
+            let value = eval_expr(&param_var("x"), &mut context)
+                .expect("eval should succeed")
+                .0;
+            assert_scalar_close(10.0, &value);
+        }
+
+        #[test]
+        fn eval_parameter_in_arithmetic() {
+            let mut external = TestExternalContext::new();
+            let mut context = EvalContext::new(&mut external);
+            context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+            context.add_parameter_result(
+                ParameterName::from("x"),
+                Ok(parameter_result("x", Value::Number(Number::Scalar(3.0)))),
+            );
+
+            let expr = binary(ir::BinaryOp::Add, param_var("x"), lit_number(2.0));
+            let value = eval_expr(&expr, &mut context)
+                .expect("eval should succeed")
+                .0;
+            assert_scalar_close(5.0, &value);
+        }
+
+        #[test]
+        fn eval_missing_parameter() {
+            let mut external = TestExternalContext::new();
+            let mut context = EvalContext::new(&mut external);
+            let model = EvalInstanceKey::root(test_model_path("test"));
+            context.push_active_model(model.clone());
+
+            let errors = eval_expr(&param_var("missing"), &mut context)
+                .expect_err("eval should fail");
+            assert_eq!(errors.len(), 1);
+            assert!(
+                matches!(
+                    &errors[0],
+                    EvalError::ParameterHasError {
+                        parameter_name,
+                        parameter_instance_key,
+                        ..
+                    } if parameter_name.as_str() == "missing"
+                        && parameter_instance_key == &model
+                ),
+                "expected ParameterHasError for missing, got {:?}",
+                errors[0]
+            );
+        }
+
+        #[test]
+        fn eval_external_parameter_lookup() {
+            let mut external = TestExternalContext::new();
+            let mut context = EvalContext::new(&mut external);
+
+            let parent = EvalInstanceKey::root(test_model_path("parent"));
+            let child = EvalInstanceKey::root(test_model_path("child"));
+
+            context.add_parameter_result_to(
+                &child,
+                ParameterName::from("y"),
+                Ok(parameter_result("y", Value::Number(Number::Scalar(7.0)))),
+            );
+
+            context.push_active_model(parent);
+            context.add_reference(ReferenceName::from("child"), child);
+
+            let value = eval_expr(&external_var("y", "child"), &mut context)
+                .expect("eval should succeed")
+                .0;
+            assert_scalar_close(7.0, &value);
+        }
+    }
+
+    mod function_calls {
+        use super::*;
+
+        #[test]
+        fn eval_builtin_abs() {
+            let expr = builtin_call("abs", vec![lit_number(-4.0)]);
+            let value = eval(&expr).expect("eval should succeed");
+            assert_scalar_close(4.0, &value);
+        }
+
+        #[test]
+        fn eval_builtin_sqrt() {
+            let expr = builtin_call("sqrt", vec![lit_number(9.0)]);
+            let value = eval(&expr).expect("eval should succeed");
+            assert_scalar_close(3.0, &value);
+        }
+
+        #[test]
+        fn eval_imported_function() {
+            let mut external = TestExternalContext::new();
+            external.register_imported_function(
+                PythonPath::from_str_no_ext("helpers"),
+                PyFunctionName::from("double"),
+                |args| {
+                    let Value::Number(Number::Scalar(n)) = &args[0].0 else {
+                        panic!("expected scalar argument");
+                    };
+                    Ok(Value::Number(Number::Scalar(n * 2.0)))
+                },
+            );
+
+            let mut context = EvalContext::new(&mut external);
+            context.set_evaluation_cache_root(test_model_path("test"));
+
+            let expr = imported_call("helpers", "double", vec![lit_number(21.0)]);
+            let value = eval_expr(&expr, &mut context)
+                .expect("eval should succeed")
+                .0;
+            assert_scalar_close(42.0, &value);
+        }
+
+        #[test]
+        fn eval_imported_function_python_error() {
+            let mut external = TestExternalContext::new();
+            external.register_imported_function(
+                PythonPath::from_str_no_ext("helpers"),
+                PyFunctionName::from("fail"),
+                |_args| {
+                    Err(Box::new(EvalError::PythonEvalError {
+                        function_name: PyFunctionName::from("fail"),
+                        function_call_span: Span::synthetic(),
+                        message: "boom".to_string(),
+                        traceback: Some("traceback".to_string()),
+                    }))
+                },
+            );
+
+            let mut context = EvalContext::new(&mut external);
+            context.set_evaluation_cache_root(test_model_path("test"));
+
+            let expr = imported_call("helpers", "fail", vec![lit_number(1.0)]);
+            let errors = eval_expr(&expr, &mut context).expect_err("eval should fail");
+            assert_eq!(errors.len(), 1);
+            assert!(
+                matches!(
+                    &errors[0],
+                    EvalError::PythonEvalError {
+                        function_name,
+                        message,
+                        traceback: Some(traceback),
+                        ..
+                    } if function_name.as_str() == "fail"
+                        && message == "boom"
+                        && traceback == "traceback"
+                ),
+                "expected PythonEvalError, got {:?}",
+                errors[0]
+            );
+        }
+
+        #[test]
+        fn eval_fallback_uses_right_on_python_error() {
+            let mut external = TestExternalContext::new();
+            external.register_imported_function(
+                PythonPath::from_str_no_ext("helpers"),
+                PyFunctionName::from("fail"),
+                |_args| {
+                    Err(Box::new(EvalError::PythonEvalError {
+                        function_name: PyFunctionName::from("fail"),
+                        function_call_span: Span::synthetic(),
+                        message: "boom".to_string(),
+                        traceback: None,
+                    }))
+                },
+            );
+
+            let mut context = EvalContext::new(&mut external);
+            context.set_evaluation_cache_root(test_model_path("test"));
+
+            let expr = ir::Expr::fallback(
+                random_span(),
+                imported_call("helpers", "fail", vec![lit_number(1.0)]),
+                lit_number(99.0),
+            );
+            let value = eval_expr(&expr, &mut context)
+                .expect("eval should succeed")
+                .0;
+            assert_scalar_close(99.0, &value);
+
+            let warnings = context.take_expression_warnings();
+            assert_eq!(warnings.len(), 1);
+            assert!(
+                matches!(
+                    &warnings[0],
+                    output::EvalWarning::UsedFallback {
+                        function_name,
+                        message,
+                        ..
+                    } if function_name.as_str() == "fail" && message == "boom"
+                ),
+                "expected UsedFallback warning, got {:?}",
+                warnings[0]
+            );
+        }
+
+        #[test]
+        fn eval_function_call_collects_arg_errors() {
+            let expr = builtin_call(
+                "abs",
+                vec![
+                    unary(ir::UnaryOp::Not, lit_number(1.0)),
+                    unary(ir::UnaryOp::Not, lit_number(2.0)),
+                ],
+            );
+            let errors = eval(&expr).expect_err("eval should fail");
+            assert_eq!(errors.len(), 2);
+            assert_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type());
+            assert_invalid_type(&errors[1], &ExpectedType::Boolean, &scalar_number_type());
         }
     }
 
