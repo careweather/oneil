@@ -1134,3 +1134,647 @@ fn best_match<'c>(candidates: &[&'c str], query: &str) -> Option<&'c str> {
         SearchResult::Fuzzy { .. } => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indexmap::IndexMap;
+    use oneil_frontend::{
+        BuiltinLookup, DesignResolutionError, HostLocation, InstanceGraph, InstanceValidationError,
+        InstanceValidationErrorKind, InstancedModel, ReferenceImport, ResolutionErrorCollection,
+    };
+    use oneil_ir as ir;
+    use oneil_shared::{
+        InstancePath, RelativePath,
+        labels::ParameterLabel,
+        paths::ModelPath,
+        span::Span,
+        symbols::{ParameterName, ReferenceName, TestIndex},
+    };
+
+    use super::validate_instance_graph;
+
+    /// Stub builtin lookup for classification.
+    struct StubBuiltins {
+        names: Vec<&'static str>,
+    }
+
+    impl StubBuiltins {
+        fn new(names: &[&'static str]) -> Self {
+            Self {
+                names: names.to_vec(),
+            }
+        }
+    }
+
+    impl BuiltinLookup for StubBuiltins {
+        fn has_builtin_value(&self, name: &str) -> bool {
+            self.names.contains(&name)
+        }
+    }
+
+    /// Synthetic span for IR in these tests.
+    fn span() -> Span {
+        Span::synthetic()
+    }
+
+    /// Model path without an extension.
+    fn model_path(name: &str) -> ModelPath {
+        ModelPath::from_str_no_ext(name)
+    }
+
+    /// Parameter variable expression.
+    fn param_var(name: &str) -> ir::Expr {
+        ir::Expr::parameter_variable(span(), span(), ParameterName::from(name))
+    }
+
+    /// External variable expression (`parameter.reference` in source).
+    fn external_var(parameter: &str, reference: &str) -> ir::Expr {
+        ir::Expr::external_variable(
+            span(),
+            ReferenceName::from(reference),
+            span(),
+            ParameterName::from(parameter),
+            span(),
+        )
+    }
+
+    /// Numeric literal expression.
+    fn lit_number(value: f64) -> ir::Expr {
+        ir::Expr::literal(span(), ir::Literal::number(value))
+    }
+
+    /// IR parameter with the given RHS expression.
+    fn param_with_expr(name: &str, expr: ir::Expr) -> ir::Parameter {
+        ir::Parameter::new(
+            ir::Dependencies::new(),
+            ParameterName::from(name),
+            span(),
+            span(),
+            ParameterLabel::from(name),
+            None,
+            None,
+            ir::ParameterValue::simple(expr, None),
+            ir::Limits::default(),
+            false,
+            ir::TraceLevel::None,
+            None,
+        )
+    }
+
+    /// Independent leaf parameter (`= 0`).
+    fn param_leaf(name: &str) -> ir::Parameter {
+        param_with_expr(name, lit_number(0.0))
+    }
+
+    /// Parameter whose RHS is a bare parameter reference.
+    fn param_depends_on(name: &str, dep: &str) -> ir::Parameter {
+        param_with_expr(name, param_var(dep))
+    }
+
+    /// IR test whose body is the given expression.
+    fn test_with_expr(expr: ir::Expr) -> ir::Test {
+        ir::Test::new(
+            span(),
+            ir::TraceLevel::None,
+            expr,
+            ir::Dependencies::new(),
+            None,
+            None,
+        )
+    }
+
+    /// Cross-file reference import pointing at `path`.
+    fn reference_import(alias: &str, path: &ModelPath) -> ReferenceImport {
+        ReferenceImport::new(
+            ReferenceName::from(alias),
+            span(),
+            None,
+            None,
+            path.clone(),
+        )
+    }
+
+    /// Instantiated model with only parameters.
+    fn model_with_params(
+        path: &ModelPath,
+        parameters: IndexMap<ParameterName, ir::Parameter>,
+    ) -> InstancedModel {
+        InstancedModel::new(
+            path.clone(),
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            parameters,
+            IndexMap::new(),
+            None,
+        )
+    }
+
+    /// Instantiated model with parameters and cross-file references.
+    fn model_with_refs(
+        path: &ModelPath,
+        parameters: IndexMap<ParameterName, ir::Parameter>,
+        references: IndexMap<ReferenceName, ReferenceImport>,
+    ) -> InstancedModel {
+        InstancedModel::new(
+            path.clone(),
+            IndexMap::new(),
+            IndexMap::new(),
+            references,
+            IndexMap::new(),
+            parameters,
+            IndexMap::new(),
+            None,
+        )
+    }
+
+    /// Graph rooted at `root` with an empty reference pool.
+    fn graph_from_root(root: InstancedModel) -> InstanceGraph {
+        let mut graph = InstanceGraph::empty(root.path().clone());
+        *graph.root = root;
+        graph
+    }
+
+    /// Graph with `root` and a single pool entry.
+    fn graph_with_pool(
+        root: InstancedModel,
+        pool_path: ModelPath,
+        pool_model: InstancedModel,
+    ) -> InstanceGraph {
+        let mut graph = graph_from_root(root);
+        graph
+            .reference_pool
+            .insert(pool_path, Box::new(pool_model));
+        graph
+    }
+
+    /// Asserts that validation produced no errors.
+    #[track_caller]
+    fn assert_no_errors(graph: &InstanceGraph) {
+        assert!(
+            graph.validation_errors.is_empty(),
+            "expected no validation errors, got {:?}",
+            graph.validation_errors
+        );
+    }
+
+    /// Returns kinds of all validation errors, in order.
+    fn error_kinds(
+        errors: &[InstanceValidationError],
+    ) -> Vec<&InstanceValidationErrorKind> {
+        errors.iter().map(InstanceValidationError::kind).collect()
+    }
+
+    #[test]
+    fn valid_leaf_model_reports_no_errors() {
+        let path = model_path("ok");
+        let mut parameters = IndexMap::new();
+        parameters.insert(ParameterName::from("x"), param_leaf("x"));
+        parameters.insert(ParameterName::from("y"), param_depends_on("y", "x"));
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_no_errors(&graph);
+    }
+
+    #[test]
+    fn undefined_parameter_is_reported() {
+        let path = model_path("undef");
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("y"),
+            param_depends_on("y", "missing"),
+        );
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 1);
+        let err = &graph.validation_errors[0];
+        assert_eq!(err.host_path, InstancePath::root());
+        assert_eq!(
+            err.host_location,
+            HostLocation::Parameter(ParameterName::from("y"))
+        );
+        let InstanceValidationErrorKind::UndefinedParameter {
+            parameter_name,
+            design_info,
+            ..
+        } = &err.kind
+        else {
+            panic!("expected UndefinedParameter, got {:?}", err.kind);
+        };
+        assert_eq!(parameter_name.as_str(), "missing");
+        assert!(design_info.is_none());
+    }
+
+    #[test]
+    fn undefined_parameter_in_test_is_reported() {
+        let path = model_path("test_undef");
+        let mut tests = IndexMap::new();
+        tests.insert(
+            TestIndex::new(0),
+            test_with_expr(param_var("missing")),
+        );
+
+        let root = InstancedModel::new(
+            path,
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            tests,
+            None,
+        );
+        let mut graph = graph_from_root(root);
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 1);
+        assert_eq!(
+            graph.validation_errors[0].host_location,
+            HostLocation::Test(TestIndex::new(0))
+        );
+        assert!(matches!(
+            graph.validation_errors[0].kind,
+            InstanceValidationErrorKind::UndefinedParameter { .. }
+        ));
+    }
+
+    #[test]
+    fn unknown_parameter_matching_builtin_is_reclassified_not_undefined() {
+        let path = model_path("builtin_ok");
+        // `y = pi` — `pi` is not a host parameter, but classification turns
+        // it into a Builtin before existence checks run.
+        let mut parameters = IndexMap::new();
+        parameters.insert(ParameterName::from("y"), param_depends_on("y", "pi"));
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&["pi"]));
+
+        assert_no_errors(&graph);
+    }
+
+    #[test]
+    fn undefined_reference_is_reported() {
+        let path = model_path("undef_ref");
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("y"),
+            param_with_expr("y", external_var("x", "nosuch")),
+        );
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 1);
+        let InstanceValidationErrorKind::UndefinedReference {
+            reference_name,
+            design_info,
+            ..
+        } = &graph.validation_errors[0].kind
+        else {
+            panic!(
+                "expected UndefinedReference, got {:?}",
+                graph.validation_errors[0].kind
+            );
+        };
+        assert_eq!(reference_name.as_str(), "nosuch");
+        assert!(design_info.is_none());
+    }
+
+    #[test]
+    fn undefined_reference_parameter_is_reported() {
+        let root_path = model_path("consumer");
+        let other_path = model_path("planet");
+
+        let mut other_params = IndexMap::new();
+        other_params.insert(ParameterName::from("mass"), param_leaf("mass"));
+        let other = model_with_params(&other_path, other_params);
+
+        let mut root_params = IndexMap::new();
+        root_params.insert(
+            ParameterName::from("y"),
+            param_with_expr("y", external_var("nosuch", "planet")),
+        );
+        let mut references = IndexMap::new();
+        references.insert(
+            ReferenceName::from("planet"),
+            reference_import("planet", &other_path),
+        );
+        let root = model_with_refs(&root_path, root_params, references);
+
+        let mut graph = graph_with_pool(root, other_path.clone(), other);
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 1);
+        let InstanceValidationErrorKind::UndefinedReferenceParameter {
+            reference_name,
+            parameter_name,
+            target_model,
+            design_info,
+            ..
+        } = &graph.validation_errors[0].kind
+        else {
+            panic!(
+                "expected UndefinedReferenceParameter, got {:?}",
+                graph.validation_errors[0].kind
+            );
+        };
+        assert_eq!(reference_name.as_str(), "planet");
+        assert_eq!(parameter_name.as_str(), "nosuch");
+        assert_eq!(target_model, &other_path);
+        assert!(design_info.is_none());
+    }
+
+    #[test]
+    fn undefined_reference_parameter_suppressed_when_target_has_resolution_errors() {
+        let root_path = model_path("consumer");
+        let other_path = model_path("broken");
+
+        let mut other_params = IndexMap::new();
+        other_params.insert(ParameterName::from("mass"), param_leaf("mass"));
+        let other = model_with_params(&other_path, other_params);
+
+        let mut root_params = IndexMap::new();
+        root_params.insert(
+            ParameterName::from("y"),
+            param_with_expr("y", external_var("nosuch", "broken")),
+        );
+        let mut references = IndexMap::new();
+        references.insert(
+            ReferenceName::from("broken"),
+            reference_import("broken", &other_path),
+        );
+        let root = model_with_refs(&root_path, root_params, references);
+
+        let mut graph = graph_with_pool(root, other_path.clone(), other);
+        let mut resolution_errors = ResolutionErrorCollection::empty();
+        resolution_errors.add_design_resolution_error(DesignResolutionError::new(
+            "file already broken",
+            span(),
+        ));
+        graph
+            .resolution_errors
+            .insert(other_path, resolution_errors);
+
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_no_errors(&graph);
+    }
+
+    #[test]
+    fn reference_has_error_is_reported() {
+        let root_path = model_path("host");
+        let other_path = model_path("other");
+
+        let mut root_params = IndexMap::new();
+        root_params.insert(
+            ParameterName::from("y"),
+            param_with_expr("y", external_var("x", "other")),
+        );
+        let mut references = IndexMap::new();
+        references.insert(
+            ReferenceName::from("other"),
+            reference_import("other", &other_path),
+        );
+        let mut root = model_with_refs(&root_path, root_params, references);
+        root.add_reference_with_error(ReferenceName::from("other"));
+
+        // Pool entry exists so resolution does not fall through to
+        // UndefinedReference; the references_with_errors set short-circuits first.
+        let other = model_with_params(&other_path, IndexMap::new());
+        let mut graph = graph_with_pool(root, other_path, other);
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 1);
+        let InstanceValidationErrorKind::ReferenceHasError {
+            reference_name, ..
+        } = &graph.validation_errors[0].kind
+        else {
+            panic!(
+                "expected ReferenceHasError, got {:?}",
+                graph.validation_errors[0].kind
+            );
+        };
+        assert_eq!(reference_name.as_str(), "other");
+    }
+
+    #[test]
+    fn self_parameter_cycle_is_reported() {
+        let path = model_path("self_cycle");
+        let mut parameters = IndexMap::new();
+        parameters.insert(ParameterName::from("a"), param_depends_on("a", "a"));
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 1);
+        let InstanceValidationErrorKind::ParameterCycle {
+            parameter_name,
+            cycle,
+            design_info,
+            ..
+        } = &graph.validation_errors[0].kind
+        else {
+            panic!(
+                "expected ParameterCycle, got {:?}",
+                graph.validation_errors[0].kind
+            );
+        };
+        assert_eq!(parameter_name.as_str(), "a");
+        assert_eq!(cycle.len(), 1);
+        assert_eq!(cycle[0].parameter_name.as_str(), "a");
+        assert!(design_info.is_none());
+    }
+
+    #[test]
+    fn two_parameter_cycle_emits_one_error_per_member() {
+        let path = model_path("cycle");
+        let mut parameters = IndexMap::new();
+        parameters.insert(ParameterName::from("a"), param_depends_on("a", "b"));
+        parameters.insert(ParameterName::from("b"), param_depends_on("b", "a"));
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 2);
+        for err in &graph.validation_errors {
+            assert!(matches!(
+                err.kind,
+                InstanceValidationErrorKind::ParameterCycle { .. }
+            ));
+        }
+        let names: Vec<_> = graph
+            .validation_errors
+            .iter()
+            .filter_map(|err| match &err.kind {
+                InstanceValidationErrorKind::ParameterCycle {
+                    parameter_name, ..
+                } => Some(parameter_name.as_str()),
+                InstanceValidationErrorKind::UndefinedParameter { .. }
+                | InstanceValidationErrorKind::UndefinedReference { .. }
+                | InstanceValidationErrorKind::UndefinedReferenceParameter { .. }
+                | InstanceValidationErrorKind::ReferenceHasError { .. } => None,
+            })
+            .collect();
+        assert!(names.contains(&"a"));
+        assert!(names.contains(&"b"));
+    }
+
+    #[test]
+    fn parameter_cycle_in_reference_pool_is_detected() {
+        // Pool entries are walked as their own subtrees; a cycle entirely
+        // inside a pool model must still surface ParameterCycle errors.
+        let root_path = model_path("root");
+        let other_path = model_path("other");
+
+        let mut other_params = IndexMap::new();
+        other_params.insert(ParameterName::from("x"), param_depends_on("x", "y"));
+        other_params.insert(ParameterName::from("y"), param_depends_on("y", "x"));
+        let other = model_with_params(&other_path, other_params);
+
+        let mut root_params = IndexMap::new();
+        root_params.insert(ParameterName::from("z"), param_leaf("z"));
+        let mut references = IndexMap::new();
+        references.insert(
+            ReferenceName::from("other"),
+            reference_import("other", &other_path),
+        );
+        let root = model_with_refs(&root_path, root_params, references);
+
+        let mut graph = graph_with_pool(root, other_path, other);
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        let cycle_count = graph
+            .validation_errors
+            .iter()
+            .filter(|err| {
+                matches!(
+                    err.kind,
+                    InstanceValidationErrorKind::ParameterCycle { .. }
+                )
+            })
+            .count();
+        assert_eq!(cycle_count, 2, "pool cycle should yield one error per member");
+    }
+
+    #[test]
+    fn design_provenance_attaches_design_info_to_undefined_parameter() {
+        let path = model_path("host");
+        let design_path = model_path("overlay");
+        let param = param_depends_on("y", "missing").with_design_provenance(ir::DesignProvenance {
+            design_path: design_path.clone(),
+            is_addition: false,
+            assignment_span: span(),
+            anchor_path: RelativePath::self_path(),
+            applied_via: None,
+        });
+        let mut parameters = IndexMap::new();
+        parameters.insert(ParameterName::from("y"), param);
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 1);
+        let InstanceValidationErrorKind::UndefinedParameter {
+            design_info,
+            parameter_name,
+            ..
+        } = &graph.validation_errors[0].kind
+        else {
+            panic!(
+                "expected UndefinedParameter, got {:?}",
+                graph.validation_errors[0].kind
+            );
+        };
+        assert_eq!(parameter_name.as_str(), "missing");
+        let (reported_design, _) = design_info
+            .as_ref()
+            .expect("design_info should be present");
+        assert_eq!(reported_design, &design_path);
+    }
+
+    #[test]
+    fn validation_is_idempotent_and_clears_prior_errors() {
+        let path = model_path("ok");
+        let mut parameters = IndexMap::new();
+        parameters.insert(ParameterName::from("x"), param_leaf("x"));
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        graph.validation_errors.push(InstanceValidationError {
+            host_path: InstancePath::root(),
+            host_location: HostLocation::Parameter(ParameterName::from("stale")),
+            kind: InstanceValidationErrorKind::UndefinedParameter {
+                parameter_name: ParameterName::from("stale"),
+                parameter_span: span(),
+                best_match: None,
+                design_info: None,
+            },
+        });
+
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+        assert_no_errors(&graph);
+
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+        assert_no_errors(&graph);
+    }
+
+    #[test]
+    fn valid_external_reference_reports_no_errors() {
+        let root_path = model_path("consumer");
+        let other_path = model_path("planet");
+
+        let mut other_params = IndexMap::new();
+        other_params.insert(ParameterName::from("mass"), param_leaf("mass"));
+        let other = model_with_params(&other_path, other_params);
+
+        let mut root_params = IndexMap::new();
+        root_params.insert(
+            ParameterName::from("y"),
+            param_with_expr("y", external_var("mass", "planet")),
+        );
+        let mut references = IndexMap::new();
+        references.insert(
+            ReferenceName::from("planet"),
+            reference_import("planet", &other_path),
+        );
+        let root = model_with_refs(&root_path, root_params, references);
+
+        let mut graph = graph_with_pool(root, other_path, other);
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_no_errors(&graph);
+    }
+
+    #[test]
+    fn mixed_undefined_and_cycle_errors_are_both_reported() {
+        // One undefined param and one self-cycle: both should appear.
+        let path = model_path("mixed");
+        let mut parameters = IndexMap::new();
+        parameters.insert(ParameterName::from("a"), param_depends_on("a", "a"));
+        parameters.insert(
+            ParameterName::from("b"),
+            param_depends_on("b", "ghost"),
+        );
+
+        let mut graph = graph_from_root(model_with_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        let kinds = error_kinds(&graph.validation_errors);
+        assert!(
+            kinds
+                .iter()
+                .any(|k| matches!(k, InstanceValidationErrorKind::UndefinedParameter { .. })),
+            "expected UndefinedParameter among {kinds:?}"
+        );
+        assert!(
+            kinds
+                .iter()
+                .any(|k| matches!(k, InstanceValidationErrorKind::ParameterCycle { .. })),
+            "expected ParameterCycle among {kinds:?}"
+        );
+    }
+}
