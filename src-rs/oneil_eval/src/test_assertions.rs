@@ -184,7 +184,10 @@ pub fn assert_measured_scalar_case(
     expected_is_db: bool,
 ) {
     let Value::MeasuredNumber(number) = value else {
-        panic!("{}expected measured number, got {value:?}", case_prefix(case));
+        panic!(
+            "{}expected measured number, got {value:?}",
+            case_prefix(case)
+        );
     };
     let Number::Scalar(actual) = *number.normalized_value().as_number() else {
         panic!(

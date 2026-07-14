@@ -939,7 +939,8 @@ mod tests {
 
     use crate::{
         assert_is_close, assert_param_measured_scalar, assert_param_measured_scalar_case,
-        assert_param_scalar_close_case, context::EvalContext,
+        assert_param_scalar_close_case,
+        context::EvalContext,
         test_context::{TestExternalContext, test_model_path},
         test_fixtures::{
             UnitSpec, build_binary_parameter, build_exponent_parameter, build_literal_parameter,

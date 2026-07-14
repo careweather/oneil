@@ -1,0 +1,6 @@
+# Force depends on a local mass and an external gravity from a referenced planet.
+# Used by analysis snapshot tests for dependency / reference trees and independents.
+reference ../gravity_earth as planet
+
+Mass: m = 10 :kg
+Force: f = m * g.planet :N

@@ -1,0 +1,11 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_dep_tree(\"analysis/force_with_ref.on\", \"f\")"
+---
+dependency tree for `f`
+┌── m = 10 :kg
+│     = 10
+├── g.planet = 9.81 :m/s^2
+│            = 9.81
+f = 98.1 :N
+  = m * g.planet

@@ -77,9 +77,9 @@ pub fn parameter_cycle_member_names(errors: &[InstanceValidationError]) -> Vec<&
     errors
         .iter()
         .filter_map(|err| match &err.kind {
-            InstanceValidationErrorKind::ParameterCycle {
-                parameter_name, ..
-            } => Some(parameter_name.as_str()),
+            InstanceValidationErrorKind::ParameterCycle { parameter_name, .. } => {
+                Some(parameter_name.as_str())
+            }
             InstanceValidationErrorKind::UndefinedParameter { .. }
             | InstanceValidationErrorKind::UndefinedReference { .. }
             | InstanceValidationErrorKind::UndefinedReferenceParameter { .. }

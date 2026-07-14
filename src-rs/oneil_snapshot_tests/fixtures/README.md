@@ -127,7 +127,19 @@ generic contribution diagnostic at `mid.on`'s `apply` span. The root
 also surfaces a generic "submodel `m` has errors" notification at the
 import declaration so the LSP can squiggle there.
 
-## Test count summary (24 tests)
+### `analysis/` — dependency tree, reference tree, independents (6 tests)
+
+Plain-text snapshots of the analysis CLI surfaces (tree topology and
+independents), driven through the runtime APIs rather than ANSI-styled
+stdout:
+
+- `basic/basic.on` — dependency tree of `f`, reference tree of `m`,
+  top-level independents
+- `analysis/force_with_ref.on` — dependency tree with an external
+  `g.planet` edge; reference tree of local `m`; recursive independents
+  across the referenced planet
+
+## Test count summary (42 tests)
 
 | Category                       | Tests |
 |--------------------------------|------:|
@@ -141,4 +153,6 @@ import declaration so the LSP can squiggle there.
 | Anchor scope                   | 2     |
 | Cycles (file, overlay, build)  | 3     |
 | Apply errors (local + chain)   | 4     |
-| **Total**                      | **24**|
+| Analysis (trees / independents)| 6     |
+| Other (designs, python, …)     | 12    |
+| **Total**                      | **42**|

@@ -1,0 +1,11 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_dep_tree(\"basic/basic.on\", \"f\")"
+---
+dependency tree for `f`
+┌── m = 10 :kg
+│     = 10
+├── a = 9.81 :m/s^2
+│     = 9.81
+f = 98.1 :N
+  = m * a

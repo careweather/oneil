@@ -560,7 +560,9 @@ mod tests {
 
     use super::{get_dependency_tree, get_reference_tree};
     use crate::{
-        output::{DependencyName, ReferenceTreeValue, error::GetTestValueError, error::GetValueError},
+        output::{
+            DependencyName, ReferenceTreeValue, error::GetTestValueError, error::GetValueError,
+        },
         test_assertions::{assert_no_tree_errors, child_dependency_names},
         test_context::{TestAnalysisContext, test_model_path},
         test_fixtures::{

@@ -1,0 +1,9 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_ref_tree(\"analysis/force_with_ref.on\", \"m\")"
+---
+reference tree for `m`
+┌── fixtures/analysis/force_with_ref.on f = 98.1 :N
+│                                         = m * g.planet
+fixtures/analysis/force_with_ref.on m = 10 :kg
+                                      = 10

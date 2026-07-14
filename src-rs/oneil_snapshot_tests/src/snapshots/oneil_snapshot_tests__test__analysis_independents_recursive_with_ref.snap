@@ -1,0 +1,8 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_independents(\"analysis/force_with_ref.on\", true)"
+---
+fixtures/analysis/force_with_ref.on:
+m = 10 :kg
+fixtures/analysis/../gravity_earth.on:
+g = 9.81 :m/s^2

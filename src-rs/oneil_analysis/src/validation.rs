@@ -1155,9 +1155,9 @@ mod tests {
             validation_error_kinds,
         },
         test_fixtures::{
-            StubBuiltins, external_var, graph_from_root, graph_with_pool, ir_parameter_depends_on,
-            ir_parameter_expr, ir_parameter_leaf, ir_test_expr, instanced_model,
-            instanced_model_params, instanced_model_with_refs, model_path, param_var,
+            StubBuiltins, external_var, graph_from_root, graph_with_pool, instanced_model,
+            instanced_model_params, instanced_model_with_refs, ir_parameter_depends_on,
+            ir_parameter_expr, ir_parameter_leaf, ir_test_expr, model_path, param_var,
             reference_import, span,
         },
     };
@@ -1167,10 +1167,7 @@ mod tests {
         let path = model_path("ok");
         let mut parameters = IndexMap::new();
         parameters.insert(ParameterName::from("x"), ir_parameter_leaf("x"));
-        parameters.insert(
-            ParameterName::from("y"),
-            ir_parameter_depends_on("y", "x"),
-        );
+        parameters.insert(ParameterName::from("y"), ir_parameter_depends_on("y", "x"));
 
         let mut graph = graph_from_root(instanced_model_params(&path, parameters));
         validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
@@ -1236,10 +1233,7 @@ mod tests {
         // `y = pi` — `pi` is not a host parameter, but classification turns
         // it into a Builtin before existence checks run.
         let mut parameters = IndexMap::new();
-        parameters.insert(
-            ParameterName::from("y"),
-            ir_parameter_depends_on("y", "pi"),
-        );
+        parameters.insert(ParameterName::from("y"), ir_parameter_depends_on("y", "pi"));
 
         let mut graph = graph_from_root(instanced_model_params(&path, parameters));
         validate_instance_graph(&mut graph, &StubBuiltins::new(&["pi"]));
@@ -1342,10 +1336,8 @@ mod tests {
 
         let mut graph = graph_with_pool(root, other_path.clone(), other);
         let mut resolution_errors = ResolutionErrorCollection::empty();
-        resolution_errors.add_design_resolution_error(DesignResolutionError::new(
-            "file already broken",
-            span(),
-        ));
+        resolution_errors
+            .add_design_resolution_error(DesignResolutionError::new("file already broken", span()));
         graph
             .resolution_errors
             .insert(other_path, resolution_errors);
@@ -1380,9 +1372,8 @@ mod tests {
         validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
 
         assert_eq!(graph.validation_errors.len(), 1);
-        let InstanceValidationErrorKind::ReferenceHasError {
-            reference_name, ..
-        } = &graph.validation_errors[0].kind
+        let InstanceValidationErrorKind::ReferenceHasError { reference_name, .. } =
+            &graph.validation_errors[0].kind
         else {
             panic!(
                 "expected ReferenceHasError, got {:?}",
@@ -1396,10 +1387,7 @@ mod tests {
     fn self_parameter_cycle_is_reported() {
         let path = model_path("self_cycle");
         let mut parameters = IndexMap::new();
-        parameters.insert(
-            ParameterName::from("a"),
-            ir_parameter_depends_on("a", "a"),
-        );
+        parameters.insert(ParameterName::from("a"), ir_parameter_depends_on("a", "a"));
 
         let mut graph = graph_from_root(instanced_model_params(&path, parameters));
         validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
@@ -1427,14 +1415,8 @@ mod tests {
     fn two_parameter_cycle_emits_one_error_per_member() {
         let path = model_path("cycle");
         let mut parameters = IndexMap::new();
-        parameters.insert(
-            ParameterName::from("a"),
-            ir_parameter_depends_on("a", "b"),
-        );
-        parameters.insert(
-            ParameterName::from("b"),
-            ir_parameter_depends_on("b", "a"),
-        );
+        parameters.insert(ParameterName::from("a"), ir_parameter_depends_on("a", "b"));
+        parameters.insert(ParameterName::from("b"), ir_parameter_depends_on("b", "a"));
 
         let mut graph = graph_from_root(instanced_model_params(&path, parameters));
         validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
@@ -1455,14 +1437,8 @@ mod tests {
         let other_path = model_path("other");
 
         let mut other_params = IndexMap::new();
-        other_params.insert(
-            ParameterName::from("x"),
-            ir_parameter_depends_on("x", "y"),
-        );
-        other_params.insert(
-            ParameterName::from("y"),
-            ir_parameter_depends_on("y", "x"),
-        );
+        other_params.insert(ParameterName::from("x"), ir_parameter_depends_on("x", "y"));
+        other_params.insert(ParameterName::from("y"), ir_parameter_depends_on("y", "x"));
         let other = instanced_model_params(&other_path, other_params);
 
         let mut root_params = IndexMap::new();
@@ -1480,14 +1456,12 @@ mod tests {
         let cycle_count = graph
             .validation_errors
             .iter()
-            .filter(|err| {
-                matches!(
-                    err.kind,
-                    InstanceValidationErrorKind::ParameterCycle { .. }
-                )
-            })
+            .filter(|err| matches!(err.kind, InstanceValidationErrorKind::ParameterCycle { .. }))
             .count();
-        assert_eq!(cycle_count, 2, "pool cycle should yield one error per member");
+        assert_eq!(
+            cycle_count, 2,
+            "pool cycle should yield one error per member"
+        );
     }
 
     #[test]
@@ -1521,9 +1495,7 @@ mod tests {
             );
         };
         assert_eq!(parameter_name.as_str(), "missing");
-        let (reported_design, _) = design_info
-            .as_ref()
-            .expect("design_info should be present");
+        let (reported_design, _) = design_info.as_ref().expect("design_info should be present");
         assert_eq!(reported_design, &design_path);
     }
 
@@ -1583,10 +1555,7 @@ mod tests {
     fn mixed_undefined_and_cycle_errors_are_both_reported() {
         let path = model_path("mixed");
         let mut parameters = IndexMap::new();
-        parameters.insert(
-            ParameterName::from("a"),
-            ir_parameter_depends_on("a", "a"),
-        );
+        parameters.insert(ParameterName::from("a"), ir_parameter_depends_on("a", "a"));
         parameters.insert(
             ParameterName::from("b"),
             ir_parameter_depends_on("b", "ghost"),

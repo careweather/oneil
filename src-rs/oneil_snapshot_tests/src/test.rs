@@ -8,7 +8,10 @@
 
 use std::path::PathBuf;
 
-use crate::util::run_model_and_format;
+use crate::util::{
+    run_dependency_tree_and_format, run_independents_and_format, run_model_and_format,
+    run_reference_tree_and_format,
+};
 
 fn fixture_path(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -25,6 +28,30 @@ fn manifest_dir() -> PathBuf {
 /// detects it and applies it to the declared target model.
 fn run_fixture(name: &str) -> String {
     run_model_and_format(&fixture_path(name), Some(manifest_dir().as_path()))
+}
+
+fn run_dep_tree(name: &str, parameter: &str) -> String {
+    run_dependency_tree_and_format(
+        &fixture_path(name),
+        parameter,
+        Some(manifest_dir().as_path()),
+    )
+}
+
+fn run_ref_tree(name: &str, parameter: &str) -> String {
+    run_reference_tree_and_format(
+        &fixture_path(name),
+        parameter,
+        Some(manifest_dir().as_path()),
+    )
+}
+
+fn run_independents(name: &str, recursive: bool) -> String {
+    run_independents_and_format(
+        &fixture_path(name),
+        recursive,
+        Some(manifest_dir().as_path()),
+    )
 }
 
 // =============================================================================
@@ -358,4 +385,44 @@ fn chain_apply_validation_cycle() {
 #[test]
 fn python_square_area() {
     insta::assert_snapshot!(run_fixture("python/python_square_area.on"));
+}
+
+// =============================================================================
+// Analysis: dependency tree, reference tree, independents
+// =============================================================================
+
+#[test]
+fn analysis_dependency_tree_basic_force() {
+    // `f = m * a` — dependency tree should include both local leaves.
+    insta::assert_snapshot!(run_dep_tree("basic/basic.on", "f"));
+}
+
+#[test]
+fn analysis_reference_tree_basic_mass() {
+    // `m` is referenced by `f` and (indirectly) by the force threshold test.
+    insta::assert_snapshot!(run_ref_tree("basic/basic.on", "m"));
+}
+
+#[test]
+fn analysis_independents_basic() {
+    // Leaf params `m`, `a`, and `t` are independent; `f` is not.
+    insta::assert_snapshot!(run_independents("basic/basic.on", false));
+}
+
+#[test]
+fn analysis_dependency_tree_with_external() {
+    // `f = m * g.planet` — external edge + local mass.
+    insta::assert_snapshot!(run_dep_tree("analysis/force_with_ref.on", "f"));
+}
+
+#[test]
+fn analysis_reference_tree_with_external_consumer() {
+    // Local `m` is consumed by `f` (which also depends on an external).
+    insta::assert_snapshot!(run_ref_tree("analysis/force_with_ref.on", "m"));
+}
+
+#[test]
+fn analysis_independents_recursive_with_ref() {
+    // Top-level `m` plus planet `g` when printing recursively.
+    insta::assert_snapshot!(run_independents("analysis/force_with_ref.on", true));
 }

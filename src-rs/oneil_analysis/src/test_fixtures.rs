@@ -204,14 +204,7 @@ pub fn ir_test_expr(expr: ir::Expr) -> ir::Test {
 /// IR test with explicit dependencies and body expression.
 #[must_use]
 pub fn ir_test_with_expr(dependencies: ir::Dependencies, expr: ir::Expr) -> ir::Test {
-    ir::Test::new(
-        span(),
-        ir::TraceLevel::None,
-        expr,
-        dependencies,
-        None,
-        None,
-    )
+    ir::Test::new(span(), ir::TraceLevel::None, expr, dependencies, None, None)
 }
 
 /// Evaluated parameter with a scalar numeric value and no dependencies.
@@ -285,13 +278,7 @@ pub fn evaluated_test_failed() -> Test {
 /// Cross-file reference import pointing at `path`.
 #[must_use]
 pub fn reference_import(alias: &str, path: &ModelPath) -> ReferenceImport {
-    ReferenceImport::new(
-        ReferenceName::from(alias),
-        span(),
-        None,
-        None,
-        path.clone(),
-    )
+    ReferenceImport::new(ReferenceName::from(alias), span(), None, None, path.clone())
 }
 
 /// [`InstancedModel`] with the given parameters, tests, and references.
@@ -349,9 +336,7 @@ pub fn graph_with_pool(
     pool_model: InstancedModel,
 ) -> InstanceGraph {
     let mut graph = graph_from_root(root);
-    graph
-        .reference_pool
-        .insert(pool_path, Box::new(pool_model));
+    graph.reference_pool.insert(pool_path, Box::new(pool_model));
     graph
 }
 
