@@ -66,69 +66,24 @@ fn is_empty_dependencies(deps: &DependencySet) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use indexmap::{IndexMap, IndexSet};
-    use oneil_output::{
-        BuiltinDependency, DependencySet, ExternalDependency, ParameterDependency, Value,
-    };
+    use indexmap::IndexMap;
+    use oneil_output::Value;
     use oneil_shared::{
         EvalInstanceKey,
         load_result::LoadResult,
-        symbols::{BuiltinValueName, ParameterName, ReferenceName},
+        symbols::{ParameterName, ReferenceName},
     };
 
     use super::get_independents;
     use crate::{
         output::error::ModelEvalHasErrors,
-        test_context::{
-            TestAnalysisContext, evaluated_model, evaluated_parameter,
-            evaluated_parameter_with_deps, test_model_path,
+        test_assertions::assert_independent_params,
+        test_context::{TestAnalysisContext, test_model_path},
+        test_fixtures::{
+            builtin_deps, evaluated_model, evaluated_parameter, evaluated_parameter_with_deps,
+            external_deps, parameter_deps,
         },
     };
-
-    /// Builds a dependency set with only same-model parameter dependencies.
-    fn parameter_deps(names: &[&str]) -> DependencySet {
-        DependencySet {
-            builtin_dependencies: IndexSet::new(),
-            parameter_dependencies: names
-                .iter()
-                .map(|name| ParameterDependency {
-                    parameter_name: ParameterName::from(*name),
-                })
-                .collect(),
-            external_dependencies: IndexSet::new(),
-        }
-    }
-
-    /// Builds a dependency set with only builtin dependencies.
-    fn builtin_deps(names: &[&str]) -> DependencySet {
-        DependencySet {
-            builtin_dependencies: names
-                .iter()
-                .map(|name| BuiltinDependency {
-                    name: BuiltinValueName::from(*name),
-                })
-                .collect(),
-            parameter_dependencies: IndexSet::new(),
-            external_dependencies: IndexSet::new(),
-        }
-    }
-
-    /// Builds a dependency set with a single external dependency.
-    fn external_deps(
-        instance_key: EvalInstanceKey,
-        reference: &str,
-        parameter: &str,
-    ) -> DependencySet {
-        DependencySet {
-            builtin_dependencies: IndexSet::new(),
-            parameter_dependencies: IndexSet::new(),
-            external_dependencies: IndexSet::from([ExternalDependency {
-                instance_key,
-                reference_name: ReferenceName::from(reference),
-                parameter_name: ParameterName::from(parameter),
-            }]),
-        }
-    }
 
     #[test]
     fn missing_model_reports_error() {
@@ -170,15 +125,7 @@ mod tests {
 
         assert!(errors.is_empty());
         let params = independents.get(&path).expect("model entry");
-        assert_eq!(params.len(), 2);
-        assert_eq!(
-            params.get(&ParameterName::from("x")),
-            Some(&Value::from(1.0))
-        );
-        assert_eq!(
-            params.get(&ParameterName::from("y")),
-            Some(&Value::from(2.0))
-        );
+        assert_independent_params(params, &[("x", 1.0), ("y", 2.0)]);
     }
 
     #[test]

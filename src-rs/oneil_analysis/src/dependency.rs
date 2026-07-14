@@ -551,69 +551,24 @@ fn resolve_external_instance_key(
 #[cfg(test)]
 mod tests {
     use indexmap::IndexMap;
-    use oneil_frontend::ReferenceImport;
     use oneil_ir as ir;
     use oneil_output::Value;
     use oneil_shared::{
         EvalInstanceKey,
-        span::Span,
         symbols::{BuiltinValueName, ParameterName, ReferenceName, TestIndex},
     };
 
     use super::{get_dependency_tree, get_reference_tree};
     use crate::{
-        output::{DependencyName, ReferenceTreeValue, Tree, error::GetValueError},
-        test_context::{
-            TestAnalysisContext, evaluated_parameter, evaluated_test_failed, evaluated_test_passed,
-            instanced_model, ir_parameter, ir_test, test_model_path,
+        output::{DependencyName, ReferenceTreeValue, error::GetTestValueError, error::GetValueError},
+        test_assertions::{assert_no_tree_errors, child_dependency_names},
+        test_context::{TestAnalysisContext, test_model_path},
+        test_fixtures::{
+            deps_on_builtin, deps_on_external, deps_on_parameters, evaluated_parameter,
+            evaluated_test_failed, evaluated_test_passed, instanced_model, ir_parameter, ir_test,
+            reference_import,
         },
     };
-
-    /// Asserts that a tree-errors collection is empty.
-    #[track_caller]
-    fn assert_no_tree_errors(errors: &crate::output::error::TreeErrors) {
-        assert!(
-            errors.model_paths().next().is_none(),
-            "expected no tree errors, got {errors:?}"
-        );
-    }
-
-    /// Returns the dependency names of direct children, in tree order.
-    fn child_dependency_names(
-        tree: &Tree<crate::output::DependencyTreeValue>,
-    ) -> Vec<&DependencyName> {
-        tree.children()
-            .iter()
-            .map(|child| &child.value().dependency_name)
-            .collect()
-    }
-
-    /// Builds dependencies that name same-model parameters.
-    fn deps_on_parameters(names: &[&str]) -> ir::Dependencies {
-        let mut deps = ir::Dependencies::new();
-        for name in names {
-            deps.insert_parameter(ParameterName::from(*name), Span::synthetic());
-        }
-        deps
-    }
-
-    /// Builds dependencies that name a single builtin.
-    fn deps_on_builtin(name: &str) -> ir::Dependencies {
-        let mut deps = ir::Dependencies::new();
-        deps.insert_builtin(BuiltinValueName::from(name), Span::synthetic());
-        deps
-    }
-
-    /// Builds dependencies that name one external `(reference, parameter)`.
-    fn deps_on_external(reference: &str, parameter: &str) -> ir::Dependencies {
-        let mut deps = ir::Dependencies::new();
-        deps.insert_external(
-            ReferenceName::from(reference),
-            ParameterName::from(parameter),
-            Span::synthetic(),
-        );
-        deps
-    }
 
     #[test]
     fn dependency_tree_leaf_has_no_children() {
@@ -774,13 +729,7 @@ mod tests {
         let mut references = IndexMap::new();
         references.insert(
             ReferenceName::from("other"),
-            ReferenceImport::new(
-                ReferenceName::from("other"),
-                Span::synthetic(),
-                None,
-                None,
-                other_path.clone(),
-            ),
+            reference_import("other", &other_path),
         );
 
         let mut context = TestAnalysisContext::new();
@@ -1001,6 +950,36 @@ mod tests {
     }
 
     #[test]
+    fn reference_tree_test_lookup_error_is_reported() {
+        let path = test_model_path("ref_test_err");
+        let key = EvalInstanceKey::root(path.clone());
+        let test_index = TestIndex::new(0);
+
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            ir_parameter("x", ir::Dependencies::new()),
+        );
+
+        let mut tests = IndexMap::new();
+        tests.insert(test_index, ir_test(deps_on_parameters(&["x"])));
+
+        let mut context = TestAnalysisContext::new();
+        context.insert_model_ir(
+            key.clone(),
+            instanced_model(&path, parameters, tests, IndexMap::new()),
+        );
+        context.insert_evaluated_parameter(&key, evaluated_parameter("x", 1.0));
+        context.insert_test_error(&key, test_index, GetTestValueError::Test);
+
+        let (tree, errors) = get_reference_tree(&mut context, &path, &ParameterName::from("x"));
+
+        let tree = tree.expect("parameter root should still exist");
+        assert!(tree.children().is_empty());
+        assert_eq!(errors.model_paths().collect::<Vec<_>>(), vec![&path]);
+    }
+
+    #[test]
     fn reference_tree_includes_external_parameter_referees() {
         let root_path = test_model_path("ref_root");
         let other_path = test_model_path("ref_other");
@@ -1022,13 +1001,7 @@ mod tests {
         let mut references = IndexMap::new();
         references.insert(
             ReferenceName::from("other"),
-            ReferenceImport::new(
-                ReferenceName::from("other"),
-                Span::synthetic(),
-                None,
-                None,
-                other_path.clone(),
-            ),
+            reference_import("other", &other_path),
         );
 
         let mut context = TestAnalysisContext::new();

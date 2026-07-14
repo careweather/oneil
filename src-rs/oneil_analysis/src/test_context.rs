@@ -1,19 +1,13 @@
-//! Test support for analysis tree tests.
-//!
-//! Provides [`TestAnalysisContext`] that implements [`ExternalAnalysisContext`]
-//! with manually registered IR, evaluated parameters/tests, and builtins.
+//! Test double for [`ExternalAnalysisContext`](crate::ExternalAnalysisContext).
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use oneil_frontend::InstancedModel;
-use oneil_ir as ir;
-use oneil_output::{self as output, Model, Parameter, PrintLevel, Test, Value};
+use oneil_output::{Model, Parameter, Test, Value};
 use oneil_shared::{
-    EvalInstanceKey, InstancePath,
-    labels::ParameterLabel,
+    EvalInstanceKey,
     load_result::LoadResult,
     paths::ModelPath,
-    span::Span,
-    symbols::{BuiltinValueName, ParameterName, ReferenceName, TestIndex},
+    symbols::{BuiltinValueName, ParameterName, TestIndex},
 };
 
 use crate::{
@@ -82,6 +76,16 @@ impl TestAnalysisContext {
         self.tests.insert((key.clone(), test_index), Ok(test));
     }
 
+    /// Registers a test lookup error (model- or test-level).
+    pub fn insert_test_error(
+        &mut self,
+        key: &EvalInstanceKey,
+        test_index: TestIndex,
+        error: GetTestValueError,
+    ) {
+        self.tests.insert((key.clone(), test_index), Err(error));
+    }
+
     /// Registers a builtin value.
     pub fn insert_builtin(&mut self, name: BuiltinValueName, value: Value) {
         self.builtins.insert(name, value);
@@ -145,128 +149,4 @@ impl ExternalAnalysisContext for TestAnalysisContext {
                 Err(GetTestValueError::Test) => Err(GetTestValueError::Test),
             })
     }
-}
-
-/// Builds a simple IR parameter with the given dependencies and a numeric literal body.
-#[must_use]
-pub fn ir_parameter(name: &str, dependencies: ir::Dependencies) -> ir::Parameter {
-    let span = Span::synthetic();
-    ir::Parameter::new(
-        dependencies,
-        ParameterName::from(name),
-        span.clone(),
-        span,
-        ParameterLabel::from(name),
-        None,
-        None,
-        ir::ParameterValue::simple(
-            ir::Expr::literal(Span::synthetic(), ir::Literal::number(0.0)),
-            None,
-        ),
-        ir::Limits::default(),
-        false,
-        ir::TraceLevel::None,
-        None,
-    )
-}
-
-/// Builds an IR test with the given dependencies and a boolean literal body.
-#[must_use]
-pub fn ir_test(dependencies: ir::Dependencies) -> ir::Test {
-    ir::Test::new(
-        Span::synthetic(),
-        ir::TraceLevel::None,
-        ir::Expr::literal(Span::synthetic(), ir::Literal::boolean(true)),
-        dependencies,
-        None,
-        None,
-    )
-}
-
-/// Builds an evaluated parameter with a scalar numeric value and no dependencies.
-#[must_use]
-pub fn evaluated_parameter(name: &str, value: f64) -> Parameter {
-    evaluated_parameter_with_deps(name, value, output::DependencySet::default())
-}
-
-/// Builds an evaluated parameter with a scalar numeric value and the given dependencies.
-#[must_use]
-pub fn evaluated_parameter_with_deps(
-    name: &str,
-    value: f64,
-    dependencies: output::DependencySet,
-) -> Parameter {
-    Parameter {
-        ident: ParameterName::from(name),
-        label: ParameterLabel::from(name),
-        value: Value::from(value),
-        print_level: PrintLevel::None,
-        debug_info: None,
-        dependencies,
-        expr_span: Span::synthetic(),
-        warnings: Vec::new(),
-    }
-}
-
-/// Builds an evaluated model with the given parameters and references.
-#[must_use]
-pub fn evaluated_model(
-    path: &ModelPath,
-    parameters: IndexMap<ParameterName, Parameter>,
-    references: IndexMap<ReferenceName, EvalInstanceKey>,
-) -> Model {
-    Model {
-        path: path.clone(),
-        instance_path: InstancePath::root(),
-        submodels: IndexSet::new(),
-        references,
-        parameters,
-        tests: IndexMap::new(),
-    }
-}
-
-/// Builds a passed evaluated test.
-#[must_use]
-pub fn evaluated_test_passed() -> Test {
-    Test {
-        expr_span: Span::synthetic(),
-        result: output::TestResult::Passed,
-        warnings: Vec::new(),
-    }
-}
-
-/// Builds a failed evaluated test.
-#[must_use]
-pub fn evaluated_test_failed() -> Test {
-    Test {
-        expr_span: Span::synthetic(),
-        result: output::TestResult::Failed {
-            debug_info: Box::new(output::DebugInfo {
-                builtin_dependency_values: IndexMap::new(),
-                parameter_dependency_values: IndexMap::new(),
-                external_dependency_values: IndexMap::new(),
-            }),
-        },
-        warnings: Vec::new(),
-    }
-}
-
-/// Builds an [`InstancedModel`] with the given parameters, tests, and references.
-#[must_use]
-pub fn instanced_model(
-    path: &ModelPath,
-    parameters: IndexMap<ParameterName, ir::Parameter>,
-    tests: IndexMap<TestIndex, ir::Test>,
-    references: IndexMap<oneil_shared::symbols::ReferenceName, oneil_frontend::ReferenceImport>,
-) -> InstancedModel {
-    InstancedModel::new(
-        path.clone(),
-        IndexMap::new(),
-        IndexMap::new(),
-        references,
-        IndexMap::new(),
-        parameters,
-        tests,
-        None,
-    )
 }

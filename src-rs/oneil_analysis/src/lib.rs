@@ -18,4 +18,8 @@ pub use validation::validate_instance_graph;
 pub use oneil_frontend::{HostLocation, InstanceValidationError, InstanceValidationErrorKind};
 
 #[cfg(test)]
+mod test_assertions;
+#[cfg(test)]
 mod test_context;
+#[cfg(test)]
+mod test_fixtures;
