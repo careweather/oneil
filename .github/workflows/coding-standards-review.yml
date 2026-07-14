@@ -1,0 +1,111 @@
+# Advisory Cursor review of PR diffs against docs/CODING_STANDARDS.md.
+# Posts (or updates) a sticky PR comment. Does not fail on style findings.
+# Infra failures (missing key, agent crash) fail the job.
+
+name: Coding Standards Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "src-rs/**"
+
+concurrency:
+  group: coding-standards-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  OUTPUT_PATH: ${{ github.workspace }}/coding-standards-review.md
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Fetch PR base
+        run: git fetch --no-tags origin ${{ github.event.pull_request.base.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+          cache-dependency-path: .github/scripts/coding-standards-review/package-lock.json
+
+      - name: Install review dependencies
+        working-directory: .github/scripts/coding-standards-review
+        run: npm ci
+
+      - name: Run Cursor coding-standards review
+        working-directory: .github/scripts/coding-standards-review
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_OUTPUT_PATH: ${{ env.OUTPUT_PATH }}
+        run: node review.mjs
+
+      - name: Upload review artifact
+        if: hashFiles(env.OUTPUT_PATH) != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coding-standards-review-${{ github.event.pull_request.number }}
+          path: ${{ env.OUTPUT_PATH }}
+          if-no-files-found: ignore
+
+  # A separate job to upsert the sticky PR comment. This is done so that the
+  # call to Cursor can't write to the pull request. This is because the call to
+  # Cursor contains untrusted input (the code to be reviewed), and we don't want
+  # to risk prompt engineering.
+  #
+  # The review is passed between the jobs via an artifact.
+  post-review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    needs: review
+    steps:
+      - name: Download review artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coding-standards-review-${{ github.event.pull_request.number }}
+
+      - name: Upsert sticky PR comment
+        if: hashFiles(env.OUTPUT_PATH) != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          MARKER='<!-- coding-standards-review -->'
+
+          ls -la "${{ env.OUTPUT_PATH }}"
+
+          COMMENT_ID=$(
+            gh api \
+              "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+              --paginate \
+              --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" \
+              | head -n 1
+          )
+
+          if [ -n "${COMMENT_ID}" ]; then
+            gh api \
+              --method PATCH \
+              "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              -F body=@"${{ env.OUTPUT_PATH }}"
+            echo "Updated comment ${COMMENT_ID}"
+          else
+            gh api \
+              --method POST \
+              "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+              -F body=@"${{ env.OUTPUT_PATH }}"
+            echo "Created new coding-standards review comment"
+          fi

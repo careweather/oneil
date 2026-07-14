@@ -1,0 +1,11 @@
+{
+  "name": "coding-standards-review",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "@cursor/sdk": "1.0.23"
+  }
+}

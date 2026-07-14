@@ -23,3 +23,6 @@ oncmp_config.toml
 
 # VSCode extension package
 *.vsix
+
+# Node (GitHub Action review scripts)
+node_modules/
