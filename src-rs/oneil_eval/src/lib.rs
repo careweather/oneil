@@ -19,6 +19,14 @@ pub use oneil_frontend::{ApplyDesign, InstanceGraph, InstancedModel};
 mod test_assertions;
 #[cfg(test)]
 mod test_context;
+#[cfg(test)]
+mod test_fixtures;
 
 #[cfg(test)]
-pub use test_assertions::{assert_is_close, assert_units_dimensionally_eq};
+pub use test_assertions::{
+    assert_boolean, assert_invalid_type, assert_is_close, assert_is_close_case,
+    assert_measured_scalar, assert_measured_scalar_case, assert_param_measured_scalar,
+    assert_param_measured_scalar_case, assert_param_scalar_close, assert_param_scalar_close_case,
+    assert_scalar_close, assert_scalar_close_case, assert_type_mismatch, assert_unit_eq,
+    assert_unit_eq_case, assert_units_dimensionally_eq, assert_units_dimensionally_eq_case,
+};

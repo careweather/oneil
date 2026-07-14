@@ -1,8 +1,6 @@
 use oneil_ir as ir;
 use oneil_shared::span::Span;
 
-#[cfg(test)]
-use oneil_output::DimensionMap;
 use oneil_output::{DisplayUnit, Unit};
 
 use crate::context::{EvalContext, ExternalEvaluationContext};
@@ -101,965 +99,482 @@ fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::f64::consts::PI;
 
-    use oneil_output::Dimension;
-
-    use oneil_shared::symbols::{UnitBaseName, UnitName, UnitPrefix};
+    use oneil_output::{Dimension, Unit};
 
     use crate::{
-        assert_is_close, assert_units_dimensionally_eq, context::EvalContext,
+        assert_is_close, assert_unit_eq_case,
+        context::EvalContext,
         test_context::TestExternalContext,
+        test_fixtures::{UnitSpec, ir_composite_unit},
     };
 
     use super::*;
 
-    /// Returns a dummy span for use in test parameters.
-    ///
-    /// This function creates a span with all fields set to zero.
-    /// It is not intended to be directly tested, but rather used
-    /// as a placeholder when constructing IR nodes for testing.
-    fn random_span() -> Span {
-        Span::synthetic()
+    /// Evaluates `specs` in a fresh context.
+    fn eval_specs(specs: impl IntoIterator<Item = UnitSpec>) -> Unit {
+        let mut external = TestExternalContext::new();
+        let context = EvalContext::new(&mut external);
+        eval_unit(&ir_composite_unit(specs), &context).0
     }
 
-    /// Returns a display unit that isn't intended to be tested.
-    fn unimportant_display_unit() -> ir::DisplayCompositeUnit {
-        ir::DisplayCompositeUnit::BaseUnit(ir::DisplayUnit::new("unimportant".to_string(), 1.0))
-    }
-
-    /// Specification for a unit in tests.
-    #[derive(Debug, Clone, Copy)]
-    struct UnitSpec {
-        /// The base unit name (e.g., "m", "s", "W"). Use `None` for pure dB.
-        base_name: Option<&'static str>,
-        /// Optional SI prefix (e.g., "k" for kilo, "m" for milli).
-        prefix: Option<&'static str>,
-        /// Whether this is a decibel unit.
+    #[track_caller]
+    fn assert_eval_unit(
+        name: &str,
+        specs: &[UnitSpec],
+        magnitude: f64,
+        dims: &[(Dimension, f64)],
         is_db: bool,
-        /// The exponent of the unit.
-        exponent: f64,
+    ) {
+        let unit = eval_specs(specs.iter().copied());
+        assert_unit_eq_case(name, &unit, magnitude, dims, is_db);
     }
 
-    impl UnitSpec {
-        const fn new(
-            base_name: Option<&'static str>,
-            prefix: Option<&'static str>,
-            is_db: bool,
-            exponent: f64,
-        ) -> Self {
-            Self {
-                base_name,
-                prefix,
-                is_db,
-                exponent,
-            }
-        }
+    #[track_caller]
+    fn assert_units_equivalent(name: &str, left: &[UnitSpec], right: &[UnitSpec]) {
+        let left_unit = eval_specs(left.iter().copied());
+        let right_unit = eval_specs(right.iter().copied());
+        assert!(
+            left_unit.numerically_eq(&right_unit),
+            "{name}: units should be numerically equal\nleft={left_unit:?}\nright={right_unit:?}"
+        );
     }
 
-    fn ir_composite_unit(unit_list: impl IntoIterator<Item = UnitSpec>) -> ir::CompositeUnit {
-        let unit_vec = unit_list
-            .into_iter()
-            .map(|spec| {
-                let full_name = build_full_name(spec.base_name, spec.prefix, spec.is_db);
-                let info = build_unit_info(spec.base_name, spec.prefix, spec.is_db);
-                ir::Unit::new(
-                    random_span(),
-                    full_name,
-                    random_span(),
-                    spec.exponent,
-                    None,
-                    info,
-                )
-            })
-            .collect::<Vec<_>>();
-        // Tests construct CompositeUnits without consulting a real builtin
-        // unit table, so we leave the dimension map dimensionless. The eval
-        // path under test (`eval_unit`) does its own dimension computation,
-        // so this placeholder isn't observed by the assertions below.
-        ir::CompositeUnit::new(
-            unit_vec,
-            unimportant_display_unit(),
-            random_span(),
-            DimensionMap::dimensionless(),
-        )
+    #[test]
+    fn eval_unitless() {
+        let unit = eval_specs([]);
+        assert!(unit.is_dimensionless(), "unit should be dimensionless");
     }
 
-    fn build_full_name(base_name: Option<&str>, prefix: Option<&str>, is_db: bool) -> UnitName {
-        UnitName::new(format!(
-            "{}{}{}",
-            if is_db { "dB" } else { "" },
-            prefix.unwrap_or(""),
-            base_name.unwrap_or("")
-        ))
-    }
-
-    fn build_unit_info(base_name: Option<&str>, prefix: Option<&str>, is_db: bool) -> ir::UnitInfo {
-        if is_db {
-            ir::UnitInfo::Db {
-                prefix: prefix.map(UnitPrefix::from),
-                base_name: base_name.map(UnitBaseName::from),
-            }
-        } else {
-            ir::UnitInfo::Standard {
-                prefix: prefix.map(UnitPrefix::from),
-                base_name: UnitBaseName::from(base_name.expect("base name should be provided")),
-            }
-        }
-    }
-
-    mod unit_eval {
-
-        use super::*;
-
-        #[test]
-        fn eval_unitless() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            assert!(unit.is_dimensionless(), "unit should be dimensionless");
-        }
-
-        #[test]
-        fn eval_simple() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("s"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_simple_with_prefix() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("s"), Some("m"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(0.001, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_simple_with_prefix_and_exponent() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("s"), Some("m"), false, 2.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(0.001_f64.powi(2), unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, 2.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_db() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(None, None, true, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([], &unit);
-            assert!(unit.is_db);
-        }
-
-        #[test]
-        fn eval_db_watts() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("W"), None, true, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([
-                    (Dimension::Mass, 1.0),
-                    (Dimension::Distance, 2.0),
-                    (Dimension::Time, -3.0)
-                ], &unit);
-            assert!(unit.is_db);
-        }
-
-        #[test]
-        fn eval_db_watts_per_meter_squared_per_hertz() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([
-                UnitSpec::new(Some("W"), None, true, 1.0),
-                UnitSpec::new(Some("m"), None, false, -2.0),
-                UnitSpec::new(Some("Hz"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // dBW: Mass, Distance^2, Time^-3
-            // m^-2: Distance^-2
-            // Hz^-1: Time^1 (since Hz has Time^-1)
-            // Result: Mass, Time^-2
-            // Magnitude: 1 / (2π) because Hz has magnitude 2π, so Hz^-1 contributes 1/(2π)
-            assert_is_close(1.0 / (2.0 * PI), unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Mass, 1.0), (Dimension::Time, -2.0)], &unit);
-            assert!(unit.is_db);
-        }
-
-        #[test]
-        fn eval_kilometers() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("m"), Some("k"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1000.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Distance, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_square_kilometers() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("m"), Some("k"), false, 2.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1000.0_f64.powi(2), unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Distance, 2.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_gigahertz() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("Hz"), Some("G"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // Hz has magnitude 2π, so GHz = 1e9 * 2π
-            assert_is_close(1e9 * (2.0 * PI), unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, -1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_kilohertz() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("Hz"), Some("k"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // Hz has magnitude 2π, so kHz = 1e3 * 2π
-            assert_is_close(1e3 * (2.0 * PI), unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, -1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_megahertz() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("Hz"), Some("M"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // Hz has magnitude 2π, so MHz = 1e6 * 2π
-            assert_is_close(1e6 * (2.0 * PI), unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, -1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_microseconds() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("s"), Some("u"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1e-6, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_volts() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("V"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([
+    #[test]
+    #[expect(clippy::too_many_lines, clippy::type_complexity)]
+    fn eval_units_table() {
+        let cases: &[(&str, &[UnitSpec], f64, &[(Dimension, f64)], bool)] = &[
+            (
+                "simple",
+                &[UnitSpec::new(None, Some("s"), false, 1.0)],
+                1.0,
+                &[(Dimension::Time, 1.0)],
+                false,
+            ),
+            (
+                "simple_with_prefix",
+                &[UnitSpec::new(Some("m"), Some("s"), false, 1.0)],
+                0.001,
+                &[(Dimension::Time, 1.0)],
+                false,
+            ),
+            (
+                "simple_with_prefix_and_exponent",
+                &[UnitSpec::new(Some("m"), Some("s"), false, 2.0)],
+                0.001_f64.powi(2),
+                &[(Dimension::Time, 2.0)],
+                false,
+            ),
+            (
+                "db",
+                &[UnitSpec::new(None, None, true, 1.0)],
+                1.0,
+                &[],
+                true,
+            ),
+            (
+                "db_watts",
+                &[UnitSpec::new(None, Some("W"), true, 1.0)],
+                1.0,
+                &[
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
-                    (Dimension::Current, -1.0)
-                ], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_millivolts() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("V"), Some("m"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(0.001, unit.magnitude);
-            assert_units_dimensionally_eq([
+                ],
+                true,
+            ),
+            (
+                "db_watts_per_meter_squared_per_hertz",
+                &[
+                    UnitSpec::new(None, Some("W"), true, 1.0),
+                    UnitSpec::new(None, Some("m"), false, -2.0),
+                    UnitSpec::new(None, Some("Hz"), false, -1.0),
+                ],
+                1.0 / (2.0 * PI),
+                &[(Dimension::Mass, 1.0), (Dimension::Time, -2.0)],
+                true,
+            ),
+            (
+                "kilometers",
+                &[UnitSpec::new(Some("k"), Some("m"), false, 1.0)],
+                1000.0,
+                &[(Dimension::Distance, 1.0)],
+                false,
+            ),
+            (
+                "square_kilometers",
+                &[UnitSpec::new(Some("k"), Some("m"), false, 2.0)],
+                1000.0_f64.powi(2),
+                &[(Dimension::Distance, 2.0)],
+                false,
+            ),
+            (
+                "gigahertz",
+                &[UnitSpec::new(Some("G"), Some("Hz"), false, 1.0)],
+                1e9 * (2.0 * PI),
+                &[(Dimension::Time, -1.0)],
+                false,
+            ),
+            (
+                "kilohertz",
+                &[UnitSpec::new(Some("k"), Some("Hz"), false, 1.0)],
+                1e3 * (2.0 * PI),
+                &[(Dimension::Time, -1.0)],
+                false,
+            ),
+            (
+                "megahertz",
+                &[UnitSpec::new(Some("M"), Some("Hz"), false, 1.0)],
+                1e6 * (2.0 * PI),
+                &[(Dimension::Time, -1.0)],
+                false,
+            ),
+            (
+                "microseconds",
+                &[UnitSpec::new(Some("u"), Some("s"), false, 1.0)],
+                1e-6,
+                &[(Dimension::Time, 1.0)],
+                false,
+            ),
+            (
+                "volts",
+                &[UnitSpec::new(None, Some("V"), false, 1.0)],
+                1.0,
+                &[
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
-                    (Dimension::Current, -1.0)
-                ], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_ohms() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("Ohm"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([
+                    (Dimension::Current, -1.0),
+                ],
+                false,
+            ),
+            (
+                "millivolts",
+                &[UnitSpec::new(Some("m"), Some("V"), false, 1.0)],
+                0.001,
+                &[
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
                     (Dimension::Time, -3.0),
-                    (Dimension::Current, -2.0)
-                ], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_watts() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("W"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([
+                    (Dimension::Current, -1.0),
+                ],
+                false,
+            ),
+            (
+                "ohms",
+                &[UnitSpec::new(None, Some("Ohm"), false, 1.0)],
+                1.0,
+                &[
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
-                    (Dimension::Time, -3.0)
-                ], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_watts_per_square_meter() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([
-                UnitSpec::new(Some("W"), None, false, 1.0),
-                UnitSpec::new(Some("m"), None, false, -2.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Mass, 1.0), (Dimension::Time, -3.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_kelvin() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("K"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Temperature, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_amperes() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("A"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Current, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_milliampere_hours() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("Ah"), Some("m"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // mAh = 0.001 A * 3600 s = 3.6 A*s
-            assert_is_close(3.6, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Current, 1.0), (Dimension::Time, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_joules() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("J"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([
+                    (Dimension::Time, -3.0),
+                    (Dimension::Current, -2.0),
+                ],
+                false,
+            ),
+            (
+                "watts",
+                &[UnitSpec::new(None, Some("W"), false, 1.0)],
+                1.0,
+                &[
                     (Dimension::Mass, 1.0),
                     (Dimension::Distance, 2.0),
-                    (Dimension::Time, -2.0)
-                ], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_hours() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("hr"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // hr = 3600 s
-            assert_is_close(3600.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_minutes() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("min"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // min = 60 s
-            assert_is_close(60.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_revolutions_per_minute() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("rpm"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // rpm has magnitude 2π/60 (radians per second)
-            assert_is_close(2.0 * PI / 60.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Time, -1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_degrees() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("deg"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // deg is dimensionless with magnitude π/180 (conversion to radians)
-            assert_is_close(PI / 180.0, unit.magnitude);
-            assert_units_dimensionally_eq([], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_percent() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("%"), None, false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // % is dimensionless with magnitude 0.01
-            assert_is_close(0.01, unit.magnitude);
-            assert_units_dimensionally_eq([], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_megabits_per_second() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("bps"), Some("M"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // Mbps = 1e6 * bps, and bps has Information*Time^-1 dimension
-            assert_is_close(1e6, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Information, 1.0), (Dimension::Time, -1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_kilobytes() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([UnitSpec::new(Some("B"), Some("k"), false, 1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // B has magnitude 8 (bits), so kB = 1000 * 8 = 8000 bits
-            assert_is_close(8000.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Information, 1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_boltzmann_constant_unit() {
-            // setup unit and context
-            // m^2*kg/s^2/K - the unit of Boltzmann's constant
-            let ir_unit = ir_composite_unit([
-                UnitSpec::new(Some("m"), None, false, 2.0),
-                UnitSpec::new(Some("g"), Some("k"), false, 1.0),
-                UnitSpec::new(Some("s"), None, false, -2.0),
-                UnitSpec::new(Some("K"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            // kg is the base unit (magnitude 1), not g
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([
+                    (Dimension::Time, -3.0),
+                ],
+                false,
+            ),
+            (
+                "watts_per_square_meter",
+                &[
+                    UnitSpec::new(None, Some("W"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, -2.0),
+                ],
+                1.0,
+                &[(Dimension::Mass, 1.0), (Dimension::Time, -3.0)],
+                false,
+            ),
+            (
+                "kelvin",
+                &[UnitSpec::new(None, Some("K"), false, 1.0)],
+                1.0,
+                &[(Dimension::Temperature, 1.0)],
+                false,
+            ),
+            (
+                "amperes",
+                &[UnitSpec::new(None, Some("A"), false, 1.0)],
+                1.0,
+                &[(Dimension::Current, 1.0)],
+                false,
+            ),
+            (
+                "milliampere_hours",
+                &[UnitSpec::new(Some("m"), Some("Ah"), false, 1.0)],
+                3.6,
+                &[(Dimension::Current, 1.0), (Dimension::Time, 1.0)],
+                false,
+            ),
+            (
+                "joules",
+                &[UnitSpec::new(None, Some("J"), false, 1.0)],
+                1.0,
+                &[
+                    (Dimension::Mass, 1.0),
+                    (Dimension::Distance, 2.0),
+                    (Dimension::Time, -2.0),
+                ],
+                false,
+            ),
+            (
+                "hours",
+                &[UnitSpec::new(None, Some("hr"), false, 1.0)],
+                3600.0,
+                &[(Dimension::Time, 1.0)],
+                false,
+            ),
+            (
+                "minutes",
+                &[UnitSpec::new(None, Some("min"), false, 1.0)],
+                60.0,
+                &[(Dimension::Time, 1.0)],
+                false,
+            ),
+            (
+                "revolutions_per_minute",
+                &[UnitSpec::new(None, Some("rpm"), false, 1.0)],
+                2.0 * PI / 60.0,
+                &[(Dimension::Time, -1.0)],
+                false,
+            ),
+            (
+                "degrees",
+                &[UnitSpec::new(None, Some("deg"), false, 1.0)],
+                PI / 180.0,
+                &[],
+                false,
+            ),
+            (
+                "percent",
+                &[UnitSpec::new(None, Some("%"), false, 1.0)],
+                0.01,
+                &[],
+                false,
+            ),
+            (
+                "megabits_per_second",
+                &[UnitSpec::new(Some("M"), Some("bps"), false, 1.0)],
+                1e6,
+                &[(Dimension::Information, 1.0), (Dimension::Time, -1.0)],
+                false,
+            ),
+            (
+                "kilobytes",
+                &[UnitSpec::new(Some("k"), Some("B"), false, 1.0)],
+                8000.0,
+                &[(Dimension::Information, 1.0)],
+                false,
+            ),
+            (
+                "boltzmann_constant_unit",
+                &[
+                    UnitSpec::new(None, Some("m"), false, 2.0),
+                    UnitSpec::new(Some("k"), Some("g"), false, 1.0),
+                    UnitSpec::new(None, Some("s"), false, -2.0),
+                    UnitSpec::new(None, Some("K"), false, -1.0),
+                ],
+                1.0,
+                &[
                     (Dimension::Distance, 2.0),
                     (Dimension::Mass, 1.0),
                     (Dimension::Time, -2.0),
-                    (Dimension::Temperature, -1.0)
-                ], &unit);
-            assert!(!unit.is_db);
-        }
+                    (Dimension::Temperature, -1.0),
+                ],
+                false,
+            ),
+            (
+                "meters_per_second",
+                &[
+                    UnitSpec::new(None, Some("m"), false, 1.0),
+                    UnitSpec::new(None, Some("s"), false, -1.0),
+                ],
+                1.0,
+                &[(Dimension::Distance, 1.0), (Dimension::Time, -1.0)],
+                false,
+            ),
+            (
+                "meters_per_second_squared",
+                &[
+                    UnitSpec::new(None, Some("m"), false, 1.0),
+                    UnitSpec::new(None, Some("s"), false, -2.0),
+                ],
+                1.0,
+                &[(Dimension::Distance, 1.0), (Dimension::Time, -2.0)],
+                false,
+            ),
+        ];
 
-        #[test]
-        fn eval_meters_per_second() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([
-                UnitSpec::new(Some("m"), None, false, 1.0),
-                UnitSpec::new(Some("s"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Distance, 1.0), (Dimension::Time, -1.0)], &unit);
-            assert!(!unit.is_db);
-        }
-
-        #[test]
-        fn eval_meters_per_second_squared() {
-            // setup unit and context
-            let ir_unit = ir_composite_unit([
-                UnitSpec::new(Some("m"), None, false, 1.0),
-                UnitSpec::new(Some("s"), None, false, -2.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            // evaluate unit
-            let (unit, _unit_span) = eval_unit(&ir_unit, &context);
-
-            // check sized unit
-            assert_is_close(1.0, unit.magnitude);
-            assert_units_dimensionally_eq([(Dimension::Distance, 1.0), (Dimension::Time, -2.0)], &unit);
-            assert!(!unit.is_db);
+        for (name, specs, magnitude, dims, is_db) in cases {
+            assert_eval_unit(name, specs, *magnitude, dims, *is_db);
         }
     }
 
-    mod unit_equivalence {
-        use super::*;
+    #[test]
+    #[expect(clippy::too_many_lines)]
+    fn eval_unit_equivalence_table() {
+        let cases: &[(&str, &[UnitSpec], &[UnitSpec])] = &[
+            (
+                "newtons_are_kg_m_s_2",
+                &[UnitSpec::new(None, Some("N"), false, 1.0)],
+                &[
+                    UnitSpec::new(Some("k"), Some("g"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, 1.0),
+                    UnitSpec::new(None, Some("s"), false, -2.0),
+                ],
+            ),
+            (
+                "joules_are_newton_meters",
+                &[UnitSpec::new(None, Some("J"), false, 1.0)],
+                &[
+                    UnitSpec::new(None, Some("N"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, 1.0),
+                ],
+            ),
+            (
+                "joules_are_kg_m2_s2",
+                &[UnitSpec::new(None, Some("J"), false, 1.0)],
+                &[
+                    UnitSpec::new(Some("k"), Some("g"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, 2.0),
+                    UnitSpec::new(None, Some("s"), false, -2.0),
+                ],
+            ),
+            (
+                "watts_are_joules_per_second",
+                &[UnitSpec::new(None, Some("W"), false, 1.0)],
+                &[
+                    UnitSpec::new(None, Some("J"), false, 1.0),
+                    UnitSpec::new(None, Some("s"), false, -1.0),
+                ],
+            ),
+            (
+                "watts_are_newton_meters_per_second",
+                &[UnitSpec::new(None, Some("W"), false, 1.0)],
+                &[
+                    UnitSpec::new(None, Some("N"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, 1.0),
+                    UnitSpec::new(None, Some("s"), false, -1.0),
+                ],
+            ),
+            (
+                "watts_are_kg_m2_s3",
+                &[UnitSpec::new(None, Some("W"), false, 1.0)],
+                &[
+                    UnitSpec::new(Some("k"), Some("g"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, 2.0),
+                    UnitSpec::new(None, Some("s"), false, -3.0),
+                ],
+            ),
+            (
+                "volts_are_watts_per_ampere",
+                &[UnitSpec::new(None, Some("V"), false, 1.0)],
+                &[
+                    UnitSpec::new(None, Some("W"), false, 1.0),
+                    UnitSpec::new(None, Some("A"), false, -1.0),
+                ],
+            ),
+            (
+                "volts_are_kg_m2_s3_a",
+                &[UnitSpec::new(None, Some("V"), false, 1.0)],
+                &[
+                    UnitSpec::new(Some("k"), Some("g"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, 2.0),
+                    UnitSpec::new(None, Some("s"), false, -3.0),
+                    UnitSpec::new(None, Some("A"), false, -1.0),
+                ],
+            ),
+            (
+                "ohms_are_volts_per_ampere",
+                &[UnitSpec::new(None, Some("Ohm"), false, 1.0)],
+                &[
+                    UnitSpec::new(None, Some("V"), false, 1.0),
+                    UnitSpec::new(None, Some("A"), false, -1.0),
+                ],
+            ),
+            (
+                "ohms_are_kg_m2_s3_a2",
+                &[UnitSpec::new(None, Some("Ohm"), false, 1.0)],
+                &[
+                    UnitSpec::new(Some("k"), Some("g"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, 2.0),
+                    UnitSpec::new(None, Some("s"), false, -3.0),
+                    UnitSpec::new(None, Some("A"), false, -2.0),
+                ],
+            ),
+            (
+                "pascals_are_newtons_per_square_meter",
+                &[UnitSpec::new(None, Some("Pa"), false, 1.0)],
+                &[
+                    UnitSpec::new(None, Some("N"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, -2.0),
+                ],
+            ),
+            (
+                "pascals_are_kg_m_s2",
+                &[UnitSpec::new(None, Some("Pa"), false, 1.0)],
+                &[
+                    UnitSpec::new(Some("k"), Some("g"), false, 1.0),
+                    UnitSpec::new(None, Some("m"), false, -1.0),
+                    UnitSpec::new(None, Some("s"), false, -2.0),
+                ],
+            ),
+            (
+                "watt_hours_are_watts_times_hours",
+                &[UnitSpec::new(None, Some("Wh"), false, 1.0)],
+                &[
+                    UnitSpec::new(None, Some("W"), false, 1.0),
+                    UnitSpec::new(None, Some("hr"), false, 1.0),
+                ],
+            ),
+            (
+                "amp_hours_are_amperes_times_hours",
+                &[UnitSpec::new(None, Some("Ah"), false, 1.0)],
+                &[
+                    UnitSpec::new(None, Some("A"), false, 1.0),
+                    UnitSpec::new(None, Some("hr"), false, 1.0),
+                ],
+            ),
+            (
+                "tesla_are_kg_s2_a",
+                &[UnitSpec::new(None, Some("T"), false, 1.0)],
+                &[
+                    UnitSpec::new(Some("k"), Some("g"), false, 1.0),
+                    UnitSpec::new(None, Some("s"), false, -2.0),
+                    UnitSpec::new(None, Some("A"), false, -1.0),
+                ],
+            ),
+        ];
 
-        #[test]
-        fn eval_newtons_are_kg_m_s_2() {
-            let newton_unit = ir_composite_unit([UnitSpec::new(Some("N"), None, false, 1.0)]);
-            let kg_m_s_2_unit = ir_composite_unit([
-                UnitSpec::new(Some("g"), Some("k"), false, 1.0),
-                UnitSpec::new(Some("m"), None, false, 1.0),
-                UnitSpec::new(Some("s"), None, false, -2.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (newton_unit, _) = eval_unit(&newton_unit, &context);
-            let (kg_m_s_2_unit, _) = eval_unit(&kg_m_s_2_unit, &context);
-
-            assert!(newton_unit.numerically_eq(&kg_m_s_2_unit));
+        for (name, left, right) in cases {
+            assert_units_equivalent(name, left, right);
         }
+    }
 
-        #[test]
-        fn eval_joules_are_newton_meters() {
-            let joule_unit = ir_composite_unit([UnitSpec::new(Some("J"), None, false, 1.0)]);
-            let newton_meter_unit = ir_composite_unit([
-                UnitSpec::new(Some("N"), None, false, 1.0),
-                UnitSpec::new(Some("m"), None, false, 1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
+    #[test]
+    fn eval_hertz_are_per_second() {
+        let hertz_unit = eval_specs([UnitSpec::new(None, Some("Hz"), false, 1.0)]);
+        let per_second_unit = eval_specs([UnitSpec::new(None, Some("s"), false, -1.0)]);
 
-            let (joule_unit, _) = eval_unit(&joule_unit, &context);
-            let (newton_meter_unit, _) = eval_unit(&newton_meter_unit, &context);
-
-            assert!(joule_unit.numerically_eq(&newton_meter_unit));
-        }
-
-        #[test]
-        fn eval_joules_are_kg_m2_s2() {
-            let joule_unit = ir_composite_unit([UnitSpec::new(Some("J"), None, false, 1.0)]);
-            let kg_m2_s2_unit = ir_composite_unit([
-                UnitSpec::new(Some("g"), Some("k"), false, 1.0),
-                UnitSpec::new(Some("m"), None, false, 2.0),
-                UnitSpec::new(Some("s"), None, false, -2.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (joule_unit, _) = eval_unit(&joule_unit, &context);
-            let (kg_m2_s2_unit, _) = eval_unit(&kg_m2_s2_unit, &context);
-
-            assert!(joule_unit.numerically_eq(&kg_m2_s2_unit));
-        }
-
-        #[test]
-        fn eval_watts_are_joules_per_second() {
-            let watt_unit = ir_composite_unit([UnitSpec::new(Some("W"), None, false, 1.0)]);
-            let joule_per_second_unit = ir_composite_unit([
-                UnitSpec::new(Some("J"), None, false, 1.0),
-                UnitSpec::new(Some("s"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (watt_unit, _) = eval_unit(&watt_unit, &context);
-            let (joule_per_second_unit, _) = eval_unit(&joule_per_second_unit, &context);
-
-            assert!(watt_unit.numerically_eq(&joule_per_second_unit));
-        }
-
-        #[test]
-        fn eval_watts_are_newton_meters_per_second() {
-            let watt_unit = ir_composite_unit([UnitSpec::new(Some("W"), None, false, 1.0)]);
-            let newton_meter_per_second_unit = ir_composite_unit([
-                UnitSpec::new(Some("N"), None, false, 1.0),
-                UnitSpec::new(Some("m"), None, false, 1.0),
-                UnitSpec::new(Some("s"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (watt_unit, _) = eval_unit(&watt_unit, &context);
-            let (newton_meter_per_second_unit, _) =
-                eval_unit(&newton_meter_per_second_unit, &context);
-
-            assert!(watt_unit.numerically_eq(&newton_meter_per_second_unit));
-        }
-
-        #[test]
-        fn eval_watts_are_kg_m2_s3() {
-            let watt_unit = ir_composite_unit([UnitSpec::new(Some("W"), None, false, 1.0)]);
-            let kg_m2_s3_unit = ir_composite_unit([
-                UnitSpec::new(Some("g"), Some("k"), false, 1.0),
-                UnitSpec::new(Some("m"), None, false, 2.0),
-                UnitSpec::new(Some("s"), None, false, -3.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (watt_unit, _) = eval_unit(&watt_unit, &context);
-            let (kg_m2_s3_unit, _) = eval_unit(&kg_m2_s3_unit, &context);
-
-            assert!(watt_unit.numerically_eq(&kg_m2_s3_unit));
-        }
-
-        #[test]
-        fn eval_volts_are_watts_per_ampere() {
-            let volt_unit = ir_composite_unit([UnitSpec::new(Some("V"), None, false, 1.0)]);
-            let watt_per_ampere_unit = ir_composite_unit([
-                UnitSpec::new(Some("W"), None, false, 1.0),
-                UnitSpec::new(Some("A"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (volt_unit, _) = eval_unit(&volt_unit, &context);
-            let (watt_per_ampere_unit, _) = eval_unit(&watt_per_ampere_unit, &context);
-
-            assert!(volt_unit.numerically_eq(&watt_per_ampere_unit));
-        }
-
-        #[test]
-        fn eval_volts_are_kg_m2_s3_a() {
-            let volt_unit = ir_composite_unit([UnitSpec::new(Some("V"), None, false, 1.0)]);
-            let kg_m2_s3_a_unit = ir_composite_unit([
-                UnitSpec::new(Some("g"), Some("k"), false, 1.0),
-                UnitSpec::new(Some("m"), None, false, 2.0),
-                UnitSpec::new(Some("s"), None, false, -3.0),
-                UnitSpec::new(Some("A"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (volt_unit, _) = eval_unit(&volt_unit, &context);
-            let (kg_m2_s3_a_unit, _) = eval_unit(&kg_m2_s3_a_unit, &context);
-
-            assert!(volt_unit.numerically_eq(&kg_m2_s3_a_unit));
-        }
-
-        #[test]
-        fn eval_ohms_are_volts_per_ampere() {
-            let ohm_unit = ir_composite_unit([UnitSpec::new(Some("Ohm"), None, false, 1.0)]);
-            let volt_per_ampere_unit = ir_composite_unit([
-                UnitSpec::new(Some("V"), None, false, 1.0),
-                UnitSpec::new(Some("A"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (ohm_unit, _) = eval_unit(&ohm_unit, &context);
-            let (volt_per_ampere_unit, _) = eval_unit(&volt_per_ampere_unit, &context);
-
-            assert!(ohm_unit.numerically_eq(&volt_per_ampere_unit));
-        }
-
-        #[test]
-        fn eval_ohms_are_kg_m2_s3_a2() {
-            let ohm_unit = ir_composite_unit([UnitSpec::new(Some("Ohm"), None, false, 1.0)]);
-            let kg_m2_s3_a2_unit = ir_composite_unit([
-                UnitSpec::new(Some("g"), Some("k"), false, 1.0),
-                UnitSpec::new(Some("m"), None, false, 2.0),
-                UnitSpec::new(Some("s"), None, false, -3.0),
-                UnitSpec::new(Some("A"), None, false, -2.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (ohm_unit, _) = eval_unit(&ohm_unit, &context);
-            let (kg_m2_s3_a2_unit, _) = eval_unit(&kg_m2_s3_a2_unit, &context);
-
-            assert!(ohm_unit.numerically_eq(&kg_m2_s3_a2_unit));
-        }
-
-        #[test]
-        fn eval_pascals_are_newtons_per_square_meter() {
-            let pascal_unit = ir_composite_unit([UnitSpec::new(Some("Pa"), None, false, 1.0)]);
-            let newton_per_square_meter_unit = ir_composite_unit([
-                UnitSpec::new(Some("N"), None, false, 1.0),
-                UnitSpec::new(Some("m"), None, false, -2.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (pascal_unit, _) = eval_unit(&pascal_unit, &context);
-            let (newton_per_square_meter_unit, _) =
-                eval_unit(&newton_per_square_meter_unit, &context);
-
-            assert!(pascal_unit.numerically_eq(&newton_per_square_meter_unit));
-        }
-
-        #[test]
-        fn eval_pascals_are_kg_m_s2() {
-            let pascal_unit = ir_composite_unit([UnitSpec::new(Some("Pa"), None, false, 1.0)]);
-            let kg_m_s2_unit = ir_composite_unit([
-                UnitSpec::new(Some("g"), Some("k"), false, 1.0),
-                UnitSpec::new(Some("m"), None, false, -1.0),
-                UnitSpec::new(Some("s"), None, false, -2.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (pascal_unit, _) = eval_unit(&pascal_unit, &context);
-            let (kg_m_s2_unit, _) = eval_unit(&kg_m_s2_unit, &context);
-
-            assert!(pascal_unit.numerically_eq(&kg_m_s2_unit));
-        }
-
-        #[test]
-        fn eval_watt_hours_are_watts_times_hours() {
-            let watt_hour_unit = ir_composite_unit([UnitSpec::new(Some("Wh"), None, false, 1.0)]);
-            let watt_times_hour_unit = ir_composite_unit([
-                UnitSpec::new(Some("W"), None, false, 1.0),
-                UnitSpec::new(Some("hr"), None, false, 1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (watt_hour_unit, _) = eval_unit(&watt_hour_unit, &context);
-            let (watt_times_hour_unit, _) = eval_unit(&watt_times_hour_unit, &context);
-
-            assert!(watt_hour_unit.numerically_eq(&watt_times_hour_unit));
-        }
-
-        #[test]
-        fn eval_amp_hours_are_amperes_times_hours() {
-            let amp_hour_unit = ir_composite_unit([UnitSpec::new(Some("Ah"), None, false, 1.0)]);
-            let ampere_times_hour_unit = ir_composite_unit([
-                UnitSpec::new(Some("A"), None, false, 1.0),
-                UnitSpec::new(Some("hr"), None, false, 1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (amp_hour_unit, _) = eval_unit(&amp_hour_unit, &context);
-            let (ampere_times_hour_unit, _) = eval_unit(&ampere_times_hour_unit, &context);
-
-            assert!(amp_hour_unit.numerically_eq(&ampere_times_hour_unit));
-        }
-
-        #[test]
-        fn eval_tesla_are_kg_s2_a() {
-            let tesla_unit = ir_composite_unit([UnitSpec::new(Some("T"), None, false, 1.0)]);
-            let kg_s2_a_unit = ir_composite_unit([
-                UnitSpec::new(Some("g"), Some("k"), false, 1.0),
-                UnitSpec::new(Some("s"), None, false, -2.0),
-                UnitSpec::new(Some("A"), None, false, -1.0),
-            ]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (tesla_unit, _) = eval_unit(&tesla_unit, &context);
-            let (kg_s2_a_unit, _) = eval_unit(&kg_s2_a_unit, &context);
-
-            assert!(tesla_unit.numerically_eq(&kg_s2_a_unit));
-        }
-
-        #[test]
-        fn eval_hertz_are_per_second() {
-            let hertz_unit = ir_composite_unit([UnitSpec::new(Some("Hz"), None, false, 1.0)]);
-            let per_second_unit = ir_composite_unit([UnitSpec::new(Some("s"), None, false, -1.0)]);
-            let mut external = TestExternalContext::new();
-            let context = EvalContext::new(&mut external);
-
-            let (hertz_unit, _) = eval_unit(&hertz_unit, &context);
-            let (per_second_unit, _) = eval_unit(&per_second_unit, &context);
-
-            assert_is_close(per_second_unit.magnitude, hertz_unit.magnitude / (2.0 * PI));
-            assert!(hertz_unit.dimensionally_eq(&per_second_unit));
-            assert!(!hertz_unit.is_db);
-            assert!(!per_second_unit.is_db);
-        }
+        assert_is_close(per_second_unit.magnitude, hertz_unit.magnitude / (2.0 * PI));
+        assert!(hertz_unit.dimensionally_eq(&per_second_unit));
+        assert!(!hertz_unit.is_db);
+        assert!(!per_second_unit.is_db);
     }
 }

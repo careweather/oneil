@@ -517,281 +517,33 @@ mod tests {
 
     use oneil_ir as ir;
     use oneil_output::{
-        self as output, Dimension, DimensionMap, DisplayUnit, EvalError, ExpectedType, Number,
-        NumberType, Value, ValueType,
+        self as output, Dimension, DisplayUnit, EvalError, ExpectedType, Number, Value, ValueType,
     };
     use oneil_shared::{
         EvalInstanceKey,
-        labels::ParameterLabel,
         paths::PythonPath,
-        span::Span,
-        symbols::{
-            BuiltinFunctionName, BuiltinValueName, ParameterName, PyFunctionName, ReferenceName,
-            UnitBaseName, UnitName, UnitPrefix,
-        },
+        symbols::{BuiltinValueName, ParameterName, PyFunctionName, ReferenceName},
     };
 
     use crate::{
-        assert_is_close, assert_units_dimensionally_eq,
+        assert_boolean, assert_invalid_type, assert_is_close, assert_scalar_close,
+        assert_type_mismatch, assert_units_dimensionally_eq,
         context::EvalContext,
         test_context::{TestExternalContext, test_model_path},
+        test_fixtures::{
+            UnitSpec, binary, builtin_call, compare, compare_chained, external_var, imported_call,
+            ir_composite_unit, lit_bool, lit_number, lit_string, output_parameter, param_var,
+            scalar_number_type, span, unary,
+        },
     };
 
     use super::*;
-
-    /// Returns a dummy span for constructing IR nodes in tests.
-    fn random_span() -> Span {
-        Span::synthetic()
-    }
-
-    /// Builds a numeric literal expression.
-    fn lit_number(value: f64) -> ir::Expr {
-        ir::Expr::literal(random_span(), ir::Literal::number(value))
-    }
-
-    /// Builds a boolean literal expression.
-    fn lit_bool(value: bool) -> ir::Expr {
-        ir::Expr::literal(random_span(), ir::Literal::boolean(value))
-    }
-
-    /// Builds a string literal expression.
-    fn lit_string(value: &str) -> ir::Expr {
-        ir::Expr::literal(random_span(), ir::Literal::string(value.to_string()))
-    }
-
-    /// Builds a binary operation over two expressions.
-    fn binary(op: ir::BinaryOp, left: ir::Expr, right: ir::Expr) -> ir::Expr {
-        ir::Expr::binary_op(random_span(), op, left, right)
-    }
-
-    /// Builds a unary operation over an expression.
-    fn unary(op: ir::UnaryOp, expr: ir::Expr) -> ir::Expr {
-        ir::Expr::unary_op(random_span(), op, expr)
-    }
-
-    /// Builds a comparison between two expressions.
-    fn compare(op: ir::ComparisonOp, left: ir::Expr, right: ir::Expr) -> ir::Expr {
-        ir::Expr::comparison_op(random_span(), op, left, right, vec![])
-    }
-
-    /// Builds a chained comparison expression.
-    fn compare_chained(
-        left: ir::Expr,
-        op: ir::ComparisonOp,
-        right: ir::Expr,
-        rest: Vec<(ir::ComparisonOp, ir::Expr)>,
-    ) -> ir::Expr {
-        ir::Expr::comparison_op(random_span(), op, left, right, rest)
-    }
-
-    /// Asserts that `error` is an [`EvalError::InvalidType`] with the given types.
-    #[track_caller]
-    fn assert_invalid_type(error: &EvalError, expected: &ExpectedType, found: &ValueType) {
-        assert!(
-            matches!(
-                error,
-                EvalError::InvalidType {
-                    expected_type,
-                    found_type,
-                    ..
-                } if expected_type == expected && found_type == found
-            ),
-            "expected InvalidType {{ expected: {expected:?}, found: {found:?} }}, got {error:?}"
-        );
-    }
-
-    /// Asserts that `error` is an [`EvalError::TypeMismatch`] with the given types.
-    #[track_caller]
-    fn assert_type_mismatch(error: &EvalError, expected: &ExpectedType, found: &ValueType) {
-        assert!(
-            matches!(
-                error,
-                EvalError::TypeMismatch {
-                    expected_type,
-                    found_type,
-                    ..
-                } if expected_type == expected && found_type == found
-            ),
-            "expected TypeMismatch {{ expected: {expected:?}, found: {found:?} }}, got {error:?}"
-        );
-    }
-
-    /// A scalar number value type.
-    const fn scalar_number_type() -> ValueType {
-        ValueType::Number {
-            number_type: NumberType::Scalar,
-        }
-    }
-
-    /// Specification for a unit in tests.
-    #[derive(Debug, Clone, Copy)]
-    struct UnitSpec {
-        base_name: Option<&'static str>,
-        prefix: Option<&'static str>,
-        is_db: bool,
-        exponent: f64,
-    }
-
-    impl UnitSpec {
-        const fn new(
-            base_name: Option<&'static str>,
-            prefix: Option<&'static str>,
-            is_db: bool,
-            exponent: f64,
-        ) -> Self {
-            Self {
-                base_name,
-                prefix,
-                is_db,
-                exponent,
-            }
-        }
-    }
-
-    fn build_full_name(base_name: Option<&str>, prefix: Option<&str>, is_db: bool) -> UnitName {
-        UnitName::new(format!(
-            "{}{}{}",
-            if is_db { "dB" } else { "" },
-            prefix.unwrap_or(""),
-            base_name.unwrap_or("")
-        ))
-    }
-
-    fn build_unit_info(base_name: Option<&str>, prefix: Option<&str>, is_db: bool) -> ir::UnitInfo {
-        if is_db {
-            ir::UnitInfo::Db {
-                prefix: prefix.map(UnitPrefix::from),
-                base_name: base_name.map(UnitBaseName::from),
-            }
-        } else {
-            ir::UnitInfo::Standard {
-                prefix: prefix.map(UnitPrefix::from),
-                base_name: UnitBaseName::from(base_name.expect("base name should be provided")),
-            }
-        }
-    }
-
-    fn ir_display_composite_unit(
-        unit_list: impl IntoIterator<Item = UnitSpec>,
-    ) -> ir::DisplayCompositeUnit {
-        let mut units = unit_list.into_iter().map(|spec| {
-            ir::DisplayCompositeUnit::BaseUnit(ir::DisplayUnit::new(
-                build_full_name(spec.base_name, spec.prefix, spec.is_db).into_string(),
-                spec.exponent,
-            ))
-        });
-
-        let Some(first) = units.next() else {
-            return ir::DisplayCompositeUnit::One;
-        };
-
-        units.fold(first, |acc, unit| {
-            ir::DisplayCompositeUnit::Multiply(Box::new(acc), Box::new(unit))
-        })
-    }
-
-    fn ir_composite_unit(unit_list: impl IntoIterator<Item = UnitSpec>) -> ir::CompositeUnit {
-        let unit_specs: Vec<_> = unit_list.into_iter().collect();
-        let display_unit = ir_display_composite_unit(unit_specs.iter().copied());
-        let unit_vec = unit_specs
-            .into_iter()
-            .map(|spec| {
-                let full_name = build_full_name(spec.base_name, spec.prefix, spec.is_db);
-                let info = build_unit_info(spec.base_name, spec.prefix, spec.is_db);
-                ir::Unit::new(
-                    random_span(),
-                    full_name,
-                    random_span(),
-                    spec.exponent,
-                    None,
-                    info,
-                )
-            })
-            .collect::<Vec<_>>();
-        ir::CompositeUnit::new(
-            unit_vec,
-            display_unit,
-            random_span(),
-            DimensionMap::dimensionless(),
-        )
-    }
 
     /// Evaluates an expression in a fresh test context.
     fn eval(expr: &ir::Expr) -> Result<Value, Vec<EvalError>> {
         let mut external = TestExternalContext::new();
         let mut context = EvalContext::new(&mut external);
         eval_expr(expr, &mut context).map(|(value, _span)| value)
-    }
-
-    /// Asserts that a value is a scalar number close to `expected`.
-    fn assert_scalar_close(expected: f64, value: &Value) {
-        let Value::Number(Number::Scalar(actual)) = value else {
-            panic!("expected scalar number, got {value:?}");
-        };
-        assert_is_close(expected, *actual);
-    }
-
-    /// Asserts that a value is the given boolean.
-    fn assert_boolean(expected: bool, value: &Value) {
-        assert_eq!(value, &Value::Boolean(expected));
-    }
-
-    /// Builds a stub evaluated parameter for seeding the eval context.
-    fn parameter_result(name: &str, value: Value) -> output::Parameter {
-        output::Parameter {
-            value,
-            ident: ParameterName::from(name),
-            label: ParameterLabel::from(name),
-            print_level: output::PrintLevel::None,
-            debug_info: None,
-            dependencies: output::DependencySet::default(),
-            expr_span: random_span(),
-            warnings: Vec::new(),
-        }
-    }
-
-    /// Builds a parameter variable expression.
-    fn param_var(name: &str) -> ir::Expr {
-        ir::Expr::parameter_variable(
-            random_span(),
-            random_span(),
-            ParameterName::from(name),
-        )
-    }
-
-    /// Builds an external parameter variable expression (`name.reference`).
-    fn external_var(parameter_name: &str, reference_name: &str) -> ir::Expr {
-        ir::Expr::external_variable(
-            random_span(),
-            ReferenceName::from(reference_name),
-            random_span(),
-            ParameterName::from(parameter_name),
-            random_span(),
-        )
-    }
-
-    /// Builds a builtin function call expression.
-    fn builtin_call(name: &str, args: Vec<ir::Expr>) -> ir::Expr {
-        ir::Expr::function_call(
-            random_span(),
-            random_span(),
-            ir::FunctionName::builtin(BuiltinFunctionName::from(name), random_span()),
-            args,
-        )
-    }
-
-    /// Builds an imported function call expression.
-    fn imported_call(python_path: &str, name: &str, args: Vec<ir::Expr>) -> ir::Expr {
-        ir::Expr::function_call(
-            random_span(),
-            random_span(),
-            ir::FunctionName::imported(
-                PythonPath::from_str_no_ext(python_path),
-                PyFunctionName::from(name),
-                random_span(),
-            ),
-            args,
-        )
     }
 
     mod literals {
@@ -820,73 +572,37 @@ mod tests {
         use super::*;
 
         #[test]
-        fn eval_add() {
-            let expr = binary(ir::BinaryOp::Add, lit_number(2.0), lit_number(3.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(5.0, &value);
+        fn eval_numeric_ops_table() {
+            let cases = [
+                (ir::BinaryOp::Add, 2.0, 3.0, 5.0),
+                (ir::BinaryOp::Sub, 5.0, 2.0, 3.0),
+                (ir::BinaryOp::EscapedSub, 5.0, 2.0, 3.0),
+                (ir::BinaryOp::Mul, 4.0, 3.0, 12.0),
+                (ir::BinaryOp::Div, 10.0, 4.0, 2.5),
+                (ir::BinaryOp::EscapedDiv, 10.0, 4.0, 2.5),
+                (ir::BinaryOp::Mod, 10.0, 3.0, 1.0),
+                (ir::BinaryOp::Pow, 2.0, 3.0, 8.0),
+            ];
+
+            for (op, left, right, expected) in cases {
+                let value = eval(&binary(op, lit_number(left), lit_number(right)))
+                    .expect("eval should succeed");
+                assert_scalar_close(expected, &value);
+            }
         }
 
         #[test]
-        fn eval_sub() {
-            let expr = binary(ir::BinaryOp::Sub, lit_number(5.0), lit_number(2.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(3.0, &value);
-        }
+        fn eval_boolean_ops_table() {
+            let cases = [
+                (ir::BinaryOp::And, true, false, false),
+                (ir::BinaryOp::Or, false, true, true),
+            ];
 
-        #[test]
-        fn eval_escaped_sub() {
-            let expr = binary(ir::BinaryOp::EscapedSub, lit_number(5.0), lit_number(2.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(3.0, &value);
-        }
-
-        #[test]
-        fn eval_mul() {
-            let expr = binary(ir::BinaryOp::Mul, lit_number(4.0), lit_number(3.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(12.0, &value);
-        }
-
-        #[test]
-        fn eval_div() {
-            let expr = binary(ir::BinaryOp::Div, lit_number(10.0), lit_number(4.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(2.5, &value);
-        }
-
-        #[test]
-        fn eval_escaped_div() {
-            let expr = binary(ir::BinaryOp::EscapedDiv, lit_number(10.0), lit_number(4.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(2.5, &value);
-        }
-
-        #[test]
-        fn eval_mod() {
-            let expr = binary(ir::BinaryOp::Mod, lit_number(10.0), lit_number(3.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(1.0, &value);
-        }
-
-        #[test]
-        fn eval_pow() {
-            let expr = binary(ir::BinaryOp::Pow, lit_number(2.0), lit_number(3.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(8.0, &value);
-        }
-
-        #[test]
-        fn eval_and() {
-            let expr = binary(ir::BinaryOp::And, lit_bool(true), lit_bool(false));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(false, &value);
-        }
-
-        #[test]
-        fn eval_or() {
-            let expr = binary(ir::BinaryOp::Or, lit_bool(false), lit_bool(true));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
+            for (op, left, right, expected) in cases {
+                let value = eval(&binary(op, lit_bool(left), lit_bool(right)))
+                    .expect("eval should succeed");
+                assert_boolean(expected, &value);
+            }
         }
 
         #[test]
@@ -969,64 +685,21 @@ mod tests {
         use super::*;
 
         #[test]
-        fn eval_eq_true() {
-            let expr = compare(ir::ComparisonOp::Eq, lit_number(2.0), lit_number(2.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
-        }
-
-        #[test]
-        fn eval_eq_false() {
-            let expr = compare(ir::ComparisonOp::Eq, lit_number(2.0), lit_number(3.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(false, &value);
-        }
-
-        #[test]
-        fn eval_not_eq() {
-            let expr = compare(ir::ComparisonOp::NotEq, lit_number(2.0), lit_number(3.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
-        }
-
-        #[test]
-        fn eval_less_than() {
-            let expr = compare(ir::ComparisonOp::LessThan, lit_number(1.0), lit_number(2.0));
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
-        }
-
-        #[test]
-        fn eval_less_than_eq() {
-            let expr = compare(
-                ir::ComparisonOp::LessThanEq,
-                lit_number(2.0),
-                lit_number(2.0),
-            );
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
-        }
-
-        #[test]
-        fn eval_greater_than() {
-            let expr = compare(
-                ir::ComparisonOp::GreaterThan,
-                lit_number(3.0),
-                lit_number(1.0),
-            );
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
-        }
-
-        #[test]
-        fn eval_greater_than_eq() {
-            let expr = compare(
-                ir::ComparisonOp::GreaterThanEq,
-                lit_number(3.0),
-                lit_number(3.0),
-            );
-            let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
+        fn eval_comparisons_table() {
+            let cases = [
+                (ir::ComparisonOp::Eq, 2.0, 2.0, true),
+                (ir::ComparisonOp::Eq, 2.0, 3.0, false),
+                (ir::ComparisonOp::NotEq, 2.0, 3.0, true),
+                (ir::ComparisonOp::LessThan, 1.0, 2.0, true),
+                (ir::ComparisonOp::LessThanEq, 2.0, 2.0, true),
+                (ir::ComparisonOp::GreaterThan, 3.0, 1.0, true),
+                (ir::ComparisonOp::GreaterThanEq, 3.0, 3.0, true),
+            ];
+            for (op, left, right, expected) in cases {
+                let value = eval(&compare(op, lit_number(left), lit_number(right)))
+                    .expect("eval should succeed");
+                assert_boolean(expected, &value);
+            }
         }
 
         #[test]
@@ -1092,7 +765,7 @@ mod tests {
 
         #[test]
         fn eval_fallback_uses_left_when_successful() {
-            let expr = ir::Expr::fallback(random_span(), lit_number(1.0), lit_number(2.0));
+            let expr = ir::Expr::fallback(span(), lit_number(1.0), lit_number(2.0));
             let value = eval(&expr).expect("eval should succeed");
             assert_scalar_close(1.0, &value);
         }
@@ -1102,7 +775,7 @@ mod tests {
             // Left fails with a type error (not a PythonEvalError), so fallback
             // must not evaluate the right side.
             let expr = ir::Expr::fallback(
-                random_span(),
+                span(),
                 unary(ir::UnaryOp::Not, lit_number(1.0)),
                 lit_number(2.0),
             );
@@ -1117,8 +790,8 @@ mod tests {
 
         #[test]
         fn eval_cast_number_to_meters() {
-            let unit = ir_composite_unit([UnitSpec::new(Some("m"), None, false, 1.0)]);
-            let expr = ir::Expr::unit_cast(random_span(), lit_number(5.0), unit);
+            let unit = ir_composite_unit([UnitSpec::new(None, Some("m"), false, 1.0)]);
+            let expr = ir::Expr::unit_cast(span(), lit_number(5.0), unit);
             let value = eval(&expr).expect("eval should succeed");
 
             let Value::MeasuredNumber(measured) = value else {
@@ -1135,8 +808,8 @@ mod tests {
 
         #[test]
         fn eval_cast_number_to_kilometers() {
-            let unit = ir_composite_unit([UnitSpec::new(Some("m"), Some("k"), false, 1.0)]);
-            let expr = ir::Expr::unit_cast(random_span(), lit_number(2.0), unit);
+            let unit = ir_composite_unit([UnitSpec::new(Some("k"), Some("m"), false, 1.0)]);
+            let expr = ir::Expr::unit_cast(span(), lit_number(2.0), unit);
             let value = eval(&expr).expect("eval should succeed");
 
             let Value::MeasuredNumber(measured) = value else {
@@ -1154,8 +827,8 @@ mod tests {
 
         #[test]
         fn eval_cast_rejects_boolean() {
-            let unit = ir_composite_unit([UnitSpec::new(Some("m"), None, false, 1.0)]);
-            let expr = ir::Expr::unit_cast(random_span(), lit_bool(true), unit);
+            let unit = ir_composite_unit([UnitSpec::new(None, Some("m"), false, 1.0)]);
+            let expr = ir::Expr::unit_cast(span(), lit_bool(true), unit);
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
             assert_type_mismatch(
@@ -1168,10 +841,10 @@ mod tests {
         #[test]
         fn eval_cast_unit_mismatch() {
             // First cast to meters, then attempt to cast the measured value to seconds.
-            let meters = ir_composite_unit([UnitSpec::new(Some("m"), None, false, 1.0)]);
-            let seconds = ir_composite_unit([UnitSpec::new(Some("s"), None, false, 1.0)]);
-            let measured = ir::Expr::unit_cast(random_span(), lit_number(1.0), meters);
-            let expr = ir::Expr::unit_cast(random_span(), measured, seconds);
+            let meters = ir_composite_unit([UnitSpec::new(None, Some("m"), false, 1.0)]);
+            let seconds = ir_composite_unit([UnitSpec::new(None, Some("s"), false, 1.0)]);
+            let measured = ir::Expr::unit_cast(span(), lit_number(1.0), meters);
+            let expr = ir::Expr::unit_cast(span(), measured, seconds);
 
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
@@ -1195,22 +868,14 @@ mod tests {
 
         #[test]
         fn eval_builtin_pi() {
-            let expr = ir::Expr::builtin_variable(
-                random_span(),
-                random_span(),
-                BuiltinValueName::from("pi"),
-            );
+            let expr = ir::Expr::builtin_variable(span(), span(), BuiltinValueName::from("pi"));
             let value = eval(&expr).expect("eval should succeed");
             assert_scalar_close(PI, &value);
         }
 
         #[test]
         fn eval_builtin_e() {
-            let expr = ir::Expr::builtin_variable(
-                random_span(),
-                random_span(),
-                BuiltinValueName::from("e"),
-            );
+            let expr = ir::Expr::builtin_variable(span(), span(), BuiltinValueName::from("e"));
             let value = eval(&expr).expect("eval should succeed");
             assert_scalar_close(E, &value);
         }
@@ -1223,7 +888,7 @@ mod tests {
             context.push_active_model(model);
             context.add_parameter_result(
                 ParameterName::from("x"),
-                Ok(parameter_result("x", Value::Number(Number::Scalar(10.0)))),
+                Ok(output_parameter("x", Value::Number(Number::Scalar(10.0)))),
             );
 
             let value = eval_expr(&param_var("x"), &mut context)
@@ -1239,7 +904,7 @@ mod tests {
             context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
             context.add_parameter_result(
                 ParameterName::from("x"),
-                Ok(parameter_result("x", Value::Number(Number::Scalar(3.0)))),
+                Ok(output_parameter("x", Value::Number(Number::Scalar(3.0)))),
             );
 
             let expr = binary(ir::BinaryOp::Add, param_var("x"), lit_number(2.0));
@@ -1256,8 +921,8 @@ mod tests {
             let model = EvalInstanceKey::root(test_model_path("test"));
             context.push_active_model(model.clone());
 
-            let errors = eval_expr(&param_var("missing"), &mut context)
-                .expect_err("eval should fail");
+            let errors =
+                eval_expr(&param_var("missing"), &mut context).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
             assert!(
                 matches!(
@@ -1285,7 +950,7 @@ mod tests {
             context.add_parameter_result_to(
                 &child,
                 ParameterName::from("y"),
-                Ok(parameter_result("y", Value::Number(Number::Scalar(7.0)))),
+                Ok(output_parameter("y", Value::Number(Number::Scalar(7.0)))),
             );
 
             context.push_active_model(parent);
@@ -1398,7 +1063,7 @@ mod tests {
             context.set_evaluation_cache_root(test_model_path("test"));
 
             let expr = ir::Expr::fallback(
-                random_span(),
+                span(),
                 imported_call("helpers", "fail", vec![lit_number(1.0)]),
                 lit_number(99.0),
             );

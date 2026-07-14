@@ -217,10 +217,7 @@ mod tests {
     ///
     /// Panics if the actual units do not match the expected units.
     #[track_caller]
-    fn assert_units_match(
-        actual_units: &[ir::Unit],
-        expected_units: &[(&str, f64)],
-    ) {
+    fn assert_units_match(actual_units: &[ir::Unit], expected_units: &[(&str, f64)]) {
         let mut actual_units: Vec<(&str, f64)> = actual_units
             .iter()
             .map(|unit| (unit.name().as_str(), unit.exponent()))

@@ -15,9 +15,7 @@ use oneil_shared::{
     load_result::LoadResult,
     paths::{ModelPath, PythonPath},
     span::Span,
-    symbols::{
-        BuiltinFunctionName, BuiltinValueName, PyFunctionName, UnitBaseName, UnitPrefix,
-    },
+    symbols::{BuiltinFunctionName, BuiltinValueName, PyFunctionName, UnitBaseName, UnitPrefix},
 };
 
 use crate::context::ExternalEvaluationContext;
