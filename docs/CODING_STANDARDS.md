@@ -86,8 +86,8 @@ use the following tools.
 ### `cargo fmt`
 
 Using `cargo fmt` allows us to keep the code style consistent. As defined in
-[`rustfmt.toml`](./rustfmt.toml), we use the default style for the `2024`
-edition. This should be updated if the edition in [`Cargo.toml`](./Cargo.toml)
+[`rustfmt.toml`](../rustfmt.toml), we use the default style for the `2024`
+edition. This should be updated if the edition in [`Cargo.toml`](../Cargo.toml)
 is updated.
 
 If you are running VS Code, set `"editor.formatOnSave"` to `true` in your
@@ -105,7 +105,7 @@ For more information, see [the section on testing](#testing).
 
 Use `cargo clippy` to lint your code. This helps to catch potential errors and
 to use a consistent style of coding. `clippy` lints are defined in
-[`Cargo.toml`](./Cargo.toml) in the `[workspace.lints.*]` sections.
+[`Cargo.toml`](../Cargo.toml) in the `[workspace.lints.*]` sections.
 
 If you are using `rust-analyzer` in VS Code, ensure that you are using the
 `clippy` linter by [updating your
@@ -156,6 +156,29 @@ fn bar(key: u32) -> u32 {
 }
 ```
 
+## Prefer direct field access over getters and setters
+
+In Rust, structs that carry data should expose their fields as `pub` rather than
+hiding them behind getter and setter methods. Direct field access is simpler and
+avoids boilerplate that doesn't provide any value. For example,
+
+```rs
+pub struct DesignApplication {
+    pub apply_span: Span,
+    pub applied_in: ModelPath,
+    pub design_path: DesignPath,
+}
+
+let span = &application.apply_span;
+```
+
+Use a method instead of a public field **only** when you need to:
+
+- **maintain an invariant** (e.g., the setter validates the input)
+- **return a computed or derived value** rather than a stored one
+- **expose a borrowed view** of a private inner type, such as `as_str()` on a
+  newtype around `String`
+
 ## Prefer Readable Code Over Terse Code
 
 More people will read the code than write it, so optimize the code for reading.
@@ -168,15 +191,16 @@ let reference = model.references().get(reference_name);
 let reference_path = reference.path();
 ```
 
-is better than
+It could also be improved by creating a helper function.
+
+For example,
 
 ```rs
-let reference_path = runtime
-    .load_model(model_path)
-    .references()
-    .get(reference_name)
-    .path();
+let reference_path = runtime.load_model(model_path).reference_path_of(reference_name);
 ```
+
+In general, when there is a chain of function calls, ask yourself if some segment
+of it can be made more generally useful throughout the codebase.
 
 ## Avoid Writing Declarative Macros
 
@@ -207,16 +231,6 @@ size or speed, and their use has some useful benefits.
 Newtypes are a great way to help yourself and others use a value correctly.
 For example, if we store both python paths and model paths as `PathBuf`s, we
 might accidentally use a python path where we need a model path, or vice versa.
-
-```rs
-let model_path = PathBuf::from("model.on");
-let python_path = PathBuf::from("functions.on");
-    
-// ... later ...
-
-// this compiles, even though a python file will fail to parse correctly
-let model = load_model(python_path);
-```
 
 Using a newtype ensures that this kind of mistake can't happen.
 
@@ -261,28 +275,8 @@ struct Reference {
 ```
 
 However, using this representation means that it is possible to have an alias
-name without a span, or an alias span without a name.
-
-```rs
-Reference {
-  name: ReferenceName("foo"),
-  span: Span(7, 10),
-  // name with no span
-  alias_name: Some(AliasName("f")),
-  alias_span: None,
-}
-
-Reference {
-  name: ReferenceName("foo"),
-  span: Span(7, 10),
-  // span with no name
-  alias_name: None,
-  alias_span: Some(Span(14, 15)),
-}
-```
-
-Neither of these states make sense. To make them impossible, they can be merged
-into a single `Option`.
+name without a span, or an alias span without a name. Neither of these states
+make sense. To make them impossible, they can be merged into a single `Option`.
 
 ```rs
 struct Reference {
@@ -331,22 +325,12 @@ it. Generally avoid using `match` since there's usually only one expected path,
 and `let ... else` keeps the failure close to the unwrapping.
 
 ```rust
-// PREFER THIS
 let MyEnum::Variant1 { field1, field2 } = value else {
   panic!("Expected Variant1, got {value:?}");
 };
 
 assert_eq!(field1, expected_field1);
 assert_eq!(field2, expected_field2);
-
-// OVER THIS
-match value {
-  MyEnum::Variant1 { field1, field2 } => {
-    assert_eq!(field1, expected_field1);
-    assert_eq!(field2, expected_field2);
-  }
-  _ => panic!("Expected Variant1, got {value:?}");
-}
 ```
 
 ### Snapshot Tests
@@ -410,7 +394,7 @@ fuzz_target!(|input: AssociativityInput| {
 The unit test is deterministic and only runs once, whereas the property test
 is run on many semi-random inputs. Running on many inputs enables a property
 test to discover inputs that break the property, if any exist. This can give
-you confidence that a property is probably sound.
+you confidence that a property holds.
 
 For more details on fuzz testing and `cargo fuzz`, see the
 [Rust Fuzz Book](https://rust-fuzz.github.io/book/cargo-fuzz.html).
