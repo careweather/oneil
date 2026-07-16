@@ -173,7 +173,8 @@ impl analysis::ExternalAnalysisContext for Runtime {
         &self,
         instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
-    ) -> Option<Result<oneil_output::Parameter, oneil_analysis::output::error::GetValueError>> {
+    ) -> Option<Result<&oneil_output::Parameter, oneil_analysis::output::error::GetValueError>>
+    {
         let entry = self.eval_cache.get_entry_instance(instance_key)?;
         let parameter = entry.value().map_or_else(
             || Err(oneil_analysis::output::error::GetValueError::Model),
@@ -181,7 +182,6 @@ impl analysis::ExternalAnalysisContext for Runtime {
                 model
                     .parameters
                     .get(parameter_name)
-                    .cloned()
                     .ok_or(oneil_analysis::output::error::GetValueError::Parameter)
             },
         );
@@ -193,7 +193,7 @@ impl analysis::ExternalAnalysisContext for Runtime {
         &self,
         instance_key: &EvalInstanceKey,
         test_index: TestIndex,
-    ) -> Option<Result<oneil_output::Test, oneil_analysis::output::error::GetTestValueError>> {
+    ) -> Option<Result<&oneil_output::Test, oneil_analysis::output::error::GetTestValueError>> {
         let entry = self.eval_cache.get_entry_instance(instance_key)?;
         let test = entry.value().map_or_else(
             || Err(oneil_analysis::output::error::GetTestValueError::Model),
@@ -201,7 +201,6 @@ impl analysis::ExternalAnalysisContext for Runtime {
                 model
                     .tests
                     .get(&test_index)
-                    .cloned()
                     .ok_or(oneil_analysis::output::error::GetTestValueError::Test)
             },
         );

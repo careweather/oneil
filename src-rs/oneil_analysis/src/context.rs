@@ -42,7 +42,7 @@ pub trait ExternalAnalysisContext {
         &self,
         instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
-    ) -> Option<Result<Parameter, GetValueError>>;
+    ) -> Option<Result<&Parameter, GetValueError>>;
 
     /// Looks up an evaluated test by instance key and test index.
     ///
@@ -52,7 +52,7 @@ pub trait ExternalAnalysisContext {
         &self,
         instance_key: &EvalInstanceKey,
         test_index: TestIndex,
-    ) -> Option<Result<Test, GetTestValueError>>;
+    ) -> Option<Result<&Test, GetTestValueError>>;
 }
 
 /// Context for tree operations that holds a mutable reference to an [`ExternalAnalysisContext`].
@@ -114,7 +114,7 @@ impl<'external, E: ExternalAnalysisContext> TreeContext<'external, E> {
         &self,
         instance_key: &EvalInstanceKey,
         test_index: TestIndex,
-    ) -> Option<Result<Test, GetTestValueError>> {
+    ) -> Option<Result<&Test, GetTestValueError>> {
         self.external.lookup_test_value(instance_key, test_index)
     }
 
@@ -124,7 +124,7 @@ impl<'external, E: ExternalAnalysisContext> TreeContext<'external, E> {
         &self,
         instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
-    ) -> Option<Result<Parameter, GetValueError>> {
+    ) -> Option<Result<&Parameter, GetValueError>> {
         self.external
             .lookup_parameter_value(instance_key, parameter_name)
     }

@@ -82,10 +82,10 @@ fn get_dependency_value<E: ExternalAnalysisContext>(
             },
         );
 
-        let parameter_value = parameter.value;
+        let parameter_value = parameter.value.clone();
         let display_info = Some((
             location.instance_key.model_path.clone(),
-            parameter.expr_span,
+            parameter.expr_span.clone(),
         ));
 
         output::DependencyTreeValue {
@@ -194,8 +194,8 @@ fn get_reference_value<E: ExternalAnalysisContext>(
     let result = parameter.map(|parameter| {
         let model_path = location.instance_key.model_path.clone();
         let parameter_name = location.parameter_name.clone();
-        let parameter_value = parameter.value;
-        let display_info = (model_path.clone(), parameter.expr_span);
+        let parameter_value = parameter.value.clone();
+        let display_info = (model_path.clone(), parameter.expr_span.clone());
 
         output::ReferenceTreeValue::Parameter {
             model_path,
@@ -244,7 +244,7 @@ fn get_reference_tree_children(
         let result = test
             .map(|test| {
                 let test_passed = test.passed();
-                let display_info = (model_path.clone(), test.expr_span);
+                let display_info = (model_path.clone(), test.expr_span.clone());
 
                 output::ReferenceTreeValue::Test {
                     model_path: model_path.clone(),
@@ -268,7 +268,7 @@ fn get_reference_tree_children(
             .map(|test| {
                 let test_passed = test.passed();
                 let model_path = dep.instance_key.model_path.clone();
-                let display_info = (model_path.clone(), test.expr_span);
+                let display_info = (model_path.clone(), test.expr_span.clone());
 
                 output::ReferenceTreeValue::Test {
                     model_path,

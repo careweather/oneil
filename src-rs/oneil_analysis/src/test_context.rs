@@ -126,11 +126,11 @@ impl ExternalAnalysisContext for TestAnalysisContext {
         &self,
         instance_key: &EvalInstanceKey,
         parameter_name: &ParameterName,
-    ) -> Option<Result<Parameter, GetValueError>> {
+    ) -> Option<Result<&Parameter, GetValueError>> {
         self.parameters
             .get(&(instance_key.clone(), parameter_name.clone()))
             .map(|result| match result {
-                Ok(parameter) => Ok(parameter.clone()),
+                Ok(parameter) => Ok(parameter),
                 Err(GetValueError::Model) => Err(GetValueError::Model),
                 Err(GetValueError::Parameter) => Err(GetValueError::Parameter),
             })
@@ -140,11 +140,11 @@ impl ExternalAnalysisContext for TestAnalysisContext {
         &self,
         instance_key: &EvalInstanceKey,
         test_index: TestIndex,
-    ) -> Option<Result<Test, GetTestValueError>> {
+    ) -> Option<Result<&Test, GetTestValueError>> {
         self.tests
             .get(&(instance_key.clone(), test_index))
             .map(|result| match result {
-                Ok(test) => Ok(test.clone()),
+                Ok(test) => Ok(test),
                 Err(GetTestValueError::Model) => Err(GetTestValueError::Model),
                 Err(GetTestValueError::Test) => Err(GetTestValueError::Test),
             })
