@@ -1726,7 +1726,7 @@ mod tests {
             };
             assert!(rest.fragment().is_empty() || rest.fragment().chars().all(char::is_whitespace));
             let Decl::Submodel(um) = &*decl else {
-                panic!("Expected Submodel, got {:?}", &*decl);
+                panic!("Expected Submodel, got {decl:?}");
             };
             assert_eq!(um.model_info().top_component().as_str(), "foo");
             assert_eq!(um.model_info().get_alias().as_str(), "bar");
@@ -1744,7 +1744,7 @@ mod tests {
             };
             assert!(rest.fragment().is_empty() || rest.fragment().chars().all(char::is_whitespace));
             let Decl::Submodel(um) = &*decl else {
-                panic!("Expected Submodel, got {:?}", &*decl);
+                panic!("Expected Submodel, got {decl:?}");
             };
             assert_eq!(um.model_info().top_component().as_str(), "foo");
             assert_eq!(um.model_info().get_alias().as_str(), "bar");
@@ -1762,7 +1762,7 @@ mod tests {
                 panic!("Expected Ok, got {result:?}");
             };
             let Decl::Submodel(um) = &*decl else {
-                panic!("Expected Submodel, got {:?}", &*decl);
+                panic!("Expected Submodel, got {decl:?}");
             };
             assert!(um.imported_submodels().is_none());
         }

@@ -440,10 +440,9 @@ fn resolve_alias_model(
 
     let mut node: &InstancedModel = if let Some(sub) = host.submodels().get(first) {
         sub.instance.as_ref()
-    } else if let Some(r) = host.references().get(first) {
-        pool.get(&r.path).map(std::convert::AsRef::as_ref)?
     } else {
-        return None;
+        let r = host.references().get(first)?;
+        pool.get(&r.path).map(std::convert::AsRef::as_ref)?
     };
 
     for seg in iter {
@@ -469,10 +468,9 @@ fn resolve_alias_instance<'a>(
 
     let mut node: &InstancedModel = if let Some(sub) = host.submodels().get(first) {
         sub.instance.as_ref()
-    } else if let Some(r) = host.references().get(first) {
-        pool.get(&r.path).map(std::convert::AsRef::as_ref)?
     } else {
-        return None;
+        let r = host.references().get(first)?;
+        pool.get(&r.path).map(std::convert::AsRef::as_ref)?
     };
 
     for seg in iter {

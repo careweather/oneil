@@ -1062,15 +1062,14 @@ fn navigate_in_subtree<'a>(
     for seg in segments {
         if let Some(sub) = current.submodels().get(seg) {
             current = sub.instance.as_ref();
-        } else if let Some(alias) = current.aliases().get(seg) {
+        } else {
+            let alias = current.aliases().get(seg)?;
             // Follow the alias path through the submodel tree.
             let mut resolved = current;
             for alias_seg in alias.alias_path.segments() {
                 resolved = resolved.submodels().get(alias_seg)?.instance.as_ref();
             }
             current = resolved;
-        } else {
-            return None;
         }
     }
     Some(current)

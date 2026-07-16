@@ -530,10 +530,9 @@ fn resolve_external_instance_key(
             model_path: submodel.instance.path().clone(),
             instance_path: instance_key.instance_path.clone().child(first.clone()),
         }
-    } else if let Some(reference) = model.references().get(first) {
-        EvalInstanceKey::root(reference.path.clone())
     } else {
-        return None;
+        let reference = model.references().get(first)?;
+        EvalInstanceKey::root(reference.path.clone())
     };
 
     for segment in segments {
