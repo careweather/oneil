@@ -536,8 +536,8 @@ mod tests {
     };
 
     use crate::{
-        assert_boolean, assert_invalid_type, assert_is_close, assert_scalar_close,
-        assert_type_mismatch, assert_units_dimensionally_eq,
+        check_boolean, check_invalid_type, check_is_close, check_scalar_close, check_type_mismatch,
+        check_units_dimensionally_eq,
         context::EvalContext,
         test_context::{TestExternalContext, test_model_path},
         test_fixtures::{output_parameter, scalar_number_type},
@@ -558,13 +558,13 @@ mod tests {
         #[test]
         fn eval_number_literal() {
             let value = eval(&lit_number(42.5)).expect("eval should succeed");
-            assert_scalar_close(42.5, &value);
+            check_scalar_close(42.5, &value).assert();
         }
 
         #[test]
         fn eval_boolean_literal() {
             let value = eval(&lit_bool(true)).expect("eval should succeed");
-            assert_boolean(true, &value);
+            check_boolean(true, &value).assert();
         }
 
         #[test]
@@ -593,7 +593,7 @@ mod tests {
             for (op, left, right, expected) in cases {
                 let value = eval(&binary(op, lit_number(left), lit_number(right)))
                     .expect("eval should succeed");
-                assert_scalar_close(expected, &value);
+                check_scalar_close(expected, &value).assert();
             }
         }
 
@@ -607,7 +607,7 @@ mod tests {
             for (op, left, right, expected) in cases {
                 let value = eval(&binary(op, lit_bool(left), lit_bool(right)))
                     .expect("eval should succeed");
-                assert_boolean(expected, &value);
+                check_boolean(expected, &value).assert();
             }
         }
 
@@ -618,8 +618,8 @@ mod tests {
             let Value::Number(Number::Interval(interval)) = value else {
                 panic!("expected interval number, got {value:?}");
             };
-            assert_is_close(3.0, interval.min());
-            assert_is_close(7.0, interval.max());
+            check_is_close(3.0, interval.min()).assert();
+            check_is_close(7.0, interval.max()).assert();
         }
 
         #[test]
@@ -627,11 +627,12 @@ mod tests {
             let expr = binary(ir::BinaryOp::Add, lit_number(1.0), lit_bool(true));
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
-            assert_type_mismatch(
+            check_type_mismatch(
                 &errors[0],
                 &ExpectedType::Number { number_type: None },
                 &ValueType::Boolean,
-            );
+            )
+            .assert();
         }
 
         #[test]
@@ -644,8 +645,8 @@ mod tests {
             );
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 2);
-            assert_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type());
-            assert_invalid_type(&errors[1], &ExpectedType::Boolean, &scalar_number_type());
+            check_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type()).assert();
+            check_invalid_type(&errors[1], &ExpectedType::Boolean, &scalar_number_type()).assert();
         }
     }
 
@@ -656,14 +657,14 @@ mod tests {
         fn eval_neg() {
             let expr = unary(ir::UnaryOp::Neg, lit_number(5.0));
             let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(-5.0, &value);
+            check_scalar_close(-5.0, &value).assert();
         }
 
         #[test]
         fn eval_not() {
             let expr = unary(ir::UnaryOp::Not, lit_bool(true));
             let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(false, &value);
+            check_boolean(false, &value).assert();
         }
 
         #[test]
@@ -671,11 +672,12 @@ mod tests {
             let expr = unary(ir::UnaryOp::Neg, lit_bool(true));
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
-            assert_invalid_type(
+            check_invalid_type(
                 &errors[0],
                 &ExpectedType::Number { number_type: None },
                 &ValueType::Boolean,
-            );
+            )
+            .assert();
         }
 
         #[test]
@@ -683,7 +685,7 @@ mod tests {
             let expr = unary(ir::UnaryOp::Not, lit_number(1.0));
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
-            assert_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type());
+            check_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type()).assert();
         }
     }
 
@@ -704,7 +706,7 @@ mod tests {
             for (op, left, right, expected) in cases {
                 let value = eval(&compare(op, lit_number(left), lit_number(right)))
                     .expect("eval should succeed");
-                assert_boolean(expected, &value);
+                check_boolean(expected, &value).assert();
             }
         }
 
@@ -718,7 +720,7 @@ mod tests {
                 vec![(ir::ComparisonOp::LessThan, lit_number(3.0))],
             );
             let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
+            check_boolean(true, &value).assert();
         }
 
         #[test]
@@ -731,7 +733,7 @@ mod tests {
                 vec![(ir::ComparisonOp::LessThan, lit_number(1.5))],
             );
             let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(false, &value);
+            check_boolean(false, &value).assert();
         }
 
         #[test]
@@ -739,11 +741,12 @@ mod tests {
             let expr = compare(ir::ComparisonOp::LessThan, lit_number(1.0), lit_bool(true));
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
-            assert_type_mismatch(
+            check_type_mismatch(
                 &errors[0],
                 &ExpectedType::Number { number_type: None },
                 &ValueType::Boolean,
-            );
+            )
+            .assert();
         }
 
         #[test]
@@ -760,9 +763,9 @@ mod tests {
             );
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 3);
-            assert_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type());
-            assert_invalid_type(&errors[1], &ExpectedType::Boolean, &scalar_number_type());
-            assert_invalid_type(&errors[2], &ExpectedType::Boolean, &scalar_number_type());
+            check_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type()).assert();
+            check_invalid_type(&errors[1], &ExpectedType::Boolean, &scalar_number_type()).assert();
+            check_invalid_type(&errors[2], &ExpectedType::Boolean, &scalar_number_type()).assert();
         }
     }
 
@@ -773,7 +776,7 @@ mod tests {
         fn eval_fallback_uses_left_when_successful() {
             let expr = fallback(lit_number(1.0), lit_number(2.0));
             let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(1.0, &value);
+            check_scalar_close(1.0, &value).assert();
         }
 
         #[test]
@@ -783,7 +786,7 @@ mod tests {
             let expr = fallback(unary(ir::UnaryOp::Not, lit_number(1.0)), lit_number(2.0));
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
-            assert_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type());
+            check_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type()).assert();
         }
     }
 
@@ -803,9 +806,9 @@ mod tests {
             let Number::Scalar(scalar) = *measured.normalized_value().as_number() else {
                 panic!("expected scalar");
             };
-            assert_is_close(5.0, scalar);
-            assert_units_dimensionally_eq([(Dimension::Distance, 1.0)], measured.unit());
-            assert_is_close(1.0, measured.unit().magnitude);
+            check_is_close(5.0, scalar).assert();
+            check_units_dimensionally_eq([(Dimension::Distance, 1.0)], measured.unit()).assert();
+            check_is_close(1.0, measured.unit().magnitude).assert();
         }
 
         #[test]
@@ -822,9 +825,9 @@ mod tests {
             let Number::Scalar(scalar) = *measured.normalized_value().as_number() else {
                 panic!("expected scalar");
             };
-            assert_is_close(2000.0, scalar);
-            assert_units_dimensionally_eq([(Dimension::Distance, 1.0)], measured.unit());
-            assert_is_close(1000.0, measured.unit().magnitude);
+            check_is_close(2000.0, scalar).assert();
+            check_units_dimensionally_eq([(Dimension::Distance, 1.0)], measured.unit()).assert();
+            check_is_close(1000.0, measured.unit().magnitude).assert();
         }
 
         #[test]
@@ -833,11 +836,12 @@ mod tests {
             let expr = unit_cast(lit_bool(true), unit);
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
-            assert_type_mismatch(
+            check_type_mismatch(
                 &errors[0],
                 &ExpectedType::NumberOrMeasuredNumber { number_type: None },
                 &ValueType::Boolean,
-            );
+            )
+            .assert();
         }
 
         #[test]
@@ -872,14 +876,14 @@ mod tests {
         fn eval_builtin_pi() {
             let expr = builtin_var("pi");
             let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(PI, &value);
+            check_scalar_close(PI, &value).assert();
         }
 
         #[test]
         fn eval_builtin_e() {
             let expr = builtin_var("e");
             let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(E, &value);
+            check_scalar_close(E, &value).assert();
         }
 
         #[test]
@@ -896,7 +900,7 @@ mod tests {
             let value = eval_expr(&param_var("x"), &mut context)
                 .expect("eval should succeed")
                 .0;
-            assert_scalar_close(10.0, &value);
+            check_scalar_close(10.0, &value).assert();
         }
 
         #[test]
@@ -913,7 +917,7 @@ mod tests {
             let value = eval_expr(&expr, &mut context)
                 .expect("eval should succeed")
                 .0;
-            assert_scalar_close(5.0, &value);
+            check_scalar_close(5.0, &value).assert();
         }
 
         #[test]
@@ -961,7 +965,7 @@ mod tests {
             let value = eval_expr(&external_var("y", "child"), &mut context)
                 .expect("eval should succeed")
                 .0;
-            assert_scalar_close(7.0, &value);
+            check_scalar_close(7.0, &value).assert();
         }
     }
 
@@ -972,14 +976,14 @@ mod tests {
         fn eval_builtin_abs() {
             let expr = builtin_call("abs", vec![lit_number(-4.0)]);
             let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(4.0, &value);
+            check_scalar_close(4.0, &value).assert();
         }
 
         #[test]
         fn eval_builtin_sqrt() {
             let expr = builtin_call("sqrt", vec![lit_number(9.0)]);
             let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(3.0, &value);
+            check_scalar_close(3.0, &value).assert();
         }
 
         #[test]
@@ -1003,7 +1007,7 @@ mod tests {
             let value = eval_expr(&expr, &mut context)
                 .expect("eval should succeed")
                 .0;
-            assert_scalar_close(42.0, &value);
+            check_scalar_close(42.0, &value).assert();
         }
 
         #[test]
@@ -1071,7 +1075,7 @@ mod tests {
             let value = eval_expr(&expr, &mut context)
                 .expect("eval should succeed")
                 .0;
-            assert_scalar_close(99.0, &value);
+            check_scalar_close(99.0, &value).assert();
 
             let warnings = context.take_expression_warnings();
             assert_eq!(warnings.len(), 1);
@@ -1100,8 +1104,8 @@ mod tests {
             );
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 2);
-            assert_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type());
-            assert_invalid_type(&errors[1], &ExpectedType::Boolean, &scalar_number_type());
+            check_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type()).assert();
+            check_invalid_type(&errors[1], &ExpectedType::Boolean, &scalar_number_type()).assert();
         }
     }
 
@@ -1117,7 +1121,7 @@ mod tests {
                 lit_number(4.0),
             );
             let value = eval(&expr).expect("eval should succeed");
-            assert_scalar_close(20.0, &value);
+            check_scalar_close(20.0, &value).assert();
         }
 
         #[test]
@@ -1129,7 +1133,7 @@ mod tests {
                 lit_number(3.0),
             );
             let value = eval(&expr).expect("eval should succeed");
-            assert_boolean(true, &value);
+            check_boolean(true, &value).assert();
         }
     }
 }

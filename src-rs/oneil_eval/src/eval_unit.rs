@@ -106,8 +106,7 @@ mod tests {
     use oneil_output::{Dimension, Unit};
 
     use crate::{
-        assert_is_close, assert_unit_eq_case, context::EvalContext,
-        test_context::TestExternalContext,
+        check_is_close, check_unit_eq, context::EvalContext, test_context::TestExternalContext,
     };
 
     use super::*;
@@ -128,7 +127,7 @@ mod tests {
         is_db: bool,
     ) {
         let unit = eval_specs(specs.iter().copied());
-        assert_unit_eq_case(name, &unit, magnitude, dims, is_db);
+        check_unit_eq(&unit, magnitude, dims, is_db).assert_with_name(name);
     }
 
     #[track_caller]
@@ -571,7 +570,7 @@ mod tests {
         let hertz_unit = eval_specs([UnitSpec::new(None, Some("Hz"), false, 1.0)]);
         let per_second_unit = eval_specs([UnitSpec::new(None, Some("s"), false, -1.0)]);
 
-        assert_is_close(per_second_unit.magnitude, hertz_unit.magnitude / (2.0 * PI));
+        check_is_close(per_second_unit.magnitude, hertz_unit.magnitude / (2.0 * PI)).assert();
         assert!(hertz_unit.dimensionally_eq(&per_second_unit));
         assert!(!hertz_unit.is_db);
         assert!(!per_second_unit.is_db);

@@ -949,8 +949,7 @@ mod tests {
     use oneil_shared::EvalInstanceKey;
 
     use crate::{
-        assert_is_close, assert_param_measured_scalar, assert_param_measured_scalar_case,
-        assert_param_scalar_close_case,
+        check_is_close, check_param_measured_scalar, check_param_scalar_close,
         context::EvalContext,
         test_context::{TestExternalContext, test_model_path},
         test_fixtures::{eval_parameter_simple, setup_context_with_parameters},
@@ -1023,16 +1022,10 @@ mod tests {
                 panic!("{name}: eval should succeed, got {errors:?}");
             });
             match measured {
-                None => assert_param_scalar_close_case(name, &result, *value),
+                None => check_param_scalar_close(&result, *value).assert_with_name(name),
                 Some((normalized, dims, magnitude, is_db)) => {
-                    assert_param_measured_scalar_case(
-                        name,
-                        &result,
-                        *normalized,
-                        dims,
-                        *magnitude,
-                        *is_db,
-                    );
+                    check_param_measured_scalar(&result, *normalized, dims, *magnitude, *is_db)
+                        .assert_with_name(name);
                 }
             }
         }
@@ -1070,13 +1063,14 @@ mod tests {
 
         // x + y = 1.0 m + 1000.0 m = 1001.0 m
         // The value is stored in base units (meters)
-        assert_param_measured_scalar(
+        check_param_measured_scalar(
             &parameter_value,
             1001.0,
             &[(Dimension::Distance, 1.0)],
             1000.0,
             false,
-        );
+        )
+        .assert();
     }
 
     #[test]
@@ -1115,7 +1109,7 @@ mod tests {
 
         // x + y = 1.0 N + 1.0 N = 2.0 N
         // The value is stored in base units
-        assert_param_measured_scalar(
+        check_param_measured_scalar(
             &parameter_value,
             2.0,
             &[
@@ -1125,7 +1119,8 @@ mod tests {
             ],
             1.0,
             false,
-        );
+        )
+        .assert();
     }
 
     #[test]
@@ -1157,7 +1152,7 @@ mod tests {
         // x = 1.0 dBW = 10^(1.0/10.0) = 10^0.1 = 1.258925... W
         // y = 1.0 W
         // x + y = 1.258925... W + 1.0 W = 2.258925... W
-        assert_param_measured_scalar(
+        check_param_measured_scalar(
             &parameter_value,
             10.0_f64.powf(0.1) + 1.0,
             &[
@@ -1167,7 +1162,8 @@ mod tests {
             ],
             1.0,
             false,
-        );
+        )
+        .assert();
     }
 
     #[test]
@@ -1189,7 +1185,7 @@ mod tests {
             eval_parameter(&parameter, &mut context).expect("eval should succeed");
 
         // y = x^2 = (1.0 W)^2 = 1.0 W^2
-        assert_param_measured_scalar(
+        check_param_measured_scalar(
             &parameter_value,
             1.0,
             &[
@@ -1199,7 +1195,8 @@ mod tests {
             ],
             1.0,
             false,
-        );
+        )
+        .assert();
     }
 
     #[test]
@@ -1229,13 +1226,14 @@ mod tests {
             eval_parameter(&parameter, &mut context).expect("eval should succeed");
 
         // z = x * y = 3.0 m * 2.0 m = 6.0 m^2
-        assert_param_measured_scalar(
+        check_param_measured_scalar(
             &parameter_value,
             6.0,
             &[(Dimension::Distance, 2.0)],
             1.0,
             false,
-        );
+        )
+        .assert();
     }
 
     #[test]
@@ -1265,13 +1263,14 @@ mod tests {
             eval_parameter(&parameter, &mut context).expect("eval should succeed");
 
         // z = x / y = 6.0 m^2 / 2.0 m = 3.0 m
-        assert_param_measured_scalar(
+        check_param_measured_scalar(
             &parameter_value,
             3.0,
             &[(Dimension::Distance, 1.0)],
             1.0,
             false,
-        );
+        )
+        .assert();
     }
 
     #[test]
@@ -1306,7 +1305,7 @@ mod tests {
 
         // z = x // y = 6.0 m // 2.0 m = 3.0
         // For scalars, escaped division behaves the same as regular division
-        assert_param_measured_scalar(&parameter_value, 3.0, &[], 1.0, false);
+        check_param_measured_scalar(&parameter_value, 3.0, &[], 1.0, false).assert();
     }
 
     #[test]
@@ -1338,13 +1337,14 @@ mod tests {
 
         // z = x -- y = 6.0 m -- 2.0 m = 4.0 m
         // For scalars, escaped subtraction behaves the same as regular subtraction
-        assert_param_measured_scalar(
+        check_param_measured_scalar(
             &parameter_value,
             4.0,
             &[(Dimension::Distance, 1.0)],
             1.0,
             false,
-        );
+        )
+        .assert();
     }
 
     #[test]
@@ -1374,13 +1374,14 @@ mod tests {
             eval_parameter(&parameter, &mut context).expect("eval should succeed");
 
         // z = x % y = 7.0 m % 3.0 m = 1.0 m
-        assert_param_measured_scalar(
+        check_param_measured_scalar(
             &parameter_value,
             1.0,
             &[(Dimension::Distance, 1.0)],
             1.0,
             false,
-        );
+        )
+        .assert();
     }
 
     #[test]
@@ -1472,7 +1473,7 @@ mod tests {
         let Value::Number(Number::Scalar(v)) = result.value else {
             panic!("expected scalar, got {:?}", result.value);
         };
-        assert_is_close(5.0, v);
+        check_is_close(5.0, v).assert();
     }
 
     #[test]

@@ -176,7 +176,7 @@ mod tests {
     };
 
     use crate::{
-        assert_is_close,
+        check_is_close,
         context::EvalContext,
         test_context::{TestExternalContext, test_model_path},
         test_fixtures::{output_parameter, with_root_context},
@@ -243,7 +243,7 @@ mod tests {
         let Value::Number(Number::Scalar(n)) = value else {
             panic!("expected scalar, got {value:?}");
         };
-        assert_is_close(5.0, *n);
+        check_is_close(5.0, *n).assert();
     }
 
     #[test]
@@ -264,7 +264,7 @@ mod tests {
         let Value::Number(Number::Scalar(n)) = value else {
             panic!("expected scalar, got {value:?}");
         };
-        assert_is_close(PI, *n);
+        check_is_close(PI, *n).assert();
     }
 
     #[test]
@@ -300,7 +300,7 @@ mod tests {
         let Value::Number(Number::Scalar(n)) = value else {
             panic!("expected scalar, got {value:?}");
         };
-        assert_is_close(7.0, *n);
+        check_is_close(7.0, *n).assert();
     }
 
     #[test]
