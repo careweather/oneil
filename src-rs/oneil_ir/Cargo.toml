@@ -12,6 +12,9 @@ categories.workspace = true
 keywords.workspace = true
 readme = "README.md"
 
+[features]
+test-helpers = []
+
 [dependencies]
 oneil_shared = { path = "../oneil_shared" }
 oneil_output = { path = "../oneil_output" }

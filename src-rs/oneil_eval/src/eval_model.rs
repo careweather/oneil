@@ -154,13 +154,24 @@ fn eval_test<E: ExternalEvaluationContext>(
 mod tests {
     use std::f64::consts::PI;
 
-    use oneil_ir as ir;
+    use oneil_ir::{
+        self as ir,
+        test_helpers::{
+            expr::{compare, fallback, imported_call, lit_bool, lit_number, param_var, unary},
+            parameter::{
+                builtin_dependencies_singleton, external_dependencies_singleton,
+                parameter_dependencies_singleton,
+            },
+            test::make_test,
+        },
+    };
     use oneil_output::{
         self as output, EvalError, ExpectedType, Number, NumberType, TestResult, Value, ValueType,
     };
     use oneil_shared::{
         EvalInstanceKey,
         paths::PythonPath,
+        span::Span,
         symbols::{BuiltinValueName, ParameterName, PyFunctionName, ReferenceName},
     };
 
@@ -168,9 +179,7 @@ mod tests {
         assert_is_close,
         context::EvalContext,
         test_context::{TestExternalContext, test_model_path},
-        test_fixtures::{
-            lit_bool, lit_number, make_test, output_parameter, param_var, span, with_root_context,
-        },
+        test_fixtures::{output_parameter, with_root_context},
     };
 
     use super::*;
@@ -203,16 +212,13 @@ mod tests {
 
     #[test]
     fn eval_test_fails_with_parameter_dependency_values() {
-        let mut dependencies = ir::Dependencies::new();
-        dependencies.insert_parameter(ParameterName::from("x"), span());
+        let dependencies = parameter_dependencies_singleton("x");
 
         // x > 10  with x = 5 → false
-        let expr = ir::Expr::comparison_op(
-            span(),
+        let expr = compare(
             ir::ComparisonOp::GreaterThan,
             param_var("x"),
             lit_number(10.0),
-            vec![],
         );
         let test = make_test(expr, dependencies);
 
@@ -242,8 +248,7 @@ mod tests {
 
     #[test]
     fn eval_test_fails_with_builtin_dependency_values() {
-        let mut dependencies = ir::Dependencies::new();
-        dependencies.insert_builtin(BuiltinValueName::from("pi"), span());
+        let dependencies = builtin_dependencies_singleton("pi");
 
         let test = make_test(lit_bool(false), dependencies);
         let result = eval_test_simple(&test).expect("eval should succeed");
@@ -264,12 +269,7 @@ mod tests {
 
     #[test]
     fn eval_test_fails_with_external_dependency_values() {
-        let mut dependencies = ir::Dependencies::new();
-        dependencies.insert_external(
-            ReferenceName::from("child"),
-            ParameterName::from("y"),
-            span(),
-        );
+        let dependencies = external_dependencies_singleton("y", "child");
 
         let test = make_test(lit_bool(false), dependencies);
 
@@ -327,7 +327,7 @@ mod tests {
     #[test]
     fn eval_test_propagates_expression_errors() {
         // !1 is a type error
-        let expr = ir::Expr::unary_op(span(), ir::UnaryOp::Not, lit_number(1.0));
+        let expr = unary(ir::UnaryOp::Not, lit_number(1.0));
         let test = make_test(expr, ir::Dependencies::new());
         let errors = eval_test_simple(&test).expect_err("eval should fail");
         assert_eq!(errors.len(), 1);
@@ -356,7 +356,7 @@ mod tests {
             |_args| {
                 Err(Box::new(EvalError::PythonEvalError {
                     function_name: PyFunctionName::from("fail"),
-                    function_call_span: span(),
+                    function_call_span: Span::synthetic(),
                     message: "boom".to_string(),
                     traceback: None,
                 }))
@@ -368,17 +368,8 @@ mod tests {
         context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
 
         // (fail() ? true)  → passes, with a UsedFallback warning
-        let left = ir::Expr::function_call(
-            span(),
-            span(),
-            ir::FunctionName::imported(
-                PythonPath::from_str_no_ext("helpers"),
-                PyFunctionName::from("fail"),
-                span(),
-            ),
-            vec![],
-        );
-        let expr = ir::Expr::fallback(span(), left, lit_bool(true));
+        let left = imported_call("helpers", "fail", vec![]);
+        let expr = fallback(left, lit_bool(true));
         let test = make_test(expr, ir::Dependencies::new());
 
         let result = eval_test(&test, &mut context).expect("eval should succeed");

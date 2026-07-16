@@ -20,6 +20,7 @@ indexmap = { workspace = true }
 
 [dev-dependencies]
 oneil_builtins = { path = "../oneil_builtins" }
+oneil_ir = { path = "../oneil_ir", features = ["test-helpers"] }
 oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
 
 [lints]

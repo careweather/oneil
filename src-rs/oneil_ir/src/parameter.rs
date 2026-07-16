@@ -522,3 +522,175 @@ impl Limits {
         }
     }
 }
+
+/// Builders for parameter test fixtures.
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test {
+    use oneil_shared::{
+        labels::ParameterLabel,
+        span::Span,
+        symbols::{BuiltinValueName, ParameterName, ReferenceName},
+    };
+
+    use crate::{
+        BinaryOp, Literal, TraceLevel,
+        expr::test::{binary, lit_number, param_var},
+        unit::test::{UnitSpec, build_resolved_units},
+    };
+
+    use super::{Dependencies, Expr, Limits, Parameter, ParameterValue, PiecewiseExpr};
+
+    /// Builds dependencies containing one parameter.
+    #[must_use]
+    pub fn parameter_dependencies_singleton(name: &str) -> Dependencies {
+        let mut dependencies = Dependencies::new();
+        dependencies.insert_parameter(ParameterName::from(name), Span::synthetic());
+        dependencies
+    }
+
+    /// Builds dependencies containing one builtin value.
+    #[must_use]
+    pub fn builtin_dependencies_singleton(name: &str) -> Dependencies {
+        let mut dependencies = Dependencies::new();
+        dependencies.insert_builtin(BuiltinValueName::from(name), Span::synthetic());
+        dependencies
+    }
+
+    /// Builds dependencies containing one external parameter.
+    #[must_use]
+    pub fn external_dependencies_singleton(
+        parameter_name: &str,
+        reference_name: &str,
+    ) -> Dependencies {
+        let mut dependencies = Dependencies::new();
+        dependencies.insert_external(
+            ReferenceName::from(reference_name),
+            ParameterName::from(parameter_name),
+            Span::synthetic(),
+        );
+        dependencies
+    }
+
+    /// Builds continuous parameter limits.
+    #[must_use]
+    pub fn continuous_limits(min: Expr, max: Expr) -> Limits {
+        Limits::continuous(min, max, Span::synthetic())
+    }
+
+    /// Builds discrete parameter limits.
+    #[must_use]
+    pub fn discrete_limits(values: Vec<Expr>) -> Limits {
+        Limits::discrete(values, Span::synthetic())
+    }
+
+    /// Builds a parameter from an explicit expression, optional units, and limits.
+    #[must_use]
+    pub fn build_parameter_from_expr(
+        name: &str,
+        expr: Expr,
+        units: Option<crate::CompositeUnit>,
+        limits: Limits,
+    ) -> Parameter {
+        Parameter::new(
+            Dependencies::new(),
+            ParameterName::from(name),
+            Span::synthetic(),
+            Span::synthetic(),
+            ParameterLabel::from(name),
+            None,
+            None,
+            ParameterValue::simple(expr, units),
+            limits,
+            false,
+            TraceLevel::None,
+            None,
+        )
+    }
+
+    /// Builds a parameter with a literal value, optional units, and limits.
+    #[must_use]
+    pub fn build_literal_parameter(
+        name: &str,
+        value: Literal,
+        units: impl IntoIterator<Item = UnitSpec>,
+        limits: Limits,
+    ) -> Parameter {
+        build_parameter_from_expr(
+            name,
+            Expr::literal(Span::synthetic(), value),
+            build_resolved_units(units),
+            limits,
+        )
+    }
+
+    /// Builds a piecewise parameter from `(value, condition)` branches.
+    #[must_use]
+    pub fn build_piecewise_parameter(
+        name: &str,
+        branches: impl IntoIterator<Item = (Expr, Expr)>,
+        units: impl IntoIterator<Item = UnitSpec>,
+    ) -> Parameter {
+        let piecewise = branches
+            .into_iter()
+            .map(|(value, condition)| PiecewiseExpr::new(value, condition))
+            .collect();
+
+        Parameter::new(
+            Dependencies::new(),
+            ParameterName::from(name),
+            Span::synthetic(),
+            Span::synthetic(),
+            ParameterLabel::from(name),
+            None,
+            None,
+            ParameterValue::piecewise(piecewise, build_resolved_units(units)),
+            Limits::default(),
+            false,
+            TraceLevel::None,
+            None,
+        )
+    }
+
+    /// Builds a simple parameter with a numeric literal value.
+    #[must_use]
+    pub fn build_simple_parameter(
+        name: &str,
+        value: f64,
+        units: impl IntoIterator<Item = UnitSpec>,
+    ) -> Parameter {
+        build_literal_parameter(name, Literal::Number(value), units, Limits::default())
+    }
+
+    /// Builds a parameter whose value is a binary operation over two parameters.
+    #[must_use]
+    pub fn build_binary_parameter(
+        name: &str,
+        op: BinaryOp,
+        left: &str,
+        right: &str,
+        units: impl IntoIterator<Item = UnitSpec>,
+    ) -> Parameter {
+        build_parameter_from_expr(
+            name,
+            binary(op, param_var(left), param_var(right)),
+            build_resolved_units(units),
+            Limits::default(),
+        )
+    }
+
+    /// Builds a parameter whose value is `base ^ exponent`.
+    #[must_use]
+    pub fn build_exponent_parameter(
+        name: &str,
+        base: &str,
+        exponent: f64,
+        units: impl IntoIterator<Item = UnitSpec>,
+    ) -> Parameter {
+        build_parameter_from_expr(
+            name,
+            binary(BinaryOp::Pow, param_var(base), lit_number(exponent)),
+            build_resolved_units(units),
+            Limits::default(),
+        )
+    }
+}

@@ -32,3 +32,12 @@ pub use test::Test;
 pub use unit::{
     CompositeUnit, DisplayCompositeUnit, DisplayUnit, Unit, UnitInfo, compute_dimension_map,
 };
+
+/// Builders for constructing IR in downstream tests.
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test_helpers {
+    pub use crate::expr::test as expr;
+    pub use crate::parameter::test as parameter;
+    pub use crate::test::test;
+    pub use crate::unit::test as unit;
+}

@@ -268,3 +268,123 @@ impl DisplayUnit {
         Self { name, exponent }
     }
 }
+
+/// Builders for unit test fixtures.
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test {
+    use oneil_output::DimensionMap;
+    use oneil_shared::{
+        span::Span,
+        symbols::{UnitBaseName, UnitName, UnitPrefix},
+    };
+
+    use super::{CompositeUnit, DisplayCompositeUnit, DisplayUnit, Unit, UnitInfo};
+
+    /// Specification for a unit in tests.
+    #[derive(Debug, Clone, Copy)]
+    pub struct UnitSpec {
+        /// Optional SI prefix.
+        pub prefix: Option<&'static str>,
+        /// Optional base-unit name.
+        pub base_name: Option<&'static str>,
+        /// Whether this is a decibel unit.
+        pub is_db: bool,
+        /// Unit exponent.
+        pub exponent: f64,
+    }
+
+    impl UnitSpec {
+        /// Creates a unit specification.
+        #[must_use]
+        pub const fn new(
+            prefix: Option<&'static str>,
+            base_name: Option<&'static str>,
+            is_db: bool,
+            exponent: f64,
+        ) -> Self {
+            Self {
+                prefix,
+                base_name,
+                is_db,
+                exponent,
+            }
+        }
+    }
+
+    /// Builds a unit's complete display name.
+    fn build_full_name(base_name: Option<&str>, prefix: Option<&str>, is_db: bool) -> UnitName {
+        UnitName::new(format!(
+            "{}{}{}",
+            if is_db { "dB" } else { "" },
+            prefix.unwrap_or(""),
+            base_name.unwrap_or("")
+        ))
+    }
+
+    /// Builds resolved information for a unit specification.
+    fn build_unit_info(base_name: Option<&str>, prefix: Option<&str>, is_db: bool) -> UnitInfo {
+        if is_db {
+            UnitInfo::Db {
+                prefix: prefix.map(UnitPrefix::from),
+                base_name: base_name.map(UnitBaseName::from),
+            }
+        } else {
+            UnitInfo::Standard {
+                prefix: prefix.map(UnitPrefix::from),
+                base_name: UnitBaseName::from(base_name.expect("base name should be provided")),
+            }
+        }
+    }
+
+    /// Builds the display tree for a composite unit.
+    fn display_composite_unit(
+        unit_list: impl IntoIterator<Item = UnitSpec>,
+    ) -> DisplayCompositeUnit {
+        unit_list
+            .into_iter()
+            .map(|spec| {
+                DisplayCompositeUnit::BaseUnit(DisplayUnit::new(
+                    build_full_name(spec.base_name, spec.prefix, spec.is_db).into_string(),
+                    spec.exponent,
+                ))
+            })
+            .reduce(|left, right| DisplayCompositeUnit::Multiply(Box::new(left), Box::new(right)))
+            .unwrap_or(DisplayCompositeUnit::One)
+    }
+
+    /// Builds an IR composite unit from unit specifications.
+    #[must_use]
+    pub fn ir_composite_unit(unit_list: impl IntoIterator<Item = UnitSpec>) -> CompositeUnit {
+        let unit_specs: Vec<_> = unit_list.into_iter().collect();
+        let display_unit = display_composite_unit(unit_specs.iter().copied());
+        let units = unit_specs
+            .into_iter()
+            .map(|spec| {
+                Unit::new(
+                    Span::synthetic(),
+                    build_full_name(spec.base_name, spec.prefix, spec.is_db),
+                    Span::synthetic(),
+                    spec.exponent,
+                    None,
+                    build_unit_info(spec.base_name, spec.prefix, spec.is_db),
+                )
+            })
+            .collect();
+
+        CompositeUnit::new(
+            units,
+            display_unit,
+            Span::synthetic(),
+            DimensionMap::dimensionless(),
+        )
+    }
+
+    /// Builds optional resolved units, returning `None` when no specs are given.
+    #[must_use]
+    pub fn build_resolved_units(
+        units: impl IntoIterator<Item = UnitSpec>,
+    ) -> Option<CompositeUnit> {
+        let units: Vec<_> = units.into_iter().collect();
+        (!units.is_empty()).then(|| ir_composite_unit(units))
+    }
+}

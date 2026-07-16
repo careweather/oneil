@@ -708,3 +708,136 @@ pub trait ExprVisitor: Sized {
         self
     }
 }
+
+/// Builders for expression test fixtures.
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod test {
+    use oneil_shared::{
+        paths::PythonPath,
+        span::Span,
+        symbols::{
+            BuiltinFunctionName, BuiltinValueName, ParameterName, PyFunctionName, ReferenceName,
+        },
+    };
+
+    use crate::CompositeUnit;
+
+    use super::{BinaryOp, ComparisonOp, Expr, FunctionName, Literal, UnaryOp};
+
+    /// Builds a numeric literal expression.
+    #[must_use]
+    pub fn lit_number(value: f64) -> Expr {
+        Expr::literal(Span::synthetic(), Literal::number(value))
+    }
+
+    /// Builds a Boolean literal expression.
+    #[must_use]
+    pub fn lit_bool(value: bool) -> Expr {
+        Expr::literal(Span::synthetic(), Literal::boolean(value))
+    }
+
+    /// Builds a string literal expression.
+    #[must_use]
+    pub fn lit_string(value: &str) -> Expr {
+        Expr::literal(Span::synthetic(), Literal::string(value.to_string()))
+    }
+
+    /// Builds a binary operation over two expressions.
+    #[must_use]
+    pub fn binary(op: BinaryOp, left: Expr, right: Expr) -> Expr {
+        Expr::binary_op(Span::synthetic(), op, left, right)
+    }
+
+    /// Builds a unary operation over an expression.
+    #[must_use]
+    pub fn unary(op: UnaryOp, expr: Expr) -> Expr {
+        Expr::unary_op(Span::synthetic(), op, expr)
+    }
+
+    /// Builds a fallback expression.
+    #[must_use]
+    pub fn fallback(left: Expr, right: Expr) -> Expr {
+        Expr::fallback(Span::synthetic(), left, right)
+    }
+
+    /// Builds a unit cast expression.
+    #[must_use]
+    pub fn unit_cast(expr: Expr, unit: CompositeUnit) -> Expr {
+        Expr::unit_cast(Span::synthetic(), expr, unit)
+    }
+
+    /// Builds a comparison between two expressions.
+    #[must_use]
+    pub fn compare(op: ComparisonOp, left: Expr, right: Expr) -> Expr {
+        Expr::comparison_op(Span::synthetic(), op, left, right, vec![])
+    }
+
+    /// Builds a chained comparison expression.
+    #[must_use]
+    pub fn compare_chained(
+        left: Expr,
+        op: ComparisonOp,
+        right: Expr,
+        rest: Vec<(ComparisonOp, Expr)>,
+    ) -> Expr {
+        Expr::comparison_op(Span::synthetic(), op, left, right, rest)
+    }
+
+    /// Builds a parameter variable expression.
+    #[must_use]
+    pub fn param_var(name: &str) -> Expr {
+        Expr::parameter_variable(
+            Span::synthetic(),
+            Span::synthetic(),
+            ParameterName::from(name),
+        )
+    }
+
+    /// Builds a builtin variable expression.
+    #[must_use]
+    pub fn builtin_var(name: &str) -> Expr {
+        Expr::builtin_variable(
+            Span::synthetic(),
+            Span::synthetic(),
+            BuiltinValueName::from(name),
+        )
+    }
+
+    /// Builds an external parameter variable expression.
+    #[must_use]
+    pub fn external_var(parameter_name: &str, reference_name: &str) -> Expr {
+        Expr::external_variable(
+            Span::synthetic(),
+            ReferenceName::from(reference_name),
+            Span::synthetic(),
+            ParameterName::from(parameter_name),
+            Span::synthetic(),
+        )
+    }
+
+    /// Builds a call to a builtin function.
+    #[must_use]
+    pub fn builtin_call(name: &str, args: Vec<Expr>) -> Expr {
+        Expr::function_call(
+            Span::synthetic(),
+            Span::synthetic(),
+            FunctionName::builtin(BuiltinFunctionName::from(name), Span::synthetic()),
+            args,
+        )
+    }
+
+    /// Builds a call to an imported Python function.
+    #[must_use]
+    pub fn imported_call(python_path: &str, name: &str, args: Vec<Expr>) -> Expr {
+        Expr::function_call(
+            Span::synthetic(),
+            Span::synthetic(),
+            FunctionName::imported(
+                PythonPath::from_str_no_ext(python_path),
+                PyFunctionName::from(name),
+                Span::synthetic(),
+            ),
+            args,
+        )
+    }
+}

@@ -102,13 +102,12 @@ fn eval_unit_display_expr(unit: &ir::DisplayCompositeUnit) -> DisplayUnit {
 mod tests {
     use std::f64::consts::PI;
 
+    use oneil_ir::test_helpers::unit::{UnitSpec, ir_composite_unit};
     use oneil_output::{Dimension, Unit};
 
     use crate::{
-        assert_is_close, assert_unit_eq_case,
-        context::EvalContext,
+        assert_is_close, assert_unit_eq_case, context::EvalContext,
         test_context::TestExternalContext,
-        test_fixtures::{UnitSpec, ir_composite_unit},
     };
 
     use super::*;

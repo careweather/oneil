@@ -515,14 +515,24 @@ fn eval_literal(value: &ir::Literal) -> Value {
 mod tests {
     use std::f64::consts::{E, PI};
 
-    use oneil_ir as ir;
+    use oneil_ir::{
+        self as ir,
+        test_helpers::{
+            expr::{
+                binary, builtin_call, builtin_var, compare, compare_chained, external_var,
+                fallback, imported_call, lit_bool, lit_number, lit_string, param_var, unary,
+                unit_cast,
+            },
+            unit::{UnitSpec, ir_composite_unit},
+        },
+    };
     use oneil_output::{
         self as output, Dimension, DisplayUnit, EvalError, ExpectedType, Number, Value, ValueType,
     };
     use oneil_shared::{
         EvalInstanceKey,
         paths::PythonPath,
-        symbols::{BuiltinValueName, ParameterName, PyFunctionName, ReferenceName},
+        symbols::{ParameterName, PyFunctionName, ReferenceName},
     };
 
     use crate::{
@@ -530,11 +540,7 @@ mod tests {
         assert_type_mismatch, assert_units_dimensionally_eq,
         context::EvalContext,
         test_context::{TestExternalContext, test_model_path},
-        test_fixtures::{
-            UnitSpec, binary, builtin_call, compare, compare_chained, external_var, imported_call,
-            ir_composite_unit, lit_bool, lit_number, lit_string, output_parameter, param_var,
-            scalar_number_type, span, unary,
-        },
+        test_fixtures::{output_parameter, scalar_number_type},
     };
 
     use super::*;
@@ -765,7 +771,7 @@ mod tests {
 
         #[test]
         fn eval_fallback_uses_left_when_successful() {
-            let expr = ir::Expr::fallback(span(), lit_number(1.0), lit_number(2.0));
+            let expr = fallback(lit_number(1.0), lit_number(2.0));
             let value = eval(&expr).expect("eval should succeed");
             assert_scalar_close(1.0, &value);
         }
@@ -774,11 +780,7 @@ mod tests {
         fn eval_fallback_propagates_non_python_errors() {
             // Left fails with a type error (not a PythonEvalError), so fallback
             // must not evaluate the right side.
-            let expr = ir::Expr::fallback(
-                span(),
-                unary(ir::UnaryOp::Not, lit_number(1.0)),
-                lit_number(2.0),
-            );
+            let expr = fallback(unary(ir::UnaryOp::Not, lit_number(1.0)), lit_number(2.0));
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
             assert_invalid_type(&errors[0], &ExpectedType::Boolean, &scalar_number_type());
@@ -791,7 +793,7 @@ mod tests {
         #[test]
         fn eval_cast_number_to_meters() {
             let unit = ir_composite_unit([UnitSpec::new(None, Some("m"), false, 1.0)]);
-            let expr = ir::Expr::unit_cast(span(), lit_number(5.0), unit);
+            let expr = unit_cast(lit_number(5.0), unit);
             let value = eval(&expr).expect("eval should succeed");
 
             let Value::MeasuredNumber(measured) = value else {
@@ -809,7 +811,7 @@ mod tests {
         #[test]
         fn eval_cast_number_to_kilometers() {
             let unit = ir_composite_unit([UnitSpec::new(Some("k"), Some("m"), false, 1.0)]);
-            let expr = ir::Expr::unit_cast(span(), lit_number(2.0), unit);
+            let expr = unit_cast(lit_number(2.0), unit);
             let value = eval(&expr).expect("eval should succeed");
 
             let Value::MeasuredNumber(measured) = value else {
@@ -828,7 +830,7 @@ mod tests {
         #[test]
         fn eval_cast_rejects_boolean() {
             let unit = ir_composite_unit([UnitSpec::new(None, Some("m"), false, 1.0)]);
-            let expr = ir::Expr::unit_cast(span(), lit_bool(true), unit);
+            let expr = unit_cast(lit_bool(true), unit);
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
             assert_type_mismatch(
@@ -843,8 +845,8 @@ mod tests {
             // First cast to meters, then attempt to cast the measured value to seconds.
             let meters = ir_composite_unit([UnitSpec::new(None, Some("m"), false, 1.0)]);
             let seconds = ir_composite_unit([UnitSpec::new(None, Some("s"), false, 1.0)]);
-            let measured = ir::Expr::unit_cast(span(), lit_number(1.0), meters);
-            let expr = ir::Expr::unit_cast(span(), measured, seconds);
+            let measured = unit_cast(lit_number(1.0), meters);
+            let expr = unit_cast(measured, seconds);
 
             let errors = eval(&expr).expect_err("eval should fail");
             assert_eq!(errors.len(), 1);
@@ -868,14 +870,14 @@ mod tests {
 
         #[test]
         fn eval_builtin_pi() {
-            let expr = ir::Expr::builtin_variable(span(), span(), BuiltinValueName::from("pi"));
+            let expr = builtin_var("pi");
             let value = eval(&expr).expect("eval should succeed");
             assert_scalar_close(PI, &value);
         }
 
         #[test]
         fn eval_builtin_e() {
-            let expr = ir::Expr::builtin_variable(span(), span(), BuiltinValueName::from("e"));
+            let expr = builtin_var("e");
             let value = eval(&expr).expect("eval should succeed");
             assert_scalar_close(E, &value);
         }
@@ -1062,8 +1064,7 @@ mod tests {
             let mut context = EvalContext::new(&mut external);
             context.set_evaluation_cache_root(test_model_path("test"));
 
-            let expr = ir::Expr::fallback(
-                span(),
+            let expr = fallback(
                 imported_call("helpers", "fail", vec![lit_number(1.0)]),
                 lit_number(99.0),
             );

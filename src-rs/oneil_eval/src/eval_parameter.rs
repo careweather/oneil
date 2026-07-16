@@ -933,21 +933,27 @@ pub fn get_external_dependency_values<E: ExternalEvaluationContext>(
 
 #[cfg(test)]
 mod tests {
-    use oneil_ir as ir;
+    use oneil_ir::{
+        self as ir,
+        test_helpers::{
+            expr::{lit_bool, lit_number, lit_string, param_var},
+            parameter::{
+                build_binary_parameter, build_exponent_parameter, build_literal_parameter,
+                build_parameter_from_expr, build_piecewise_parameter, build_simple_parameter,
+                continuous_limits, discrete_limits,
+            },
+            unit::{UnitSpec, build_resolved_units},
+        },
+    };
     use oneil_output::{Dimension, EvalError, Number, Value, util::is_close};
-    use oneil_shared::{EvalInstanceKey, symbols::ParameterName};
+    use oneil_shared::EvalInstanceKey;
 
     use crate::{
         assert_is_close, assert_param_measured_scalar, assert_param_measured_scalar_case,
         assert_param_scalar_close_case,
         context::EvalContext,
         test_context::{TestExternalContext, test_model_path},
-        test_fixtures::{
-            UnitSpec, build_binary_parameter, build_exponent_parameter, build_literal_parameter,
-            build_parameter_from_expr, build_piecewise_parameter, build_resolved_units,
-            build_simple_parameter, eval_parameter_simple, lit_bool, lit_number, lit_string,
-            setup_context_with_parameters, span,
-        },
+        test_fixtures::{eval_parameter_simple, setup_context_with_parameters},
     };
 
     use super::*;
@@ -1460,7 +1466,7 @@ mod tests {
             "x",
             ir::Literal::number(5.0),
             [],
-            ir::Limits::continuous(lit_number(0.0), lit_number(10.0), span()),
+            continuous_limits(lit_number(0.0), lit_number(10.0)),
         );
         let result = eval_parameter_simple(&parameter).expect("eval should succeed");
         let Value::Number(Number::Scalar(v)) = result.value else {
@@ -1475,7 +1481,7 @@ mod tests {
             "x",
             ir::Literal::number(0.0),
             [],
-            ir::Limits::continuous(lit_number(1.0), lit_number(10.0), span()),
+            continuous_limits(lit_number(1.0), lit_number(10.0)),
         );
         let errors = eval_parameter_simple(&parameter).expect_err("eval should fail");
         assert_eq!(errors.len(), 1);
@@ -1495,7 +1501,7 @@ mod tests {
             "x",
             ir::Literal::number(11.0),
             [],
-            ir::Limits::continuous(lit_number(1.0), lit_number(10.0), span()),
+            continuous_limits(lit_number(1.0), lit_number(10.0)),
         );
         let errors = eval_parameter_simple(&parameter).expect_err("eval should fail");
         assert_eq!(errors.len(), 1);
@@ -1515,10 +1521,7 @@ mod tests {
             "x",
             ir::Literal::number(2.0),
             [],
-            ir::Limits::discrete(
-                vec![lit_number(1.0), lit_number(2.0), lit_number(3.0)],
-                span(),
-            ),
+            discrete_limits(vec![lit_number(1.0), lit_number(2.0), lit_number(3.0)]),
         );
         let result = eval_parameter_simple(&parameter).expect("eval should succeed");
         assert_eq!(result.value, Value::Number(Number::Scalar(2.0)));
@@ -1530,10 +1533,7 @@ mod tests {
             "x",
             ir::Literal::number(4.0),
             [],
-            ir::Limits::discrete(
-                vec![lit_number(1.0), lit_number(2.0), lit_number(3.0)],
-                span(),
-            ),
+            discrete_limits(vec![lit_number(1.0), lit_number(2.0), lit_number(3.0)]),
         );
         let errors = eval_parameter_simple(&parameter).expect_err("eval should fail");
         assert_eq!(errors.len(), 1);
@@ -1553,10 +1553,7 @@ mod tests {
             "mode",
             ir::Literal::string("b".to_string()),
             [],
-            ir::Limits::discrete(
-                vec![lit_string("a"), lit_string("b"), lit_string("c")],
-                span(),
-            ),
+            discrete_limits(vec![lit_string("a"), lit_string("b"), lit_string("c")]),
         );
         let result = eval_parameter_simple(&parameter).expect("eval should succeed");
         assert_eq!(result.value, Value::String("b".to_string()));
@@ -1568,10 +1565,7 @@ mod tests {
             "mode",
             ir::Literal::string("z".to_string()),
             [],
-            ir::Limits::discrete(
-                vec![lit_string("a"), lit_string("b"), lit_string("c")],
-                span(),
-            ),
+            discrete_limits(vec![lit_string("a"), lit_string("b"), lit_string("c")]),
         );
         let errors = eval_parameter_simple(&parameter).expect_err("eval should fail");
         assert_eq!(errors.len(), 1);
@@ -1680,12 +1674,8 @@ mod tests {
             [("src", 1.0, vec![UnitSpec::new(None, Some("m"), false, 1.0)])],
         );
 
-        let parameter = build_parameter_from_expr(
-            "dst",
-            ir::Expr::parameter_variable(span(), span(), ParameterName::from("src")),
-            None,
-            ir::Limits::default(),
-        );
+        let parameter =
+            build_parameter_from_expr("dst", param_var("src"), None, ir::Limits::default());
 
         let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
         assert_eq!(errors.len(), 1);
@@ -1709,7 +1699,7 @@ mod tests {
         // Annotate as seconds while the value is in meters.
         let parameter = build_parameter_from_expr(
             "dst",
-            ir::Expr::parameter_variable(span(), span(), ParameterName::from("src")),
+            param_var("src"),
             build_resolved_units([UnitSpec::new(None, Some("s"), false, 1.0)]),
             ir::Limits::default(),
         );

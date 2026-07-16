@@ -103,3 +103,25 @@ impl Test {
         self.design_provenance.as_ref()
     }
 }
+
+/// Builders for model-test fixtures.
+#[cfg(any(test, feature = "test-helpers"))]
+#[expect(clippy::module_inception, reason = "semantic meaning is different")]
+pub mod test {
+    use oneil_shared::span::Span;
+
+    use crate::{Dependencies, Expr, Test, TraceLevel};
+
+    /// Builds an IR test from an expression and dependency list.
+    #[must_use]
+    pub fn make_test(expr: Expr, dependencies: Dependencies) -> Test {
+        Test::new(
+            Span::synthetic(),
+            TraceLevel::None,
+            expr,
+            dependencies,
+            None,
+            None,
+        )
+    }
+}
