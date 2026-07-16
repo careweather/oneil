@@ -32,14 +32,6 @@ pub fn assert_no_validation_errors(graph: &InstanceGraph) {
     );
 }
 
-/// Returns kinds of all validation errors, in order.
-#[must_use]
-pub fn validation_error_kinds(
-    errors: &[InstanceValidationError],
-) -> Vec<&InstanceValidationErrorKind> {
-    errors.iter().map(InstanceValidationError::kind).collect()
-}
-
 /// Asserts that `errors` contains a [`ParameterCycle`] for `parameter_name`.
 ///
 /// # Panics

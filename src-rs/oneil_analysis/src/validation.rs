@@ -1152,7 +1152,6 @@ mod tests {
     use crate::{
         test_assertions::{
             assert_has_parameter_cycle, assert_no_validation_errors, parameter_cycle_member_names,
-            validation_error_kinds,
         },
         test_fixtures::{
             StubBuiltins, external_var, graph_from_root, graph_with_pool, instanced_model,
@@ -1564,7 +1563,12 @@ mod tests {
         let mut graph = graph_from_root(instanced_model_params(&path, parameters));
         validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
 
-        let kinds = validation_error_kinds(&graph.validation_errors);
+        let kinds: Vec<_> = graph
+            .validation_errors
+            .iter()
+            .map(InstanceValidationError::kind)
+            .collect();
+
         assert!(
             kinds
                 .iter()
