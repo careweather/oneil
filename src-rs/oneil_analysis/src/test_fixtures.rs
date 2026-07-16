@@ -3,6 +3,14 @@
 use indexmap::{IndexMap, IndexSet};
 use oneil_frontend::{BuiltinLookup, InstanceGraph, InstancedModel, ReferenceImport};
 use oneil_ir as ir;
+pub use oneil_ir::test_helpers::expr::{external_var, lit_bool, lit_number, param_var};
+use oneil_ir::test_helpers::{
+    parameter::{
+        build_parameter_with_dependencies, builtin_dependencies_singleton,
+        external_dependencies_singleton, parameter_dependencies,
+    },
+    test::make_test,
+};
 use oneil_output::{
     self as output, BuiltinDependency, DependencySet, ExternalDependency, Model, Parameter,
     ParameterDependency, PrintLevel, Test, Value,
@@ -29,64 +37,22 @@ pub fn model_path(name: &str) -> ModelPath {
     test_model_path(name)
 }
 
-/// Numeric literal expression.
-#[must_use]
-pub fn lit_number(value: f64) -> ir::Expr {
-    ir::Expr::literal(span(), ir::Literal::number(value))
-}
-
-/// Boolean literal expression.
-#[must_use]
-pub fn lit_bool(value: bool) -> ir::Expr {
-    ir::Expr::literal(span(), ir::Literal::boolean(value))
-}
-
-/// Parameter variable expression.
-#[must_use]
-pub fn param_var(name: &str) -> ir::Expr {
-    ir::Expr::parameter_variable(span(), span(), ParameterName::from(name))
-}
-
-/// External variable expression (`parameter.reference` in source).
-#[must_use]
-pub fn external_var(parameter: &str, reference: &str) -> ir::Expr {
-    ir::Expr::external_variable(
-        span(),
-        ReferenceName::from(reference),
-        span(),
-        ParameterName::from(parameter),
-        span(),
-    )
-}
-
 /// IR dependencies naming same-model parameters.
 #[must_use]
 pub fn deps_on_parameters(names: &[&str]) -> ir::Dependencies {
-    let mut deps = ir::Dependencies::new();
-    for name in names {
-        deps.insert_parameter(ParameterName::from(*name), span());
-    }
-    deps
+    parameter_dependencies(names)
 }
 
 /// IR dependencies naming a single builtin.
 #[must_use]
 pub fn deps_on_builtin(name: &str) -> ir::Dependencies {
-    let mut deps = ir::Dependencies::new();
-    deps.insert_builtin(BuiltinValueName::from(name), span());
-    deps
+    builtin_dependencies_singleton(name)
 }
 
 /// IR dependencies naming one external `(reference, parameter)`.
 #[must_use]
 pub fn deps_on_external(reference: &str, parameter: &str) -> ir::Dependencies {
-    let mut deps = ir::Dependencies::new();
-    deps.insert_external(
-        ReferenceName::from(reference),
-        ParameterName::from(parameter),
-        span(),
-    );
-    deps
+    external_dependencies_singleton(parameter, reference)
 }
 
 /// Evaluated [`DependencySet`] with only same-model parameter dependencies.
@@ -173,20 +139,7 @@ pub fn ir_parameter_with_expr(
     dependencies: ir::Dependencies,
     expr: ir::Expr,
 ) -> ir::Parameter {
-    ir::Parameter::new(
-        dependencies,
-        ParameterName::from(name),
-        span(),
-        span(),
-        ParameterLabel::from(name),
-        None,
-        None,
-        ir::ParameterValue::simple(expr, None),
-        ir::Limits::default(),
-        false,
-        ir::TraceLevel::None,
-        None,
-    )
+    build_parameter_with_dependencies(name, dependencies, expr)
 }
 
 /// IR test with the given dependencies and a boolean-true body.
@@ -204,7 +157,7 @@ pub fn ir_test_expr(expr: ir::Expr) -> ir::Test {
 /// IR test with explicit dependencies and body expression.
 #[must_use]
 pub fn ir_test_with_expr(dependencies: ir::Dependencies, expr: ir::Expr) -> ir::Test {
-    ir::Test::new(span(), ir::TraceLevel::None, expr, dependencies, None, None)
+    make_test(expr, dependencies)
 }
 
 /// Evaluated parameter with a scalar numeric value and no dependencies.

@@ -19,6 +19,7 @@ oneil_output = { path = "../oneil_output" }
 indexmap = { workspace = true }
 
 [dev-dependencies]
+oneil_ir = { path = "../oneil_ir", features = ["test-helpers"] }
 oneil_shared = { path = "../oneil_shared", features = ["random_span"] }
 
 [lints]

@@ -19,5 +19,8 @@ oneil_shared = { path = "../oneil_shared" }
 indexmap = { workspace = true }
 owo-colors = "4.2.3"
 
+[dev-dependencies]
+oneil_ir = { path = "../oneil_ir", features = ["test-helpers"] }
+
 [lints]
 workspace = true

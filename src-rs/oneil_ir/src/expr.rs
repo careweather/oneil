@@ -722,7 +722,7 @@ pub mod test {
 
     use crate::CompositeUnit;
 
-    use super::{BinaryOp, ComparisonOp, Expr, FunctionName, Literal, UnaryOp};
+    use super::{BinaryOp, ComparisonOp, Expr, FunctionName, Literal, UnaryOp, Variable};
 
     /// Builds a numeric literal expression.
     #[must_use]
@@ -800,6 +800,29 @@ pub mod test {
             Span::synthetic(),
             Span::synthetic(),
             BuiltinValueName::from(name),
+        )
+    }
+
+    /// Builds a raw parameter variable.
+    #[must_use]
+    pub fn parameter_variable(name: &str) -> Variable {
+        Variable::parameter(ParameterName::from(name), Span::synthetic())
+    }
+
+    /// Builds a raw builtin variable.
+    #[must_use]
+    pub fn builtin_variable(name: &str) -> Variable {
+        Variable::builtin(BuiltinValueName::from(name), Span::synthetic())
+    }
+
+    /// Builds a raw external variable.
+    #[must_use]
+    pub fn external_variable(parameter_name: &str, reference_name: &str) -> Variable {
+        Variable::external(
+            ReferenceName::from(reference_name),
+            Span::synthetic(),
+            ParameterName::from(parameter_name),
+            Span::synthetic(),
         )
     }
 

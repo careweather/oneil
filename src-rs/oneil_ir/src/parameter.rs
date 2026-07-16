@@ -527,7 +527,9 @@ impl Limits {
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test {
     use oneil_shared::{
+        RelativePath,
         labels::ParameterLabel,
+        paths::ModelPath,
         span::Span,
         symbols::{BuiltinValueName, ParameterName, ReferenceName},
     };
@@ -538,7 +540,21 @@ pub mod test {
         unit::test::{UnitSpec, build_resolved_units},
     };
 
-    use super::{Dependencies, Expr, Limits, Parameter, ParameterValue, PiecewiseExpr};
+    use super::{
+        Dependencies, DesignProvenance, Expr, Limits, Parameter, ParameterValue, PiecewiseExpr,
+    };
+
+    /// Builds dependencies containing the named parameters.
+    #[must_use]
+    pub fn parameter_dependencies(names: &[&str]) -> Dependencies {
+        names
+            .iter()
+            .map(|name| parameter_dependencies_singleton(name))
+            .fold(Dependencies::new(), |mut dependencies, next| {
+                dependencies.extend(next);
+                dependencies
+            })
+    }
 
     /// Builds dependencies containing one parameter.
     #[must_use]
@@ -583,16 +599,28 @@ pub mod test {
         Limits::discrete(values, Span::synthetic())
     }
 
-    /// Builds a parameter from an explicit expression, optional units, and limits.
+    /// Builds design provenance for a direct design contribution.
     #[must_use]
-    pub fn build_parameter_from_expr(
+    pub fn design_provenance(design_path: ModelPath, is_addition: bool) -> DesignProvenance {
+        DesignProvenance {
+            design_path,
+            is_addition,
+            assignment_span: Span::synthetic(),
+            anchor_path: RelativePath::self_path(),
+            applied_via: None,
+        }
+    }
+
+    /// Builds a parameter with all fixture-configurable fields.
+    fn build_parameter(
         name: &str,
+        dependencies: Dependencies,
         expr: Expr,
         units: Option<crate::CompositeUnit>,
         limits: Limits,
     ) -> Parameter {
         Parameter::new(
-            Dependencies::new(),
+            dependencies,
             ParameterName::from(name),
             Span::synthetic(),
             Span::synthetic(),
@@ -605,6 +633,27 @@ pub mod test {
             TraceLevel::None,
             None,
         )
+    }
+
+    /// Builds a parameter with explicit dependencies and expression.
+    #[must_use]
+    pub fn build_parameter_with_dependencies(
+        name: &str,
+        dependencies: Dependencies,
+        expr: Expr,
+    ) -> Parameter {
+        build_parameter(name, dependencies, expr, None, Limits::default())
+    }
+
+    /// Builds a parameter from an explicit expression, optional units, and limits.
+    #[must_use]
+    pub fn build_parameter_from_expr(
+        name: &str,
+        expr: Expr,
+        units: Option<crate::CompositeUnit>,
+        limits: Limits,
+    ) -> Parameter {
+        build_parameter(name, Dependencies::new(), expr, units, limits)
     }
 
     /// Builds a parameter with a literal value, optional units, and limits.

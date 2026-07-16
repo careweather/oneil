@@ -1284,11 +1284,11 @@ fn classify_variable(variable: &mut ir::Variable, scope: &ClassifyScope<'_>) {
 #[cfg(test)]
 mod tests {
     use indexmap::IndexSet;
-    use oneil_ir as ir;
-    use oneil_shared::{
-        span::Span,
-        symbols::{BuiltinValueName, ParameterName, ReferenceName},
+    use oneil_ir::{
+        self as ir,
+        test_helpers::expr::{builtin_variable, external_variable, parameter_variable},
     };
+    use oneil_shared::symbols::ParameterName;
 
     use super::{BuiltinLookup, ClassifyScope, classify_variable};
 
@@ -1321,7 +1321,7 @@ mod tests {
             builtins: &builtins,
         };
 
-        let mut var = ir::Variable::parameter(name.clone(), Span::synthetic());
+        let mut var = parameter_variable(name.as_str());
         classify_variable(&mut var, &scope);
 
         match var {
@@ -1343,7 +1343,7 @@ mod tests {
             builtins: &builtins,
         };
 
-        let mut var = ir::Variable::parameter(ParameterName::from("pi"), Span::synthetic());
+        let mut var = parameter_variable("pi");
         classify_variable(&mut var, &scope);
 
         match var {
@@ -1364,8 +1364,7 @@ mod tests {
             builtins: &builtins,
         };
 
-        let mut var =
-            ir::Variable::builtin(BuiltinValueName::new("pi".to_string()), Span::synthetic());
+        let mut var = builtin_variable("pi");
         classify_variable(&mut var, &scope);
 
         match var {
@@ -1387,7 +1386,7 @@ mod tests {
             builtins: &builtins,
         };
 
-        let mut var = ir::Variable::parameter(ParameterName::from("ghost"), Span::synthetic());
+        let mut var = parameter_variable("ghost");
         classify_variable(&mut var, &scope);
 
         match var {
@@ -1409,12 +1408,7 @@ mod tests {
             builtins: &builtins,
         };
 
-        let mut var = ir::Variable::external(
-            ReferenceName::new("r".to_string()),
-            Span::synthetic(),
-            ParameterName::from("p"),
-            Span::synthetic(),
-        );
+        let mut var = external_variable("p", "r");
         classify_variable(&mut var, &scope);
 
         match var {

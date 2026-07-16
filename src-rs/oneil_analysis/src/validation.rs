@@ -1142,9 +1142,9 @@ mod tests {
         DesignResolutionError, HostLocation, InstanceValidationError, InstanceValidationErrorKind,
         ResolutionErrorCollection,
     };
-    use oneil_ir as ir;
+    use oneil_ir::test_helpers::parameter::design_provenance;
     use oneil_shared::{
-        InstancePath, RelativePath,
+        InstancePath,
         symbols::{ParameterName, ReferenceName, TestIndex},
     };
 
@@ -1467,14 +1467,8 @@ mod tests {
     fn design_provenance_attaches_design_info_to_undefined_parameter() {
         let path = model_path("host");
         let design_path = model_path("overlay");
-        let param =
-            ir_parameter_depends_on("y", "missing").with_design_provenance(ir::DesignProvenance {
-                design_path: design_path.clone(),
-                is_addition: false,
-                assignment_span: span(),
-                anchor_path: RelativePath::self_path(),
-                applied_via: None,
-            });
+        let param = ir_parameter_depends_on("y", "missing")
+            .with_design_provenance(design_provenance(design_path.clone(), false));
         let mut parameters = IndexMap::new();
         parameters.insert(ParameterName::from("y"), param);
 
