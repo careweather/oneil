@@ -1,0 +1,11 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_ref_tree(\"basic/failing_test.on\", \"m\")"
+---
+reference tree for `m`
+    ┌── fixtures/basic/failing_test.on test = FAIL
+    │                                       = f > t
+┌── fixtures/basic/failing_test.on f = 49.05 :N
+│                                    = m * a
+fixtures/basic/failing_test.on m = 5 :kg
+                                 = 5

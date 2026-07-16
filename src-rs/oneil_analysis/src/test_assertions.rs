@@ -1,22 +1,6 @@
 //! Shared assertion helpers for analysis tests.
 
 use oneil_frontend::{InstanceGraph, InstanceValidationError, InstanceValidationErrorKind};
-use oneil_shared::symbols::ParameterName;
-
-use crate::output::error::TreeErrors;
-
-/// Asserts that a tree-errors collection is empty.
-///
-/// # Panics
-///
-/// Panics if any model path has recorded tree errors.
-#[track_caller]
-pub fn assert_no_tree_errors(errors: &TreeErrors) {
-    assert!(
-        errors.model_paths().next().is_none(),
-        "expected no tree errors, got {errors:?}"
-    );
-}
 
 /// Asserts that validation produced no errors.
 ///
@@ -69,28 +53,4 @@ pub fn parameter_cycle_member_names(errors: &[InstanceValidationError]) -> Vec<&
             | InstanceValidationErrorKind::ReferenceHasError { .. } => None,
         })
         .collect()
-}
-
-/// Asserts an independents map entry equals the expected `(name, value)` pairs.
-///
-/// # Panics
-///
-/// Panics if the maps differ.
-#[track_caller]
-pub fn assert_independent_params(
-    actual: &indexmap::IndexMap<ParameterName, oneil_output::Value>,
-    expected: &[(&str, f64)],
-) {
-    assert_eq!(
-        actual.len(),
-        expected.len(),
-        "independents length mismatch: {actual:?} vs {expected:?}"
-    );
-    for &(name, value) in expected {
-        assert_eq!(
-            actual.get(&ParameterName::from(name)),
-            Some(&oneil_output::Value::from(value)),
-            "missing or wrong independent `{name}` in {actual:?}"
-        );
-    }
 }

@@ -21,6 +21,4 @@ pub use oneil_frontend::{HostLocation, InstanceValidationError, InstanceValidati
 #[cfg(test)]
 mod test_assertions;
 #[cfg(test)]
-mod test_context;
-#[cfg(test)]
 mod test_fixtures;

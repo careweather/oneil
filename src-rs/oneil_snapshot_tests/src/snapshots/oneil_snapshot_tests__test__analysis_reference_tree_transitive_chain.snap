@@ -1,0 +1,11 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_ref_tree(\"gravity_mars.on\", \"g\")"
+---
+reference tree for `g`
+    ┌── fixtures/gravity_mars.on c = 14.88 :m/s^2
+    │                              = h * 2
+┌── fixtures/gravity_mars.on h = 7.44 :m/s^2
+│                              = g * 2
+fixtures/gravity_mars.on g = 3.72 :m/s^2
+                           = 3.72

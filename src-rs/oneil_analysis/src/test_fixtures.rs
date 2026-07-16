@@ -1,29 +1,15 @@
-//! Shared IR, graph, and evaluated-value fixtures for analysis tests.
+//! Shared IR and graph fixtures for validation tests.
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use oneil_frontend::{BuiltinLookup, InstanceGraph, InstancedModel, ReferenceImport};
 use oneil_ir as ir;
-pub use oneil_ir::test_helpers::expr::{external_var, lit_bool, lit_number, param_var};
-use oneil_ir::test_helpers::{
-    parameter::{
-        build_parameter_with_dependencies, builtin_dependencies_singleton,
-        external_dependencies_singleton, parameter_dependencies,
-    },
-    test::make_test,
-};
-use oneil_output::{
-    self as output, BuiltinDependency, DependencySet, ExternalDependency, Model, Parameter,
-    ParameterDependency, PrintLevel, Test, Value,
-};
+pub use oneil_ir::test_helpers::expr::{external_var, lit_number, param_var};
+use oneil_ir::test_helpers::{parameter::build_parameter_with_dependencies, test::make_test};
 use oneil_shared::{
-    EvalInstanceKey, InstancePath,
-    labels::ParameterLabel,
     paths::ModelPath,
     span::Span,
-    symbols::{BuiltinValueName, ParameterName, ReferenceName, TestIndex},
+    symbols::{ParameterName, ReferenceName, TestIndex},
 };
-
-use crate::test_context::test_model_path;
 
 /// Synthetic span for constructing IR in tests.
 #[must_use]
@@ -31,85 +17,10 @@ pub fn span() -> Span {
     Span::synthetic()
 }
 
-/// Alias for [`test_model_path`].
+/// Returns a synthetic model path for validation tests.
 #[must_use]
 pub fn model_path(name: &str) -> ModelPath {
-    test_model_path(name)
-}
-
-/// IR dependencies naming same-model parameters.
-#[must_use]
-pub fn deps_on_parameters(names: &[&str]) -> ir::Dependencies {
-    parameter_dependencies(names)
-}
-
-/// IR dependencies naming a single builtin.
-#[must_use]
-pub fn deps_on_builtin(name: &str) -> ir::Dependencies {
-    builtin_dependencies_singleton(name)
-}
-
-/// IR dependencies naming one external `(reference, parameter)`.
-#[must_use]
-pub fn deps_on_external(reference: &str, parameter: &str) -> ir::Dependencies {
-    external_dependencies_singleton(parameter, reference)
-}
-
-/// Evaluated [`DependencySet`] with only same-model parameter dependencies.
-#[must_use]
-pub fn parameter_deps(names: &[&str]) -> DependencySet {
-    DependencySet {
-        builtin_dependencies: IndexSet::new(),
-        parameter_dependencies: names
-            .iter()
-            .map(|name| ParameterDependency {
-                parameter_name: ParameterName::from(*name),
-            })
-            .collect(),
-        external_dependencies: IndexSet::new(),
-    }
-}
-
-/// Evaluated [`DependencySet`] with only builtin dependencies.
-#[must_use]
-pub fn builtin_deps(names: &[&str]) -> DependencySet {
-    DependencySet {
-        builtin_dependencies: names
-            .iter()
-            .map(|name| BuiltinDependency {
-                name: BuiltinValueName::from(*name),
-            })
-            .collect(),
-        parameter_dependencies: IndexSet::new(),
-        external_dependencies: IndexSet::new(),
-    }
-}
-
-/// Evaluated [`DependencySet`] with a single external dependency.
-#[must_use]
-pub fn external_deps(
-    instance_key: EvalInstanceKey,
-    reference: &str,
-    parameter: &str,
-) -> DependencySet {
-    DependencySet {
-        builtin_dependencies: IndexSet::new(),
-        parameter_dependencies: IndexSet::new(),
-        external_dependencies: IndexSet::from([ExternalDependency {
-            instance_key,
-            reference_name: ReferenceName::from(reference),
-            parameter_name: ParameterName::from(parameter),
-        }]),
-    }
-}
-
-/// IR parameter with a numeric-literal body and the given dependency set.
-///
-/// Used by dependency-/reference-tree tests, which read
-/// [`ir::Parameter::dependencies`] rather than walking the RHS expression.
-#[must_use]
-pub fn ir_parameter(name: &str, dependencies: ir::Dependencies) -> ir::Parameter {
-    ir_parameter_with_expr(name, dependencies, lit_number(0.0))
+    ModelPath::from_str_no_ext(name)
 }
 
 /// IR parameter with the given RHS expression and empty dependency set.
@@ -142,12 +53,6 @@ pub fn ir_parameter_with_expr(
     build_parameter_with_dependencies(name, dependencies, expr)
 }
 
-/// IR test with the given dependencies and a boolean-true body.
-#[must_use]
-pub fn ir_test(dependencies: ir::Dependencies) -> ir::Test {
-    ir_test_with_expr(dependencies, lit_bool(true))
-}
-
 /// IR test with an empty dependency set and the given body expression.
 #[must_use]
 pub fn ir_test_expr(expr: ir::Expr) -> ir::Test {
@@ -158,74 +63,6 @@ pub fn ir_test_expr(expr: ir::Expr) -> ir::Test {
 #[must_use]
 pub fn ir_test_with_expr(dependencies: ir::Dependencies, expr: ir::Expr) -> ir::Test {
     make_test(expr, dependencies)
-}
-
-/// Evaluated parameter with a scalar numeric value and no dependencies.
-#[must_use]
-pub fn evaluated_parameter(name: &str, value: f64) -> Parameter {
-    evaluated_parameter_with_deps(name, value, DependencySet::default())
-}
-
-/// Evaluated parameter with a scalar numeric value and the given dependencies.
-#[must_use]
-pub fn evaluated_parameter_with_deps(
-    name: &str,
-    value: f64,
-    dependencies: DependencySet,
-) -> Parameter {
-    Parameter {
-        ident: ParameterName::from(name),
-        label: ParameterLabel::from(name),
-        value: Value::from(value),
-        print_level: PrintLevel::None,
-        debug_info: None,
-        dependencies,
-        expr_span: span(),
-        warnings: Vec::new(),
-    }
-}
-
-/// Evaluated model with the given parameters and references.
-#[must_use]
-pub fn evaluated_model(
-    path: &ModelPath,
-    parameters: IndexMap<ParameterName, Parameter>,
-    references: IndexMap<ReferenceName, EvalInstanceKey>,
-) -> Model {
-    Model {
-        path: path.clone(),
-        instance_path: InstancePath::root(),
-        submodels: IndexSet::new(),
-        references,
-        parameters,
-        tests: IndexMap::new(),
-    }
-}
-
-/// Passed evaluated test.
-#[must_use]
-pub fn evaluated_test_passed() -> Test {
-    Test {
-        expr_span: span(),
-        result: output::TestResult::Passed,
-        warnings: Vec::new(),
-    }
-}
-
-/// Failed evaluated test.
-#[must_use]
-pub fn evaluated_test_failed() -> Test {
-    Test {
-        expr_span: span(),
-        result: output::TestResult::Failed {
-            debug_info: Box::new(output::DebugInfo {
-                builtin_dependency_values: IndexMap::new(),
-                parameter_dependency_values: IndexMap::new(),
-                external_dependency_values: IndexMap::new(),
-            }),
-        },
-        warnings: Vec::new(),
-    }
 }
 
 /// Cross-file reference import pointing at `path`.

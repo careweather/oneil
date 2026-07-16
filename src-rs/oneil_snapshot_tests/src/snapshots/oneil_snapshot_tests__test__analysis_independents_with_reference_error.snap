@@ -1,0 +1,8 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_independents(\"ref_undefined_param/consumer.on\", false)"
+---
+error: parameter `nosuchparam` is not defined on reference `planet` (model `fixtures/ref_undefined_param/../gravity_earth.on`)
+  at fixtures/ref_undefined_param/consumer.on:13:12
+---
+(no independents for top model)

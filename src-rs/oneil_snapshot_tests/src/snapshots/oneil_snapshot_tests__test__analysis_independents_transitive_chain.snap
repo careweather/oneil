@@ -1,0 +1,5 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_independents(\"gravity_mars.on\", false)"
+---
+g = 3.72 :m/s^2

@@ -1,0 +1,8 @@
+---
+source: src-rs/oneil_snapshot_tests/src/test.rs
+expression: "run_independents(\"basic/syntax_error.on\", false)"
+---
+error: expected parameter or test
+  at fixtures/basic/syntax_error.on:3:18
+---
+m = 10 :kg

@@ -397,16 +397,80 @@ fn analysis_dependency_tree_basic_force() {
     insta::assert_snapshot!(run_dep_tree("basic/basic.on", "f"));
 }
 
+/// Snapshots a dependency-tree leaf with no children.
+#[test]
+fn analysis_dependency_tree_leaf() {
+    insta::assert_snapshot!(run_dep_tree("basic/basic.on", "m"));
+}
+
+/// Snapshots a three-parameter transitive dependency chain.
+#[test]
+fn analysis_dependency_tree_transitive_chain() {
+    // `c = h * 2`, `h = g * 2`, and `g` is a leaf.
+    insta::assert_snapshot!(run_dep_tree("gravity_mars.on", "c"));
+}
+
+/// Snapshots dependency analysis for a parameter absent from a valid model.
+#[test]
+fn analysis_dependency_tree_missing_parameter() {
+    insta::assert_snapshot!(run_dep_tree("basic/basic.on", "missing"));
+}
+
 #[test]
 fn analysis_reference_tree_basic_mass() {
     // `m` is referenced by `f` and (indirectly) by the force threshold test.
     insta::assert_snapshot!(run_ref_tree("basic/basic.on", "m"));
 }
 
+/// Snapshots a reference-tree leaf with no consumers.
+#[test]
+fn analysis_reference_tree_leaf() {
+    insta::assert_snapshot!(run_ref_tree("gravity_mars.on", "c"));
+}
+
+/// Snapshots a three-parameter transitive reference chain.
+#[test]
+fn analysis_reference_tree_transitive_chain() {
+    insta::assert_snapshot!(run_ref_tree("gravity_mars.on", "g"));
+}
+
+/// Snapshots a failed test as a parameter consumer.
+#[test]
+fn analysis_reference_tree_failed_test() {
+    insta::assert_snapshot!(run_ref_tree("basic/failing_test.on", "m"));
+}
+
 #[test]
 fn analysis_independents_basic() {
     // Leaf params `m`, `a`, and `t` are independent; `f` is not.
     insta::assert_snapshot!(run_independents("basic/basic.on", false));
+}
+
+/// Snapshots independent selection across a transitive local chain.
+#[test]
+fn analysis_independents_transitive_chain() {
+    // Only `g` is independent; `h` and `c` have parameter dependencies.
+    insta::assert_snapshot!(run_independents("gravity_mars.on", false));
+}
+
+/// Snapshots independents analysis when model loading fails.
+#[test]
+fn analysis_independents_failed_model() {
+    insta::assert_snapshot!(run_independents("basic/syntax_error.on", false));
+}
+
+/// Snapshots non-recursive output for a model with an external reference.
+#[test]
+fn analysis_independents_non_recursive_with_ref() {
+    // Only top-level `m` is printed; the referenced planet is omitted.
+    insta::assert_snapshot!(run_independents("analysis/force_with_ref.on", false));
+}
+
+/// Snapshots independents output when reference validation fails.
+#[test]
+fn analysis_independents_with_reference_error() {
+    // The diagnostic is retained and no top-model independents are emitted.
+    insta::assert_snapshot!(run_independents("ref_undefined_param/consumer.on", false));
 }
 
 #[test]
