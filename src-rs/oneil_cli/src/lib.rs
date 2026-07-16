@@ -15,6 +15,7 @@ use anstream::{ColorChoice, eprintln, print, println};
 use clap::Parser;
 use indexmap::{IndexMap, IndexSet};
 use notify::Watcher;
+use oneil_analysis::display::{TreeDisplayConfig, format_dependency_tree, format_reference_tree};
 use oneil_runtime::{
     CachePrompterRef, Runtime,
     output::{
@@ -39,7 +40,6 @@ use crate::{
     print_debug_ir::IrPrintConfig,
     print_independents::IndependentPrintConfig,
     print_model_result::{ModelPrintConfig, TestPrintConfig},
-    print_tree::TreePrintConfig,
     print_utils::PrintUtilsConfig,
 };
 
@@ -54,7 +54,6 @@ mod print_debug_model_result;
 mod print_error;
 mod print_independents;
 mod print_model_result;
-mod print_tree;
 mod print_utils;
 mod stylesheet;
 
@@ -712,14 +711,12 @@ fn handle_tree_command(args: TreeArgs) {
         common,
     } = args;
 
-    let print_utils_config = PrintUtilsConfig {
-        sig_figs: common.sig_figs,
-    };
-
-    let tree_print_config = TreePrintConfig {
+    let tree_display_config = TreeDisplayConfig {
         recursive,
         depth,
-        print_utils_config,
+        sig_figs: common.sig_figs,
+        color: true,
+        path_prefix: None,
     };
 
     let mut runtime = runtime_from_common_args(&common);
@@ -757,18 +754,14 @@ fn handle_tree_command(args: TreeArgs) {
         return;
     }
 
-    let mut file_cache = std::collections::HashMap::new();
-
     match trees {
         TreeResults::ReferenceTrees(trees) => {
             for (param, tree) in trees {
                 match tree {
                     Some(reference_tree) => {
-                        print_tree::print_reference_tree(
-                            &file,
-                            &reference_tree,
-                            &tree_print_config,
-                            &mut file_cache,
+                        print!(
+                            "{}",
+                            format_reference_tree(&file, &reference_tree, tree_display_config,)
                         );
                     }
                     None => {
@@ -781,11 +774,9 @@ fn handle_tree_command(args: TreeArgs) {
             for (param, tree) in trees {
                 match tree {
                     Some(dependency_tree) => {
-                        print_tree::print_dependency_tree(
-                            &file,
-                            &dependency_tree,
-                            &tree_print_config,
-                            &mut file_cache,
+                        print!(
+                            "{}",
+                            format_dependency_tree(&file, &dependency_tree, tree_display_config,)
                         );
                     }
                     None => {

@@ -672,6 +672,7 @@ dependencies = [
  "oneil_ir",
  "oneil_output",
  "oneil_shared",
+ "owo-colors",
 ]
 
 [[package]]
@@ -699,6 +700,7 @@ dependencies = [
  "clap",
  "indexmap",
  "notify",
+ "oneil_analysis",
  "oneil_frontend",
  "oneil_lsp",
  "oneil_output",
@@ -842,6 +844,7 @@ name = "oneil_snapshot_tests"
 version = "0.16.1"
 dependencies = [
  "insta",
+ "oneil_analysis",
  "oneil_output",
  "oneil_runtime",
  "oneil_shared",

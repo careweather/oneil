@@ -4,6 +4,7 @@
 mod context;
 mod dep_graph;
 mod dependency;
+pub mod display;
 mod independents;
 pub mod output;
 mod validation;

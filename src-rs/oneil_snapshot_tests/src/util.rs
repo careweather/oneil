@@ -1,18 +1,12 @@
-use std::{
-    collections::HashMap,
-    fmt::Write,
-    path::{Path, PathBuf},
-};
+use std::{fmt::Write, path::Path};
 
+use oneil_analysis::display::{TreeDisplayConfig, format_dependency_tree, format_reference_tree};
 use oneil_output::util::{DEFAULT_SIG_FIGS, format_value_for_display};
 use oneil_runtime::{
     CacheReadPolicy, CacheWritePolicy, Runtime,
-    output::{
-        self, Independents, OneilDiagnostic, Value,
-        tree::{DependencyName, DependencyTreeValue, ReferenceTreeValue, Tree},
-    },
+    output::{self, Independents, OneilDiagnostic, Value},
 };
-use oneil_shared::{paths::ModelPath, span::Span, symbols::ParameterName};
+use oneil_shared::{paths::ModelPath, symbols::ParameterName};
 
 /// Runs the full evaluation pipeline on an Oneil model or design file and
 /// returns a formatted string containing any errors and the evaluation output.
@@ -187,7 +181,9 @@ pub fn run_dependency_tree_and_format(
     let (tree, errors) = runtime.get_dependency_tree(&model_path, &param);
     format_tree_analysis_result(
         &format!("dependency tree for `{parameter}`"),
-        tree.as_ref().map(format_dependency_tree),
+        tree.as_ref().map(|tree| {
+            format_dependency_tree(&model_path, tree, tree_display_config(path_prefix))
+        }),
         errors.to_vec(),
         path_prefix,
     )
@@ -207,7 +203,8 @@ pub fn run_reference_tree_and_format(
     let (tree, errors) = runtime.get_reference_tree(&model_path, &param);
     format_tree_analysis_result(
         &format!("reference tree for `{parameter}`"),
-        tree.as_ref().map(|t| format_reference_tree(t, path_prefix)),
+        tree.as_ref()
+            .map(|tree| format_reference_tree(&model_path, tree, tree_display_config(path_prefix))),
         errors.to_vec(),
         path_prefix,
     )
@@ -298,165 +295,13 @@ fn format_independent_params<'a>(
     }
 }
 
-fn format_dependency_tree(tree: &Tree<DependencyTreeValue>) -> String {
-    let mut out = String::new();
-    let mut file_cache = HashMap::new();
-    format_dependency_node(&mut out, tree, &[], true, 0, &mut file_cache);
-    out
-}
-
-fn format_reference_tree(tree: &Tree<ReferenceTreeValue>, path_prefix: Option<&Path>) -> String {
-    let mut out = String::new();
-    let mut file_cache = HashMap::new();
-    format_reference_node(&mut out, tree, &[], true, 0, path_prefix, &mut file_cache);
-    out
-}
-
-/// Formats a dependency-tree node in CLI topology order (children first).
-fn format_dependency_node(
-    out: &mut String,
-    tree: &Tree<DependencyTreeValue>,
-    parent_prefixes: &[bool],
-    is_first: bool,
-    depth: usize,
-    file_cache: &mut HashMap<PathBuf, String>,
-) {
-    let mut child_prefixes = parent_prefixes.to_vec();
-    if depth > 0 {
-        child_prefixes.push(is_first);
+/// Returns the shared plain-text tree display configuration used by snapshots.
+fn tree_display_config(path_prefix: Option<&Path>) -> TreeDisplayConfig<'_> {
+    TreeDisplayConfig {
+        recursive: true,
+        depth: None,
+        sig_figs: DEFAULT_SIG_FIGS,
+        color: false,
+        path_prefix,
     }
-    for (i, child) in tree.children().iter().enumerate() {
-        format_dependency_node(out, child, &child_prefixes, i == 0, depth + 1, file_cache);
-    }
-
-    let (first_prefix, rest_prefix) = tree_prefixes(depth, is_first);
-    let indent = build_indent(parent_prefixes);
-    let name = dependency_name_label(&tree.value().dependency_name);
-    let value_str = format_value_for_display(&tree.value().parameter_value, DEFAULT_SIG_FIGS);
-    writeln!(out, "{indent}{first_prefix}{name} = {value_str}")
-        .expect("String write is infallible");
-
-    if let Some(display_info) = tree.value().display_info.as_ref()
-        && let Some(equation) = equation_str(display_info, file_cache)
-    {
-        let pad = " ".repeat(name.len());
-        writeln!(out, "{indent}{rest_prefix}{pad} = {equation}")
-            .expect("String write is infallible");
-    }
-}
-
-fn format_reference_node(
-    out: &mut String,
-    tree: &Tree<ReferenceTreeValue>,
-    parent_prefixes: &[bool],
-    is_first: bool,
-    depth: usize,
-    path_prefix: Option<&Path>,
-    file_cache: &mut HashMap<PathBuf, String>,
-) {
-    let mut child_prefixes = parent_prefixes.to_vec();
-    if depth > 0 {
-        child_prefixes.push(is_first);
-    }
-    for (i, child) in tree.children().iter().enumerate() {
-        format_reference_node(
-            out,
-            child,
-            &child_prefixes,
-            i == 0,
-            depth + 1,
-            path_prefix,
-            file_cache,
-        );
-    }
-
-    let (first_prefix, rest_prefix) = tree_prefixes(depth, is_first);
-    let indent = build_indent(parent_prefixes);
-    let (name, value_str, display_info) = match tree.value() {
-        ReferenceTreeValue::Parameter {
-            model_path,
-            parameter_name,
-            parameter_value,
-            display_info,
-        } => {
-            let path = normalize_path(model_path.as_path(), path_prefix);
-            (
-                format!("{path} {}", parameter_name.as_str()),
-                format_value_for_display(parameter_value, DEFAULT_SIG_FIGS),
-                display_info,
-            )
-        }
-        ReferenceTreeValue::Test {
-            model_path,
-            test_passed,
-            display_info,
-            ..
-        } => {
-            let path = normalize_path(model_path.as_path(), path_prefix);
-            let status = if *test_passed { "PASS" } else { "FAIL" };
-            (format!("{path} test"), status.to_string(), display_info)
-        }
-    };
-    writeln!(out, "{indent}{first_prefix}{name} = {value_str}")
-        .expect("String write is infallible");
-
-    if let Some(equation) = equation_str(display_info, file_cache) {
-        let pad = " ".repeat(name.len());
-        writeln!(out, "{indent}{rest_prefix}{pad} = {equation}")
-            .expect("String write is infallible");
-    }
-}
-
-fn tree_prefixes(depth: usize, is_first: bool) -> (&'static str, &'static str) {
-    if depth == 0 {
-        ("", "")
-    } else if is_first {
-        ("┌── ", "│   ")
-    } else {
-        ("├── ", "│   ")
-    }
-}
-
-fn build_indent(parent_prefixes: &[bool]) -> String {
-    parent_prefixes
-        .iter()
-        .enumerate()
-        .map(|(i, is_last)| {
-            if i == 0 {
-                ""
-            } else if *is_last {
-                "    "
-            } else {
-                "│   "
-            }
-        })
-        .collect()
-}
-
-fn dependency_name_label(name: &DependencyName) -> String {
-    match name {
-        DependencyName::External(reference, parameter) => {
-            format!("{}.{}", parameter.as_str(), reference.as_str())
-        }
-        DependencyName::Parameter(parameter) => parameter.as_str().to_string(),
-        DependencyName::Builtin(builtin) => builtin.as_str().to_string(),
-    }
-}
-
-fn equation_str(
-    display_info: &(ModelPath, Span),
-    file_cache: &mut HashMap<PathBuf, String>,
-) -> Option<String> {
-    let (model_path, span) = display_info;
-    let file_path = model_path.as_path().to_path_buf();
-    if !file_cache.contains_key(&file_path) {
-        let Ok(contents) = std::fs::read_to_string(&file_path) else {
-            return None;
-        };
-        file_cache.insert(file_path.clone(), contents);
-    }
-    let contents = file_cache.get(&file_path)?;
-    contents
-        .get(span.start().offset..span.end().offset)
-        .map(str::to_string)
 }
