@@ -3,7 +3,7 @@
 use oneil_frontend::{InstanceGraph, InstanceValidationError, InstanceValidationErrorKind};
 use oneil_shared::symbols::ParameterName;
 
-use crate::output::{DependencyName, DependencyTreeValue, Tree, error::TreeErrors};
+use crate::output::error::TreeErrors;
 
 /// Asserts that a tree-errors collection is empty.
 ///
@@ -30,15 +30,6 @@ pub fn assert_no_validation_errors(graph: &InstanceGraph) {
         "expected no validation errors, got {:?}",
         graph.validation_errors
     );
-}
-
-/// Returns the dependency names of direct children, in tree order.
-#[must_use]
-pub fn child_dependency_names(tree: &Tree<DependencyTreeValue>) -> Vec<&DependencyName> {
-    tree.children()
-        .iter()
-        .map(|child| &child.value().dependency_name)
-        .collect()
 }
 
 /// Returns kinds of all validation errors, in order.

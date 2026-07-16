@@ -563,7 +563,7 @@ mod tests {
         output::{
             DependencyName, ReferenceTreeValue, error::GetTestValueError, error::GetValueError,
         },
-        test_assertions::{assert_no_tree_errors, child_dependency_names},
+        test_assertions::assert_no_tree_errors,
         test_context::{TestAnalysisContext, test_model_path},
         test_fixtures::{
             deps_on_builtin, deps_on_external, deps_on_parameters, evaluated_parameter,
@@ -642,7 +642,7 @@ mod tests {
             DependencyName::Parameter(ParameterName::from("y"))
         );
 
-        let child_names = child_dependency_names(&tree);
+        let child_names = tree.child_dependency_names();
         assert_eq!(
             child_names,
             vec![
@@ -697,13 +697,13 @@ mod tests {
         assert_no_tree_errors(&errors);
         let tree = tree.expect("tree should exist");
         assert_eq!(
-            child_dependency_names(&tree),
+            tree.child_dependency_names(),
             vec![&DependencyName::Parameter(ParameterName::from("b"))]
         );
 
         let b = &tree.children()[0];
         assert_eq!(
-            child_dependency_names(b),
+            b.child_dependency_names(),
             vec![&DependencyName::Parameter(ParameterName::from("a"))]
         );
         assert!(b.children()[0].children().is_empty());
@@ -757,7 +757,7 @@ mod tests {
         assert_no_tree_errors(&errors);
         let tree = tree.expect("tree should exist");
         assert_eq!(
-            child_dependency_names(&tree),
+            tree.child_dependency_names(),
             vec![&DependencyName::External(
                 ReferenceName::from("other"),
                 ParameterName::from("x"),

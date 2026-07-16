@@ -35,6 +35,18 @@ impl<T> Tree<T> {
     }
 }
 
+#[cfg(test)]
+impl Tree<DependencyTreeValue> {
+    /// Returns the dependency names of direct children, in tree order.
+    #[must_use]
+    pub fn child_dependency_names(&self) -> Vec<&DependencyName> {
+        self.children()
+            .iter()
+            .map(|child| &child.value().dependency_name)
+            .collect()
+    }
+}
+
 /// Name of a node in a dependency tree: either a parameter or a builtin value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DependencyName {
