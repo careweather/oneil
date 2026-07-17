@@ -1,0 +1,103 @@
+========================================================================
+Full-form parameter with continuous limits
+========================================================================
+
+Temperature (0, 100): T = 300
+
+------------------------------------------------------------------------
+
+(source_file
+  (parameter
+    label: (label
+      (identifier))
+    limits: (limits
+      (continuous_limits
+        min: (number)
+        max: (number)))
+    name: (identifier)
+    value: (simple_value
+      expr: (number))))
+
+========================================================================
+Design parameter shorthand with discrete limits
+========================================================================
+
+T [250, 300, 350] = 300
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    limits: (limits
+      (discrete_limits
+        (number)
+        (number)
+        (number)))
+    value: (simple_value
+      expr: (number))))
+
+========================================================================
+Design parameter followed by a multi-line note ending exactly at end of file
+========================================================================
+
+x = 5
+~~~
+This is a note.
+Second line.
+~~~
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (number))
+    (note
+      (multi_line_note))))
+
+========================================================================
+Unit cast expression
+========================================================================
+
+speed = (v : m/s)
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (unit_cast
+        expr: (variable
+          name: (identifier))
+        unit: (unit_binary_expression
+          left: (unit
+            name: (unit_identifier))
+          right: (unit
+            name: (unit_identifier)))))))
+
+========================================================================
+Boolean, not/and/or, and fallback operator precedence
+========================================================================
+
+n = not x and y or z ? 1
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (unary_expression
+              operand: (variable
+                name: (identifier)))
+            right: (variable
+              name: (identifier)))
+          right: (variable
+            name: (identifier)))
+        right: (number)))))

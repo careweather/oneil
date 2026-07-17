@@ -1,0 +1,145 @@
+========================================================================
+Single-line note with inline math and a stray dollar sign
+========================================================================
+
+x = 5
+~ Drag is $C_d$ and cost is $5 per kg
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (number))
+    (note
+      (single_line_note
+        (note_math)))))
+
+========================================================================
+Multi-line note with an inline math span inside a Markdown table cell
+========================================================================
+
+y = 6
+~~~
+| Symbol | Meaning |
+|---|---|
+| $C_d$ | Drag coefficient |
+~~~
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (number))
+    (note
+      (multi_line_note
+        (note_math)))))
+
+========================================================================
+Multi-line note with a block math span, one standalone and one inline
+========================================================================
+
+z = 7
+~~~
+$$a^2 + b^2 = c^2$$
+Energy: $$E = mc^2$$ too.
+~~~
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (number))
+    (note
+      (multi_line_note
+        (note_math)
+        (note_math)))))
+
+========================================================================
+Multi-line note with an unterminated inline math span, tolerated as text
+========================================================================
+
+w = 8
+~~~
+Unclosed math: $x
+still a valid note
+~~~
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (number))
+    (note
+      (multi_line_note))))
+
+========================================================================
+Multi-line note with an unterminated math span immediately followed by the closing fence
+========================================================================
+
+a = 1
+~~~
+$x
+~~~
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (number))
+    (note
+      (multi_line_note))))
+
+========================================================================
+Multi-line note with an inline math span crossing a line break
+========================================================================
+
+b = 2
+~~~
+The formula $E =
+mc^2$ is well known.
+~~~
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (number))
+    (note
+      (multi_line_note
+        (note_math)))))
+
+========================================================================
+Multi-line note with a block math span crossing several line breaks
+========================================================================
+
+c = 3
+~~~
+$$
+a^2 + b^2
+=
+c^2
+$$
+~~~
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_parameter
+    name: (identifier)
+    value: (simple_value
+      expr: (number))
+    (note
+      (multi_line_note
+        (note_math)))))

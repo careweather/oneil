@@ -1,0 +1,39 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "oneil",
+      "camelcase": "Oneil",
+      "scope": "source.oneil",
+      "path": ".",
+      "file-types": [
+        "on",
+        "one"
+      ],
+      "highlights": "queries/highlights.scm",
+      "injection-regex": "^oneil$"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MPL-2.0",
+    "description": "Tree-sitter grammar for the Oneil modeling language",
+    "authors": [
+      {
+        "name": "Careweather"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/careweather/oneil"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": false,
+    "node": true,
+    "python": false,
+    "rust": true,
+    "swift": false,
+    "zig": false
+  }
+}

@@ -1,0 +1,82 @@
+========================================================================
+Import declaration
+========================================================================
+
+import foo
+
+------------------------------------------------------------------------
+
+(source_file
+  (import
+    path: (identifier)))
+
+========================================================================
+Design target declaration
+========================================================================
+
+design mars
+
+------------------------------------------------------------------------
+
+(source_file
+  (design_target
+    target: (identifier)))
+
+========================================================================
+Apply declaration with a nested block
+========================================================================
+
+apply uhf to sc.U [
+  alibaba to a,
+]
+
+------------------------------------------------------------------------
+
+(source_file
+  (apply
+    file: (identifier)
+    target: (model_path
+      (identifier)
+      (identifier))
+    (apply_block
+      file: (identifier)
+      target: (model_path
+        (identifier)))))
+
+========================================================================
+Submodel declaration with a directory path, alias, and extraction list
+========================================================================
+
+submodel utils/math as calc [trig as t, sin]
+
+------------------------------------------------------------------------
+
+(source_file
+  (submodel
+    (directory_path
+      (identifier))
+    model: (model_info
+      name: (identifier)
+      alias: (identifier))
+    (submodel_list
+      (model_info
+        name: (identifier)
+        alias: (identifier))
+      (model_info
+        name: (identifier)))))
+
+========================================================================
+Test declaration
+========================================================================
+
+test: x > y
+
+------------------------------------------------------------------------
+
+(source_file
+  (test
+    condition: (binary_expression
+      left: (variable
+        name: (identifier))
+      right: (variable
+        name: (identifier)))))
