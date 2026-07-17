@@ -25,9 +25,10 @@
 ; disrupt Markdown inside math spans is a bare `|` (table column separator),
 ; which is a pre-existing Markdown table limitation -- use `\|` or `\mid`.
 ; Known limitation: note content with 4+ spaces of leading indentation is
-; interpreted by Markdown as a code block. Since Oneil doesn't use
-; indentation structurally, this only matters if a user deliberately indents
-; note content for visual alignment.
+; interpreted by Markdown as a code block. Indentation is the recommended
+; style inside Oneil sections, so this affects real files. Acceptable for
+; now since the VSCode TextMate highlighter is the primary tooling path and
+; tree-sitter is supplementary.
 ; `{{param:equation}}`/`{{param:value}}` interpolation placeholders are
 ; inert Markdown text and not highlighted specially.
 
