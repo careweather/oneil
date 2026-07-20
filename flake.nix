@@ -1,44 +1,39 @@
 {
-  description = "Oneil -  Design specification language for rapid, comprehensive system modeling.";
+  description = "Oneil - Design specification language for rapid, comprehensive system modeling.";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-        };
-      in
-      {
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            # Rust tools
-            rustc
-            cargo
-            clippy
-            rustfmt
-            rust-analyzer
+  outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+    systems = [ "x86_64-linux" "aarch64-linux" ];
 
-            # VSCode extension tools
-            nodejs_20
-            pnpm
-            vsce # "Visual Studio Code Extension Manager"
-          ];
-        };
+    perSystem = { pkgs, system, ... }: {
+      devShells.default = pkgs.mkShell {
+        buildInputs = [
+          # Rust tools
+          pkgs.rustc
+          pkgs.cargo
+          pkgs.clippy
+          pkgs.rustfmt
+          pkgs.rust-analyzer
+          pkgs.python3 # used by PyO3
 
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "oneil";
-          version = "0.16.1";
-          src = ./.;
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-          };
-        };
-      });
+          # VSCode extension tools
+          pkgs.nodejs
+          pkgs.pnpm
+          pkgs.vsce # "Visual Studio Code Extension Manager"
+        ];
+      };
+
+      packages.default = pkgs.rustPlatform.buildRustPackage {
+        pname = "oneil";
+        version = "0.16.1";
+        src = ./.;
+        nativeBuildInputs = [ pkgs.python3 ]; # used by PyO3
+        cargoLock.lockFile = ./Cargo.lock;
+      };
+    };
+  };
 }
-
