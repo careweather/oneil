@@ -146,12 +146,24 @@ fn validate_instance(
         let provenance = parameter.design_provenance();
         let anchor = provenance
             .and_then(|prov| resolve_anchor_for_validation(instance, ancestors, &prov.anchor_path));
+        let param_scope = anchor.unwrap_or(instance);
         let design_info =
             provenance.map(|prov| (prov.design_path.clone(), prov.assignment_span.clone()));
         validate_value(
             parameter.value(),
             instance,
-            anchor.unwrap_or(instance),
+            param_scope,
+            host_path,
+            &location,
+            design_info.as_ref(),
+            pool,
+            models_with_resolution_errors,
+            errors,
+        );
+        validate_limits(
+            parameter.limits(),
+            instance,
+            param_scope,
             host_path,
             &location,
             design_info.as_ref(),
@@ -262,6 +274,65 @@ fn validate_value(
                 );
                 validate_expr(
                     piece.if_expr(),
+                    host_instance,
+                    param_scope,
+                    host_path,
+                    location,
+                    design_info,
+                    pool,
+                    models_with_resolution_errors,
+                    errors,
+                );
+            }
+        }
+    }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "private validation helper; all args are needed"
+)]
+fn validate_limits(
+    limits: &ir::Limits,
+    host_instance: &InstancedModel,
+    param_scope: &InstancedModel,
+    host_path: &InstancePath,
+    location: &HostLocation,
+    design_info: Option<&(ModelPath, Span)>,
+    pool: &IndexMap<ModelPath, Box<InstancedModel>>,
+    models_with_resolution_errors: &IndexSet<ModelPath>,
+    errors: &mut Vec<InstanceValidationError>,
+) {
+    match limits {
+        ir::Limits::Default => {}
+        ir::Limits::Continuous { min, max, .. } => {
+            validate_expr(
+                min,
+                host_instance,
+                param_scope,
+                host_path,
+                location,
+                design_info,
+                pool,
+                models_with_resolution_errors,
+                errors,
+            );
+            validate_expr(
+                max,
+                host_instance,
+                param_scope,
+                host_path,
+                location,
+                design_info,
+                pool,
+                models_with_resolution_errors,
+                errors,
+            );
+        }
+        ir::Limits::Discrete { values, .. } => {
+            for value in values {
+                validate_expr(
+                    value,
                     host_instance,
                     param_scope,
                     host_path,
@@ -1141,6 +1212,7 @@ mod tests {
         ResolutionErrorCollection,
     };
     use oneil_ir::test_helpers::parameter::design_provenance;
+    use oneil_ir::{Limits, test_helpers::parameter::build_parameter_from_expr};
     use oneil_shared::{
         InstancePath,
         symbols::{ParameterName, ReferenceName, TestIndex},
@@ -1154,7 +1226,7 @@ mod tests {
         test_fixtures::{
             StubBuiltins, external_var, graph_from_root, graph_with_pool, instanced_model,
             instanced_model_params, instanced_model_with_refs, ir_parameter_depends_on,
-            ir_parameter_expr, ir_parameter_leaf, ir_test_expr, model_path, param_var,
+            ir_parameter_expr, ir_parameter_leaf, ir_test_expr, lit_number, model_path, param_var,
             reference_import, span,
         },
     };
@@ -1222,6 +1294,74 @@ mod tests {
             graph.validation_errors[0].kind,
             InstanceValidationErrorKind::UndefinedParameter { .. }
         ));
+    }
+
+    #[test]
+    fn undefined_parameter_in_continuous_limits_is_reported() {
+        let path = model_path("limits_undef");
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            build_parameter_from_expr(
+                "x",
+                lit_number(1.0),
+                None,
+                Limits::continuous(param_var("lo"), param_var("hi"), span()),
+            ),
+        );
+
+        let mut graph = graph_from_root(instanced_model_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 2);
+        let names: Vec<_> = graph
+            .validation_errors
+            .iter()
+            .map(|err| {
+                let InstanceValidationErrorKind::UndefinedParameter { parameter_name, .. } =
+                    &err.kind
+                else {
+                    panic!("expected UndefinedParameter, got {:?}", err.kind);
+                };
+                parameter_name.as_str()
+            })
+            .collect();
+        assert!(names.contains(&"lo"));
+        assert!(names.contains(&"hi"));
+        assert!(
+            graph.validation_errors.iter().all(|err| {
+                err.host_location == HostLocation::Parameter(ParameterName::from("x"))
+            })
+        );
+    }
+
+    #[test]
+    fn undefined_parameter_in_discrete_limits_is_reported() {
+        let path = model_path("limits_discrete_undef");
+        let mut parameters = IndexMap::new();
+        parameters.insert(
+            ParameterName::from("x"),
+            build_parameter_from_expr(
+                "x",
+                lit_number(1.0),
+                None,
+                Limits::discrete(vec![param_var("a"), lit_number(2.0)], span()),
+            ),
+        );
+
+        let mut graph = graph_from_root(instanced_model_params(&path, parameters));
+        validate_instance_graph(&mut graph, &StubBuiltins::new(&[]));
+
+        assert_eq!(graph.validation_errors.len(), 1);
+        let InstanceValidationErrorKind::UndefinedParameter { parameter_name, .. } =
+            &graph.validation_errors[0].kind
+        else {
+            panic!(
+                "expected UndefinedParameter, got {:?}",
+                graph.validation_errors[0].kind
+            );
+        };
+        assert_eq!(parameter_name.as_str(), "a");
     }
 
     #[test]
