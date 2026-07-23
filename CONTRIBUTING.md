@@ -108,6 +108,59 @@ more details on how to use those tools.
 To edit the syntax highlighting, edit the grammar defined in
 [theme/highlight.js](./docs/guide/theme/highlight.js).
 
+## Continuous Integration
+
+GitHub Actions workflows live in [`.github/workflows/`](.github/workflows/).
+They cover everyday checks, PR-only extras, docs deployment, and releases.
+
+### Rust (every push and pull request)
+
+[`.github/workflows/rust.yml`](.github/workflows/rust.yml) builds the workspace,
+runs tests, Clippy, and `cargo fmt --check`. Warnings are treated as errors
+(`RUSTFLAGS=--deny warnings`). Fuzz targets are not run here (they would not
+finish in CI).
+
+The local equivalent is roughly:
+
+```sh
+cargo build --all-targets --all-features
+cargo test --all-features
+cargo clippy --all-targets --all-features
+cargo fmt --check
+```
+
+### Pull request extras
+
+[`.github/workflows/rust-pr.yml`](.github/workflows/rust-pr.yml) runs only on
+pull requests:
+
+- **Fuzz targets** — each listed `oneil_output` fuzz target runs for a fixed
+  time window on nightly Rust. On failure, fuzz artifacts are uploaded for
+  debugging.
+
+- **Unused dependencies** — `cargo udeps` on nightly to catch crates that are
+  declared but unused.
+
+### Coding standards review (advisory)
+
+[`.github/workflows/coding-standards-review.yml`](.github/workflows/coding-standards-review.yml)
+runs when a PR changes files under `src-rs/`. A Cursor agent reviews the diff
+against [`docs/CODING_STANDARDS.md`](docs/CODING_STANDARDS.md) and posts (or
+updates) a sticky PR comment. Style findings do not fail the job; missing
+secrets or agent/infra failures do.
+
+### User guide (GitHub Pages)
+
+[`.github/workflows/guide.yml`](.github/workflows/guide.yml) builds the mdBook
+user guide under `docs/guide/` and deploys it to GitHub Pages on pushes to the
+`gh-pages` branch (and via manual `workflow_dispatch`).
+
+### Releases
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) runs when a
+version tag matching `v*` is pushed. It builds release binaries for Linux,
+Windows, and macOS, then attaches them to a GitHub Release with generated notes.
+
 ## Resources
 
 - [Crafting Interpreters](https://craftinginterpreters.com/) - If you've never
