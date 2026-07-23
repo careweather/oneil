@@ -1,0 +1,4 @@
+reference constants as c
+submodel planet as p
+
+Orbital speed: v = sqrt(G.c * M.p / R.p) :m/s

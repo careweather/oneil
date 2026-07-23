@@ -12,6 +12,7 @@ standard environments — that belong to the world your system lives in, not to
 the system itself.
 
 For example with the following constants:
+
 ```oneil
 # constants.on
 Speed of light: c = 299792458 :m/s
@@ -95,7 +96,7 @@ To access a parameter inside a reference or submodel, write `parameter_id.alias`
 — the **parameter comes first**, the model's alias second.
 
 ```oneil
-# satellite.on
+# orbital_speed.on
 reference constants as c
 submodel planet as p
 
@@ -103,15 +104,16 @@ Orbital speed: v = sqrt(G.c * M.p / R.p) :m/s
 ```
 
 > [!NOTE]
-> This is the reverse of the `object.property` convention in most programming languages, and it is intentional. 
+> This is the reverse of the `object.property` convention in most programming languages, and it is intentional.
 > In engineering equations parameters are primary, whereas subscripts often qualify which subsystem or model the parameter is part of.
 
 ## Referring to a nested submodel
 
-A submodel is also *exported* as part of the current model's structure. 
-A parent of `satellite.on` can reach nested parameters by importing a reference to a nested submodel using a local alias.
+A submodel is also *exported* as part of the current model's structure.
+A parent can reach nested parameters by importing a reference to a nested submodel using a local alias.
 
 For example with solar system defined as follows:
+
 ```oneil
 # solar_system.on
 submodel planet as earth
@@ -122,7 +124,10 @@ Earth orbital period: T_e = 365.25 :days
 Earth surface gravity: g_s = g.earth :m/s^2
 ```
 
-The syntax `[alias]` or `[alias as local_alias]` at the end of the `submodel` line exposes the nested submodels to use locally. In this example we use the solar system in a mission and access earth parameters through a local alias.
+The syntax `[alias]` or `[alias as local_alias]` exposes nested submodels at the
+current scope. Names inside the brackets are the **aliases** declared inside the
+imported model - not the source file names. Here `earth` is the alias from
+`submodel planet as earth`, and `mars` is the default alias for `submodel mars`.
 
 ```oneil
 # mission_sol.on
@@ -145,7 +150,7 @@ You can pull in multiple aliases by separating them with commas:
 ```oneil
 # mission_two_targets.on
 submodel solar_system as sol [
-    earth as e, 
+    earth as e,
     mars as t # landing target
 ]
 
@@ -155,3 +160,47 @@ Landing weight on target: W_t = m_p * g.t :N
 ```
 
 [Designs](./10-designs.md) explains **design files** (`design <target>` in a `.one` file): you **apply** a design to specific `reference` / `submodel` instances. A design **overrides** existing parameters (same name as on the target model) and can **add** new ones.
+
+### Deeper nesting
+
+When the submodel you need sits more than one level down, use a **dotted path**
+of aliases inside the import list.
+
+For example, take a radar payload that owns a satellite bus that owns an orbit:
+
+```oneil
+# orbit.on
+Orbital speed: v = 7.8 :km/s
+```
+
+```oneil
+# satellite.on
+submodel orbit as o
+
+Satellite mass: m = 500 :kg
+```
+
+```oneil
+# radar.on
+submodel satellite as sc
+
+Transmit power: P_t = 1000 :W
+```
+
+A model with a `radar` submodel can import `orbit` in one line by walking the
+alias path `sc.o` (satellite alias, then orbit alias):
+
+```oneil
+# mission_radar.on
+submodel radar as r [sc.o as o]
+
+Noise term uses orbit speed: n = v.o :km/s
+Radar power: P = P_t.r :W
+```
+
+Without `as o`, the local alias defaults to the **last** segment of the path
+(`o` in `sc.o`), so `submodel radar as r [sc.o]` is equivalent here.
+
+Importing only creates a local name for an existing nested instance; it does
+not import a new copy. After importing, parameters are still accessed as
+`parameter.local_alias` (for example `v.o`), the same as any other submodel.

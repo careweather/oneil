@@ -1,4 +1,3 @@
-reference constants as c
-submodel planet as p
+submodel orbit as o
 
-Orbital speed: v = sqrt(G.c * M.p / R.p) :m/s
+Satellite mass: m = 500 :kg

@@ -1,0 +1,4 @@
+submodel radar as r [sc.o as o]
+
+Noise term uses orbit speed: n = v.o :km/s
+Radar power: P = P_t.r :W

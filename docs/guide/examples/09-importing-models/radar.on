@@ -1,0 +1,3 @@
+submodel satellite as sc
+
+Transmit power: P_t = 1000 :W
