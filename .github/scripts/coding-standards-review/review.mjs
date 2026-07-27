@@ -11,9 +11,6 @@ import { Agent, CursorAgentError } from "@cursor/sdk";
 /** Paths whose changes warrant a coding-standards agent review. */
 const REVIEW_PATH_PREFIXES = ["src-rs/"];
 
-/** Skip the agent (and post a short note) when more than this many reviewable files change. */
-const MAX_CHANGED_FILES = 60;
-
 const WORKSPACE = process.env.GITHUB_WORKSPACE ?? process.cwd();
 const OUTPUT_PATH =
   process.env.REVIEW_OUTPUT_PATH ?? `${WORKSPACE}/coding-standards-review.md`;
@@ -174,16 +171,6 @@ async function main() {
     console.log("No reviewable changes; skipping agent");
     writeSkip(
       "No reviewable changes in this PR (nothing under `src-rs/`). Agent review skipped.",
-    );
-    return;
-  }
-
-  if (fileCount > MAX_CHANGED_FILES) {
-    console.log(
-      `Too many reviewable files (${fileCount} > ${MAX_CHANGED_FILES}); skipping agent`,
-    );
-    writeSkip(
-      `This PR touches ${fileCount} reviewable files (limit ${MAX_CHANGED_FILES}). Agent review skipped to control cost; please request a human review or split the PR.`,
     );
     return;
   }
