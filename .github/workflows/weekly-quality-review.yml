@@ -1,0 +1,169 @@
+name: Weekly Quality Review
+
+on:
+  schedule:
+    # Every Monday at 12:00 UTC
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+jobs:
+  write-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      crate: ${{ steps.pick.outputs.crate }}
+      focus: ${{ steps.pick.outputs.focus }}
+      review_path: ${{ steps.review.outputs.path }}
+      session_id: ${{ steps.review.outputs.session_id }}
+      complexity: ${{ steps.classify.outputs.complexity }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Cursor CLI
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.cursor/bin" >> $GITHUB_PATH
+
+      - name: Pick random crate and focus
+        id: pick
+        run: |
+          readarray -t crates < <(find src-rs -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Cargo.toml' \; -printf '%f\n' | sort)
+          focuses=(implementation architecture testing)
+
+          crate="${crates[RANDOM % ${#crates[@]}]}"
+          focus="${focuses[RANDOM % ${#focuses[@]}]}"
+
+          echo "crate=$crate" >> "$GITHUB_OUTPUT"
+          echo "focus=$focus" >> "$GITHUB_OUTPUT"
+          echo "Selected crate=$crate focus=$focus"
+
+      - name: Run quality review
+        id: review
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          CRATE: ${{ steps.pick.outputs.crate }}
+          FOCUS: ${{ steps.pick.outputs.focus }}
+          REVIEW_PATH: ${{ github.workspace }}/weekly-quality-review.md
+        run: |
+          case "$FOCUS" in
+            implementation)
+              prompt="Review the Rust crate at src-rs/${CRATE}/ with a focus on implementation quality.
+
+          Read the crate thoroughly. Assess correctness, error handling, Rust idioms, clarity, and adherence to docs/CODING_STANDARDS.md where relevant.
+
+          Do not edit any files. Write a concise markdown review with:
+          ### Summary
+          ### Findings
+          ### Notes"
+              ;;
+            architecture)
+              prompt="Review the Rust crate at src-rs/${CRATE}/ with a focus on architecture.
+
+          Read the crate thoroughly. Assess module boundaries, coupling, separation of concerns, API surface, and how it fits the rest of the workspace.
+
+          Do not edit any files. Write a concise markdown review with:
+          ### Summary
+          ### Findings
+          ### Notes"
+              ;;
+            testing)
+              prompt="Review the Rust crate at src-rs/${CRATE}/ with a focus on testing.
+
+          Read the crate thoroughly. Assess unit/integration/snapshot/property test coverage, test design quality, missing cases, and alignment with docs/CODING_STANDARDS.md testing guidance.
+
+          Do not edit any files. Write a concise markdown review with:
+          ### Summary
+          ### Findings
+          ### Notes"
+              ;;
+            *)
+              echo "Unknown focus: $FOCUS" >&2
+              exit 1
+              ;;
+          esac
+
+          response="$(agent -p --mode ask --output-format json "$prompt")"
+          echo "$response" | jq -r '.result' > "$REVIEW_PATH"
+          session_id="$(echo "$response" | jq -r '.session_id')"
+
+          echo "path=$REVIEW_PATH" >> "$GITHUB_OUTPUT"
+          echo "session_id=$session_id" >> "$GITHUB_OUTPUT"
+          echo "Wrote review to $REVIEW_PATH (session_id=$session_id)"
+
+      - name: Classify recommended changes
+        id: classify
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          SESSION_ID: ${{ steps.review.outputs.session_id }}
+        run: |
+          prompt='Based on your review, are the recommended changes simple or complex?
+
+          Simple means a small, localized fix that can be implemented safely in one PR without large refactors or design decisions.
+          Complex means the changes need discussion, architectural decisions, multi-crate work, or substantial redesign.
+
+          Reply with exactly one word and nothing else: simple or complex'
+
+          response="$(agent -p --resume "$SESSION_ID" --mode ask --output-format json "$prompt")"
+          raw="$(echo "$response" | jq -r '.result' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+
+          case "$raw" in
+            *complex*) complexity=complex ;;
+            *simple*) complexity=simple ;;
+            *)
+              echo "Could not classify complexity from agent response: $raw" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "complexity=$complexity" >> "$GITHUB_OUTPUT"
+          echo "Classified recommended changes as: $complexity"
+
+      - name: Implement simple fixes and open PR
+        if: steps.classify.outputs.complexity == 'simple'
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SESSION_ID: ${{ steps.review.outputs.session_id }}
+          CRATE: ${{ steps.pick.outputs.crate }}
+          FOCUS: ${{ steps.pick.outputs.focus }}
+        run: |
+          git config user.name "github-actions[bot]"
+          # NOTE: I have no idea where this number comes from, it was generated by AI
+          #       I'm sure there's a better way to do this
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          prompt="The recommended changes are simple. Implement them now.
+
+          Requirements:
+          - Create a new branch named weekly-quality/${CRATE}-${FOCUS}
+          - Apply the recommended fixes from your review
+          - Run relevant checks if practical (e.g. cargo test -p ${CRATE}, cargo clippy -p ${CRATE})
+          - Commit with a clear message
+          - Push the branch to origin
+          - Open a pull request with gh pr create, including a summary of what changed and why
+          - Do not merge the PR"
+
+          agent -p --resume "$SESSION_ID" --force --output-format text "$prompt"
+
+      - name: Open issue for complex review
+        if: steps.classify.outputs.complexity == 'complex'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CRATE: ${{ steps.pick.outputs.crate }}
+          FOCUS: ${{ steps.pick.outputs.focus }}
+          REVIEW_PATH: ${{ steps.review.outputs.path }}
+        run: |
+          {
+            echo "Weekly quality review for \`${CRATE}\` (focus: **${FOCUS}**)."
+            echo
+            echo "Recommended changes were classified as **complex**, so they need human discussion rather than an automated PR."
+            echo
+            cat "$REVIEW_PATH"
+          } > issue-body.md
+
+          gh issue create \
+            --title "Weekly quality review: ${CRATE} (${FOCUS})" \
+            --body-file issue-body.md
