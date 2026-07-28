@@ -166,25 +166,25 @@ Landing weight on target: W_t = m_p * g.t :N
 When the submodel you need sits more than one level down, use a **dotted path**
 of aliases inside the import list.
 
-For example, take a radar payload that owns a satellite bus that owns an orbit:
+For example, take a radar application on a satellite with an orbit:
 
 ```oneil
 # orbit.on
-Orbital speed: v = 7.8 :km/s
+Orbital speed: v = 3 :km/s
 ```
 
 ```oneil
 # satellite.on
 submodel orbit as o
 
-Satellite mass: m = 500 :kg
+Satellite mass: m = 50 :kg
 ```
 
 ```oneil
 # radar.on
 submodel satellite as sc
 
-Transmit power: P_t = 1000 :W
+Transmit power: P_t = 100 :W
 ```
 
 A model with a `radar` submodel can import `orbit` in one line by walking the
