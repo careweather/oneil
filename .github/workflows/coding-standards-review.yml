@@ -16,6 +16,9 @@ concurrency:
 
 env:
   OUTPUT_PATH: ${{ github.workspace }}/coding-standards-review.md
+  COMMENT_MARKER: "<!-- coding-standards-review -->"
+  PROMPT_PATH: .github/coding-standards-review/prompt.md
+  REVIEW_MODEL: composer-2.5
 
 jobs:
   review:
@@ -31,26 +34,94 @@ jobs:
       - name: Fetch PR base
         run: git fetch --no-tags origin ${{ github.event.pull_request.base.sha }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22.13"
-          cache: npm
-          cache-dependency-path: .github/scripts/coding-standards-review/package-lock.json
+      - name: Determine reviewable changes
+        id: diff
+        run: |
+          set -euo pipefail
+          RANGE="${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+          CHANGED_FILES="$(git diff --name-status "$RANGE" -- src-rs || true)"
+          COUNT="$(printf '%s\n' "$CHANGED_FILES" | grep -c . || true)"
 
-      - name: Install review dependencies
-        working-directory: .github/scripts/coding-standards-review
-        run: npm ci
+          echo "Reviewable changes in $RANGE: $COUNT file(s)"
+
+          {
+            echo "range=$RANGE"
+            echo "count=$COUNT"
+            echo "changed_files<<CHANGED_FILES_EOF"
+            echo "$CHANGED_FILES"
+            echo "CHANGED_FILES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install Cursor CLI
+        if: steps.diff.outputs.count != '0'
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run Cursor coding-standards review
-        working-directory: .github/scripts/coding-standards-review
+        if: steps.diff.outputs.count != '0'
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-          GITHUB_WORKSPACE: ${{ github.workspace }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          REVIEW_OUTPUT_PATH: ${{ env.OUTPUT_PATH }}
-        run: node review.mjs
+          RANGE: ${{ steps.diff.outputs.range }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CHANGED_FILES: ${{ steps.diff.outputs.changed_files }}
+        run: |
+          set -euo pipefail
+
+          PROMPT="Read \`${PROMPT_PATH}\` for full instructions and follow them exactly.
+
+          Base SHA: ${BASE_SHA}
+          Head SHA: ${HEAD_SHA}
+          Diff range: ${RANGE}
+
+          Changed files (reviewable):
+          \`\`\`
+          ${CHANGED_FILES}
+          \`\`\`"
+
+          set +e
+          RESULT_JSON="$(cursor-agent -p --force --trust --output-format json --model "${REVIEW_MODEL}" "${PROMPT}")"
+          STATUS=$?
+          set -e
+
+          if [ "${STATUS}" -ne 0 ]; then
+            echo "cursor-agent exited with status ${STATUS}" >&2
+            exit 1
+          fi
+
+          REVIEW_BODY="$(echo "${RESULT_JSON}" | jq -r '.result // empty')"
+          if [ -z "${REVIEW_BODY}" ]; then
+            echo "Agent finished with empty result; refusing blank review" >&2
+            exit 1
+          fi
+
+          {
+            echo "${COMMENT_MARKER}"
+            echo "## Coding standards review"
+            echo
+            echo "${REVIEW_BODY}"
+          } > "${OUTPUT_PATH}"
+
+          echo "Wrote review to ${OUTPUT_PATH}"
+
+      - name: Write skip notice
+        if: steps.diff.outputs.count == '0'
+        run: |
+          echo "No reviewable changes; skipping agent"
+          {
+            echo "${COMMENT_MARKER}"
+            echo "## Coding standards review"
+            echo
+            echo "### Summary"
+            echo
+            # shellcheck disable=SC2016 # backticks below are intentionally literal markdown
+            echo 'No reviewable changes in this PR (nothing under `src-rs/`). Agent review skipped.'
+            echo
+            echo "### Findings"
+            echo
+            echo "No issues found."
+          } > "${OUTPUT_PATH}"
 
       - name: Upload review artifact
         if: hashFiles(env.OUTPUT_PATH) != ''
@@ -84,7 +155,6 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          MARKER='<!-- coding-standards-review -->'
 
           ls -la "${{ env.OUTPUT_PATH }}"
 
@@ -92,7 +162,7 @@ jobs:
             gh api \
               "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
               --paginate \
-              --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" \
+              --jq ".[] | select(.body | contains(\"${COMMENT_MARKER}\")) | .id" \
               | head -n 1
           )
 

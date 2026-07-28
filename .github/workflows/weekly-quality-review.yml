@@ -9,6 +9,7 @@ on:
 jobs:
   write-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
@@ -25,7 +26,7 @@ jobs:
       - name: Install Cursor CLI
         run: |
           curl https://cursor.com/install -fsS | bash
-          echo "$HOME/.cursor/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Pick random crate and focus
         id: pick
@@ -85,7 +86,7 @@ jobs:
               ;;
           esac
 
-          response="$(agent -p --mode ask --output-format json "$prompt")"
+          response="$(agent -p --trust --mode ask --output-format json "$prompt")"
           echo "$response" | jq -r '.result' > "$REVIEW_PATH"
           session_id="$(echo "$response" | jq -r '.session_id')"
 
@@ -106,7 +107,7 @@ jobs:
 
           Reply with exactly one word and nothing else: simple or complex'
 
-          response="$(agent -p --resume "$SESSION_ID" --mode ask --output-format json "$prompt")"
+          response="$(agent -p --resume "$SESSION_ID" --trust --mode ask --output-format json "$prompt")"
           raw="$(echo "$response" | jq -r '.result' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 
           case "$raw" in
@@ -146,7 +147,7 @@ jobs:
           - Open a pull request with gh pr create, including a summary of what changed and why
           - Do not merge the PR"
 
-          agent -p --resume "$SESSION_ID" --force --output-format text "$prompt"
+          agent -p --resume "$SESSION_ID" --force --trust --output-format text "$prompt"
 
       - name: Open issue for complex review
         if: steps.classify.outputs.complexity == 'complex'
