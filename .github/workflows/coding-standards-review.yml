@@ -22,6 +22,9 @@ env:
 
 jobs:
   review:
+    # Skip PRs opened by weekly-quality-review.yml: those are themselves
+    # agent-generated, so having this agent review them again is redundant.
+    if: ${{ !startsWith(github.head_ref, 'weekly-quality/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -57,6 +60,61 @@ jobs:
         run: |
           curl https://cursor.com/install -fsS | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # This is a read-only review (see prompt.md #7): the agent needs `git
+      # diff`/`git show`/etc. to compute the diff itself, but has no
+      # legitimate reason to mutate the repo or touch GitHub -- posting the
+      # PR comment is deliberately left to the separate post-review job
+      # below. `deny` takes precedence over `allow` *and* is honored even
+      # with `--force`/`--yolo`, so this is a real block, not just a prompt
+      # request. Note deny entries can't be scoped by allowing a narrower
+      # pattern back (deny always wins), so read-only git subcommands are
+      # permitted simply by omitting them here and relying on --force to
+      # auto-allow anything not explicitly denied. This job never sets
+      # GH_TOKEN/GITHUB_TOKEN, so `gh` would already fail to authenticate,
+      # but it's denied here too for defense-in-depth.
+      # See https://cursor.com/docs/cli/reference/permissions.
+      - name: Deny mutating git/gh commands for the agent
+        if: steps.diff.outputs.count != '0'
+        run: |
+          mkdir -p "$HOME/.cursor"
+          cat > "$HOME/.cursor/cli-config.json" <<'EOF'
+          {
+            "version": 1,
+            "permissions": {
+              "deny": [
+                "Shell(gh)",
+                "Shell(git:push*)",
+                "Shell(git:commit*)",
+                "Shell(git:add*)",
+                "Shell(git:rm*)",
+                "Shell(git:mv*)",
+                "Shell(git:checkout*)",
+                "Shell(git:switch*)",
+                "Shell(git:branch*)",
+                "Shell(git:merge*)",
+                "Shell(git:rebase*)",
+                "Shell(git:reset*)",
+                "Shell(git:clean*)",
+                "Shell(git:stash*)",
+                "Shell(git:cherry-pick*)",
+                "Shell(git:revert*)",
+                "Shell(git:tag*)",
+                "Shell(git:remote*)",
+                "Shell(git:config*)",
+                "Shell(git:apply*)",
+                "Shell(git:am*)",
+                "Shell(git:fetch*)",
+                "Shell(git:pull*)",
+                "Shell(git:submodule*)",
+                "Shell(git:worktree*)",
+                "Shell(git:init*)",
+                "Shell(git:gc*)",
+                "Write(**)"
+              ]
+            }
+          }
+          EOF
 
       - name: Run Cursor coding-standards review
         if: steps.diff.outputs.count != '0'
