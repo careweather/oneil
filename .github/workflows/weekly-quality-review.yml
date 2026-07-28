@@ -62,7 +62,7 @@ jobs:
             architecture)
               prompt="Review the Rust crate at src-rs/${CRATE}/ with a focus on architecture.
 
-          Read the crate thoroughly. Assess module boundaries, coupling, separation of concerns, API surface, and how it fits the rest of the workspace.
+          Read the crate thoroughly. Assess module boundaries, coupling, separation of concerns, API surface, and how it fits the rest of the workspace, including what could be added to docs/CODING_STANDARDS.md to improve quality.
 
           Do not edit any files. Write a concise markdown review with:
           ### Summary
@@ -72,7 +72,7 @@ jobs:
             testing)
               prompt="Review the Rust crate at src-rs/${CRATE}/ with a focus on testing.
 
-          Read the crate thoroughly. Assess unit/integration/snapshot/property test coverage, test design quality, missing cases, and alignment with docs/CODING_STANDARDS.md testing guidance.
+          Read the crate thoroughly. Assess unit/integration/snapshot/property test coverage, test design quality, reusable test helpers, simplicity, conciseness, and alignment with docs/CODING_STANDARDS.md testing guidance.
 
           Do not edit any files. Write a concise markdown review with:
           ### Summary
