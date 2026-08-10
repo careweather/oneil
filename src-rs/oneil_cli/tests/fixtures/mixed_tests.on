@@ -1,0 +1,9 @@
+# Fixture for oneil_cli's `json_test_report` integration test: one test
+# passes, one fails, so `build_report` has something of each to report.
+Mass: m = 5 :kg
+Acceleration: a = 9.81 :m/s^2
+Force: f = m * a :N
+Threshold: t = 10 :N
+
+test: f > t
+test: f < t

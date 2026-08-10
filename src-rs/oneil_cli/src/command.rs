@@ -294,8 +294,26 @@ pub struct TestArgs {
     #[arg(long)]
     pub with_header: bool,
 
+    /// Output format for the test results
+    ///
+    /// `text` prints human-readable, colorized output. `json` prints a
+    /// single machine-readable JSON object to stdout (diagnostics and test
+    /// results; no colors, no source snippets) intended for CI tooling.
+    #[arg(long, value_enum, default_value_t = TestOutputFormat::Text)]
+    pub format: TestOutputFormat,
+
     #[command(flatten)]
     pub common: CommonArgs,
+}
+
+/// Output format for `oneil test`. See [`TestArgs::format`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum TestOutputFormat {
+    /// Human-readable, colorized text output (the default).
+    #[default]
+    Text,
+    /// Machine-readable JSON output. See `oneil_cli::json_test_report` for the schema.
+    Json,
 }
 
 #[expect(

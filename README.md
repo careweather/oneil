@@ -674,9 +674,11 @@ Runs tests defined in the model at `<FILE>`.
 
 * **`-r` / `--recursive`** — Include test results from submodels, not only the top model.
 * **`-D` / `--debug`** — After errors, still show partial test output.
-* **`--no-header`** — Omit the results header.
-* **`--no-test-report`** — Omit the test report.
+* **`--with-header`** — Print the results header (model path and test summary) before the test results.
+* **`--format <text|json>`** — Output format. `text` (default) prints human-readable, colorized output. `json` prints a single machine-readable JSON object to stdout (diagnostics plus per-test results, including dependency values for failures) intended for CI tooling — see `oneil_cli::json_test_report` for the schema.
 * **`--sig-figs`**, **`--no-colors`**, **`--venv-path`** — Same role as for `eval` (see `oneil test --help`).
+
+`oneil test` exits with status 1 if there were any error diagnostics or any test failed (in either format), so it can be used directly as a CI gate without additional tooling — e.g. `oneil test model.on && echo "tests passed"`.
 
 ### `tree`
 
@@ -729,6 +731,15 @@ oneil builtins unit
 ```
 
 For building and running from the repository, see the [quickstart](#quickstart) (`cargo run -- path/to/your/model.on`).
+
+## CI Integration for Model Repos
+
+Repos that define Oneil models (e.g. `.on` files checked into their own repo)
+can use [`careweather/oneil/actions/model-test-report`](actions/model-test-report/README.md),
+a GitHub Action that runs `oneil test --format json` and, when comparing a
+PR's head against its base, reports regressions and fixes instead of just a
+raw pass/fail count. See the action's README for inputs, outputs, and
+example workflows.
 
 ## Using Oneil with AI
 

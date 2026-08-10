@@ -14,7 +14,12 @@ use oneil_shared::{
 /// during lowering (when builtin unit definitions are in scope) so later
 /// passes — design overlay validation, dimensional analysis — can compare
 /// dimensions by data without re-evaluating the unit expression.
+/// Serializes as its resolved display string (e.g. `"kg"`, `"m/s^2"`); the
+/// `ts-bindings` override matches that wire shape rather than the internal
+/// fields.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-bindings", ts(type = "string"))]
 pub struct CompositeUnit {
     units: Vec<Unit>,
     display_unit: DisplayCompositeUnit,

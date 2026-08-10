@@ -12,20 +12,20 @@
  * - `Variable::External` → resolved via alias → model_path mapping
  */
 
-import type { ExprAst, ParameterValueAst, PiecewiseExprAst, RenderedNode } from "../types/model"
+import type { Expr, ParameterValue, PiecewiseExpr, RenderedNode } from "../types/model"
 import { paramKey } from "./instancePath"
 
 // Re-export for convenience
 export { paramKey }
 
 /**
- * Extracts all dependency keys from a bare test expression (`ExprAst`).
+ * Extracts all dependency keys from a bare test expression (`Expr`).
  *
  * Identical semantics to `extractDependencyKeys` but for test expressions,
- * which are raw `ExprAst` nodes rather than `ParameterValueAst` wrappers.
+ * which are raw `Expr` nodes rather than `ParameterValue` wrappers.
  */
 export function extractDepsFromExpr(
-    expr: ExprAst | null,
+    expr: Expr | null,
     instancePath: string[],
     aliasToModelPath: Map<string, string>,
     refPoolAliases?: Set<string>,
@@ -64,7 +64,7 @@ export function buildAliasToModelPath(node: RenderedNode): Map<string, string> {
  * @returns Set of parameter keys that this expression depends on
  */
 export function extractDependencyKeys(
-    expr: ParameterValueAst | null,
+    expr: ParameterValue | null,
     instancePath: string[],
     aliasToModelPath: Map<string, string>,
     refPoolAliases?: Set<string>,
@@ -76,7 +76,7 @@ export function extractDependencyKeys(
         ? (alias: string) => refPoolAliases.has(alias)
         : (alias: string) => aliasToModelPath.has(alias)
 
-    function walkExpr(e: ExprAst): void {
+    function walkExpr(e: Expr): void {
         if ("Variable" in e) {
             const v = e.Variable.variable
             if ("Parameter" in v) {
@@ -111,11 +111,14 @@ export function extractDependencyKeys(
             }
         } else if ("UnitCast" in e) {
             walkExpr(e.UnitCast.expr)
+        } else if ("Fallback" in e) {
+            walkExpr(e.Fallback.left)
+            walkExpr(e.Fallback.right)
         }
         // Literals have no dependencies
     }
 
-    function walkPiecewise(pw: PiecewiseExprAst): void {
+    function walkPiecewise(pw: PiecewiseExpr): void {
         walkExpr(pw.expr)
         walkExpr(pw.if_expr)
     }

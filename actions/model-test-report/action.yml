@@ -1,0 +1,63 @@
+name: "Oneil model test report"
+description: "Runs `oneil test` against Oneil models and, when comparing a PR head against its base, reports regressions and fixes."
+author: "careweather"
+branding:
+  icon: "check-circle"
+  color: "purple"
+
+inputs:
+  oneil-ref:
+    description: "Git ref (tag/branch/sha) of careweather/oneil to install and test with."
+    required: true
+  head-dir:
+    description: "Directory containing the head checkout to test."
+    required: false
+    default: "."
+  base-dir:
+    description: "Directory containing the base checkout to test, for regression/fix comparison. Omit to just report the head checkout's own results."
+    required: false
+    default: ""
+  model-dir:
+    description: "Path (relative to each checkout's root) containing the .on / .one source files."
+    required: false
+    default: "model"
+  models:
+    description: "Comma-separated list of specific .on / .one filenames (relative to model-dir) to test. Overrides auto-discovery."
+    required: false
+    default: ""
+  skip-models:
+    description: "Comma-separated list of .on / .one filenames (relative to model-dir) to exclude from auto-discovery. Ignored if `models` is set."
+    required: false
+    default: ""
+  timeout-seconds:
+    description: "Per-model `oneil test` timeout, in seconds."
+    required: false
+    default: "120"
+  report-path:
+    description: "If set, also write the Markdown report to this file (relative to the workspace)."
+    required: false
+    default: ""
+  fail-on-problems:
+    description: "Fail the action when there are problems (regressions, new failures, new diagnostics, or -- with no base-dir -- any head failure). Set to \"false\" to only warn."
+    required: false
+    default: "true"
+  head-label:
+    description: "Label for the head checkout in the report (e.g. a PR head ref)."
+    required: false
+    default: "head"
+  base-label:
+    description: 'Label for the base checkout in the report (e.g. a PR base ref). Defaults to "base" when base-dir is set.'
+    required: false
+    default: ""
+
+outputs:
+  has-problems:
+    description: '"true" if there are regressions, new failures, new diagnostics, or (with no base-dir) any head failure.'
+  report:
+    description: "The rendered Markdown report, e.g. for posting as a PR comment."
+  report-path:
+    description: "Echoes the report-path input, for convenience in later steps (e.g. actions/upload-artifact)."
+
+runs:
+  using: "node20"
+  main: "dist/index.cjs"

@@ -13,10 +13,14 @@ readme = "README.md"
 
 [features]
 random_span = ["dep:rand"]
+# Derives `ts_rs::TS` on JSON-facing types for `packages/ts-interfaces`
+# codegen. See `docs/CODING_STANDARDS.md` (Generated TypeScript Bindings).
+ts-bindings = ["dep:ts-rs"]
 
 [dependencies]
 rand = { version = "0.10.0", optional = true }
 serde = { workspace = true }
+ts-rs = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

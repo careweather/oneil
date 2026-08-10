@@ -17,6 +17,7 @@ use std::{fmt, path::Path, sync::Arc};
 ///
 /// Because [`Rc`] is not [`Copy`], `Span` is deliberately `Clone`-only.
 #[derive(Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct Span {
     start: SourceLocation,
     end: SourceLocation,
@@ -197,6 +198,7 @@ impl fmt::Debug for Span {
 //       [`LocatedSpan::naive_get_utf8_column`](https://docs.rs/nom_locate/5.0.0/nom_locate/struct.LocatedSpan.html#method.naive_get_utf8_column)
 //       is faster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct SourceLocation {
     /// The offset (in bytes) from the beginning of the source code (0-indexed)
     pub offset: usize,

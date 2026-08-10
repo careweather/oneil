@@ -90,7 +90,11 @@ pub struct TestPrintConfig {
     pub print_utils_config: PrintUtilsConfig,
 }
 
-pub fn print_test_results(eval_result: ModelReference<'_>, test_config: &TestPrintConfig) {
+/// Prints the results of `oneil test` in the default human-readable format.
+///
+/// Returns `true` if every test passed (across all printed models, when
+/// `test_config.recursive` is set), so callers can decide on an exit code.
+pub fn print_test_results(eval_result: ModelReference<'_>, test_config: &TestPrintConfig) -> bool {
     let test_info = get_model_tests(eval_result, test_config.recursive, TestInfo::default());
 
     let divider_line = divider_line();
@@ -103,6 +107,8 @@ pub fn print_test_results(eval_result: ModelReference<'_>, test_config: &TestPri
     let mut visited = IndexSet::new();
 
     print_all_tests(eval_result, test_config, &mut visited);
+
+    test_info.passed_count == test_info.test_count
 }
 
 #[derive(Default)]

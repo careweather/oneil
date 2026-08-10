@@ -231,3 +231,86 @@ pub mod f64 {
         }
     }
 }
+
+/// Serde helper for `Option<f64>` values with special float support.
+///
+/// Shared by every JSON-facing output format that represents an interval's
+/// optional upper bound (e.g. `oneil_output::EvaluatedValue`), so the
+/// `None` → `null` convention and the special-float handling from
+/// [`f64`](self::f64) aren't each hand-duplicated per consumer.
+pub mod f64_option {
+    use super::f64;
+    use serde::Serializer;
+
+    /// Serializes `None` as `null`, `Some` with the special-float-aware `f64` serializer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the serializer fails to serialize the value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use oneil_shared::serde::f64_option;
+    /// use serde::Serialize;
+    ///
+    /// #[derive(Serialize)]
+    /// struct Example {
+    ///     #[serde(serialize_with = "f64_option::serialize")]
+    ///     max: Option<f64>,
+    /// }
+    ///
+    /// let json = serde_json::to_value(Example { max: None }).expect("serialize");
+    /// assert_eq!(json, serde_json::json!({ "max": null }));
+    /// ```
+    // `clippy::ref_option` doesn't fire here (it's exempted for exported API
+    // by default), but the signature is fixed by serde's `serialize_with`
+    // convention (`&Option<T>`) regardless.
+    pub fn serialize<S>(value: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            None => serializer.serialize_none(),
+            Some(value) => f64::serialize(value, serializer),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct Example {
+            #[serde(serialize_with = "super::serialize")]
+            max: Option<f64>,
+        }
+
+        #[test]
+        fn none_serializes_as_null() {
+            assert_eq!(
+                serde_json::to_value(Example { max: None }).expect("serialize"),
+                serde_json::json!({ "max": null })
+            );
+        }
+
+        #[test]
+        fn some_finite_value_serializes_as_number() {
+            assert_eq!(
+                serde_json::to_value(Example { max: Some(2.5) }).expect("serialize"),
+                serde_json::json!({ "max": 2.5 })
+            );
+        }
+
+        #[test]
+        fn some_infinite_value_serializes_as_special_float_object() {
+            assert_eq!(
+                serde_json::to_value(Example {
+                    max: Some(f64::INFINITY)
+                })
+                .expect("serialize"),
+                serde_json::json!({ "max": { "float_special": "INFINITY" } })
+            );
+        }
+    }
+}

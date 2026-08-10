@@ -1,0 +1,52 @@
+name: model-test-report action
+
+on:
+  push:
+    paths:
+      - "actions/model-test-report/**"
+      - "packages/ts-interfaces/**"
+      - ".github/workflows/model-test-report-action.yml"
+      - "scripts/**"
+      - "src-rs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    paths:
+      - "actions/model-test-report/**"
+      - "packages/ts-interfaces/**"
+      - ".github/workflows/model-test-report-action.yml"
+      - "scripts/**"
+      - "src-rs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: actions/model-test-report
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: actions/model-test-report/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Check dist/ is up to date
+        run: npm run check-dist

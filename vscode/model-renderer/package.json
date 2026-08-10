@@ -17,6 +17,7 @@
     "jotai": "^2.12.3",
     "katex": "^0.16.22",
     "marked": "^18.0.3",
+    "oneil-ts-interfaces": "file:../../packages/ts-interfaces",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-katex": "^3.0.1",
@@ -25,6 +26,7 @@
     "styled-components": "^6.4.1"
   },
   "devDependencies": {
+    "@types/node": "^22.20.1",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",

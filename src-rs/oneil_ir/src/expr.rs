@@ -13,6 +13,7 @@ use crate::CompositeUnit;
 
 /// Abstract syntax tree for mathematical and logical expressions.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub enum Expr {
     /// Comparison operation with left and right operands, supporting chaining.
     ComparisonOp {
@@ -404,6 +405,7 @@ impl Expr {
 
 /// Binary operators for mathematical and logical operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum BinaryOp {
     /// Addition: `a + b`
@@ -434,6 +436,7 @@ pub enum BinaryOp {
 ///
 /// Comparison operations support chaining for expressions like `a < b < c`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum ComparisonOp {
     /// Less than comparison: `a < b`
@@ -490,6 +493,7 @@ impl ComparisonOp {
 
 /// Unary operators for single-operand operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum UnaryOp {
     /// Negation: `-a`
@@ -500,6 +504,7 @@ pub enum UnaryOp {
 
 /// Function names for built-in and imported functions.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub enum FunctionName {
     /// Built-in mathematical function.
     Builtin(BuiltinFunctionName, Span),
@@ -541,6 +546,7 @@ impl FunctionName {
 /// time (with overlay parameters pushing the anchor scope first via
 /// [`crate::DesignProvenance::anchor_path`]).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub enum Variable {
     /// Built-in variable.
     Builtin {
@@ -612,9 +618,19 @@ impl Variable {
 
 /// Literal values that can appear in expressions.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub enum Literal {
     /// Numeric literal (floating-point).
-    Number(#[serde(with = "f64_serde")] f64),
+    Number(
+        #[serde(with = "f64_serde")]
+        #[cfg_attr(
+            feature = "ts-bindings",
+            ts(
+                type = "number | { float_special: \"NAN\" | \"INFINITY\" | \"NEGATIVE_INFINITY\" }"
+            )
+        )]
+        f64,
+    ),
     /// String literal.
     String(String),
     /// Boolean literal.

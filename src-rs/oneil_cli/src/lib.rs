@@ -34,7 +34,7 @@ use crate::{
     command::{
         BuiltinsCommand, CachePolicy, CheckArgs, CliCommand, Commands, CommonArgs, DevCommand,
         EvalArgs, IndependentArgs, IrIncludeSection, LspArgs, ModelResultIncludeSection, TestArgs,
-        TreeArgs,
+        TestOutputFormat, TreeArgs,
     },
     print_debug_ast::AstPrintConfig,
     print_debug_ir::IrPrintConfig,
@@ -45,6 +45,7 @@ use crate::{
 
 mod cache_prompt;
 mod command;
+pub mod json_test_report;
 mod load_python_venv;
 mod panic_handler;
 mod print_builtins;
@@ -662,12 +663,22 @@ fn clear_screen() {
     std::io::stdout().flush().expect("failed to flush stdout");
 }
 
+/// Handles the `oneil test` subcommand.
+///
+/// Exits with status 1 if there were error diagnostics or any test failed
+/// (in either output format), so the command is scriptable in CI. Mirrors
+/// `handle_check_command`'s exit-code convention.
+#[expect(
+    clippy::exit,
+    reason = "scriptable pass/fail surface for CI; exit 1 on failure so wrappers can short-circuit without parsing output"
+)]
 fn handle_test_command(args: TestArgs) {
     let TestArgs {
         file,
         recursive,
         debug: display_partial_results,
         with_header,
+        format,
         common,
     } = args;
 
@@ -675,22 +686,47 @@ fn handle_test_command(args: TestArgs) {
         sig_figs: common.sig_figs,
     };
 
-    let test_print_config = TestPrintConfig {
-        with_header,
-        recursive,
-        print_utils_config,
-    };
-
     let mut runtime = runtime_from_common_args(&common);
     let (model_opt, errors) = runtime.eval_model(&file);
+    let errors_vec = errors.to_vec();
 
-    let print_result = print_error::print_all(errors.to_vec(), common.dev_show_internal_errors);
-    if print_result.saw_error_diagnostic() && !display_partial_results {
-        return;
-    }
+    let success = match format {
+        TestOutputFormat::Json => {
+            let report = json_test_report::build_report(
+                &errors_vec,
+                model_opt,
+                recursive,
+                common.dev_show_internal_errors,
+            );
+            let json = serde_json::to_string_pretty(&report)
+                .expect("test report only contains JSON-safe types, so serialization can't fail");
+            println!("{json}");
+            report.success
+        }
+        TestOutputFormat::Text => {
+            let print_result = print_error::print_all(errors_vec, common.dev_show_internal_errors);
+            let saw_error = print_result.saw_error_diagnostic();
 
-    if let Some(model_ref) = model_opt {
-        print_model_result::print_test_results(model_ref, &test_print_config);
+            // Skip printing model results on error unless partial results were
+            // requested (matches the original early-return behavior).
+            if saw_error && !display_partial_results {
+                false
+            } else {
+                let tests_passed = model_opt.is_none_or(|model_ref| {
+                    let test_print_config = TestPrintConfig {
+                        with_header,
+                        recursive,
+                        print_utils_config,
+                    };
+                    print_model_result::print_test_results(model_ref, &test_print_config)
+                });
+                !saw_error && tests_passed
+            }
+        }
+    };
+
+    if !success {
+        std::process::exit(1);
     }
 }
 

@@ -6,12 +6,23 @@ mod traits;
 
 use std::path::PathBuf;
 
+use serde::Serialize;
+
 pub use context::Context;
 pub use location::ErrorLocation;
 pub use traits::AsOneilDiagnostic;
 
 /// Classification of a [`OneilDiagnostic`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+///
+/// Derives `Serialize` (rather than requiring JSON-emitting consumers to
+/// define their own tagged copy) so that all of Oneil's JSON-facing output
+/// formats — the LSP's rendered-view diagnostics and `oneil test --format
+/// json`'s CI report alike — share one canonical wire representation
+/// (`"error"` / `"warning"`) instead of hand-maintained duplicates that could
+/// drift out of sync.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
 pub enum DiagnosticKind {
     /// A fatal or blocking issue.
     Error,

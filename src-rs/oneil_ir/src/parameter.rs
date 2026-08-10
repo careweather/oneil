@@ -407,6 +407,7 @@ impl Default for Dependencies {
 
 /// The value of a parameter, which can be either a simple expression or a piecewise function.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub enum ParameterValue {
     /// A simple expression with an optional unit.
     Simple(Box<Expr>, Option<CompositeUnit>),
@@ -430,6 +431,7 @@ impl ParameterValue {
 
 /// A single expression in a piecewise function with its associated condition.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct PiecewiseExpr {
     expr: Expr,
     if_expr: Expr,

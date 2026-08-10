@@ -5,6 +5,7 @@
 
 mod dependency;
 pub mod error;
+mod evaluated_value;
 mod interval;
 mod model;
 mod number_kinds;
@@ -18,6 +19,7 @@ pub use error::{
     BinaryEvalError, EvalError, EvalWarning, ExpectedArgumentCount, ExpectedType, ModelEvalErrors,
     UnaryEvalError, UnitConversionError,
 };
+pub use evaluated_value::EvaluatedValue;
 pub use interval::Interval;
 pub use model::{DebugInfo, Model, Parameter, PrintLevel, Test, TestResult};
 pub use number_kinds::{MeasuredNumber, Number};

@@ -8,7 +8,7 @@
  */
 
 import { atom } from "jotai"
-import type { RenderedNode, ParameterValueAst, RenderedValue } from "../../types/model"
+import type { RenderedNode, ParameterValue, EvaluatedValue } from "../../types/model"
 import type { DepLabelEntry } from "../../components/ParameterRow"
 import { fullTreeAtom, refPoolAliasesAtom } from "./app"
 
@@ -73,8 +73,8 @@ export interface DetailPanelState {
     paramLabel: string
     note: string | null
     /** Expression AST, or null for literal/simple-value parameters with no formula. */
-    expression: ParameterValueAst | null
-    value: RenderedValue
+    expression: ParameterValue | null
+    value: EvaluatedValue
     deps: DepLabelEntry[]
     instancePath: string[]
 }

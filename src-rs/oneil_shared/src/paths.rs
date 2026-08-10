@@ -300,7 +300,12 @@ impl TryFrom<ModelPath> for DesignPath {
 }
 
 /// A path to a Python module file.
+///
+/// Serializes as a JSON string (via [`Path`]); the `ts-bindings` override
+/// matches that wire shape rather than the internal `PathBuf` newtype.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-bindings", ts(type = "string"))]
 pub struct PythonPath(PathBuf);
 
 impl PythonPath {

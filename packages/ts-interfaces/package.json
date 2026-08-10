@@ -1,0 +1,17 @@
+{
+  "name": "oneil-ts-interfaces",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Generated TypeScript types for Oneil JSON wire formats (test report + LSP rendered view)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ]
+}

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **ci**: Added `actions/model-test-report`, a TypeScript GitHub Action for
+  downstream model repos: installs a pinned `oneil` ref, runs `oneil test
+  --format json`, and — when given both a head and base checkout — reports
+  regressions and fixes rather than just a pass/fail count. See
+  `actions/model-test-report/README.md`.
+- **ci**: TypeScript bindings for JSON wire formats (`TestReport`,
+  `RenderedTree`, shared leaves) are generated with `ts-rs` into
+  `packages/ts-interfaces` (`oneil-ts-interfaces`), with a CI drift check
+  (`./scripts/check-ts-interfaces.sh`). See `docs/CODING_STANDARDS.md`.
+- **cli**: `oneil test --format json` prints a machine-readable JSON report
+  (diagnostics plus per-test pass/fail results, with dependency values for
+  failures).
+
+### Changed
+
+- **cli**: `oneil test` now exits with status 1 if there were any error
+  diagnostics or any test failed
+
 ## [0.16.1] - 2026-07-03
 
 ### Added

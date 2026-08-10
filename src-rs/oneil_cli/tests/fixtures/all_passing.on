@@ -1,0 +1,8 @@
+# Fixture with only passing tests, used to smoke-test that `oneil test`
+# exits 0 (in both text and JSON formats) when every test passes.
+Mass: m = 5 :kg
+Acceleration: a = 9.81 :m/s^2
+Force: f = m * a :N
+Threshold: t = 10 :N
+
+test: f > t

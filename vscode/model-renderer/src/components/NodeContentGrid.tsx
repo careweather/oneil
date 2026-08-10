@@ -17,7 +17,7 @@ import {
 } from "./ParameterRow"
 import { TestRow } from "./TestRow"
 import type { DepLabelEntry } from "./ParameterRow"
-import type { ParameterValueAst, RenderedNode, RenderedParameter } from "../types/model"
+import type { RenderedNode, RenderedParameter } from "../types/model"
 import {
     aliasToModelPathAtom,
     buildDesignIndex,
@@ -282,7 +282,7 @@ function ParameterRow({
     const colorIdx = mark != null ? (designIndex.get(mark.design_name) ?? 0) : null
 
     const depKeys = useMemo(
-        () => extractDependencyKeys(param.expression as ParameterValueAst | null, instancePath, aliasToModelPath, refPoolAliases),
+        () => extractDependencyKeys(param.expression, instancePath, aliasToModelPath, refPoolAliases),
         [param.expression, instancePath, aliasToModelPath, refPoolAliases],
     )
 
@@ -310,7 +310,7 @@ function ParameterRow({
         setHighlightedDeps(new Set<string>())
     }, [setHighlightedDeps])
 
-    const expression = param.expression as ParameterValueAst | null
+    const expression = param.expression
 
     const onParamClick = useCallback(() => {
         navigateDetailPanel({

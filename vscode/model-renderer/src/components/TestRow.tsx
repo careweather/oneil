@@ -11,14 +11,14 @@ import katex from "katex"
 import styled from "styled-components"
 import { useTooltipTrigger } from "./Tooltip"
 import { NoteDisplay } from "./NoteDisplay"
-import type { ExprAst, RenderedParameter, RenderedTest } from "../types/model"
+import type { Expr, RenderedParameter, RenderedTest } from "../types/model"
 import {
     aliasToModelPathAtom,
     highlightedDepsAtom,
     showNotesEnabledAtom,
 } from "../store/atoms"
 import { extractDepsFromExpr } from "../utils/extractDependencies"
-import { exprAstToLatex } from "../utils/exprToLatex"
+import { exprToLatexString } from "../utils/exprToLatex"
 
 // ── Styled components ─────────────────────────────────────────────────────────
 
@@ -62,9 +62,9 @@ const TestNoteBlock = styled.div`
 
 // ── TestExprDisplay ───────────────────────────────────────────────────────────
 
-function TestExprDisplay({ expr }: { expr: ExprAst }) {
+function TestExprDisplay({ expr }: { expr: Expr }) {
     try {
-        const latex = exprAstToLatex(expr)
+        const latex = exprToLatexString(expr)
         const html = katex.renderToString(latex, {
             output: "mathml",
             throwOnError: false,

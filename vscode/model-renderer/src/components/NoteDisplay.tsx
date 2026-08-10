@@ -26,7 +26,7 @@ import {
 import katex from "katex"
 import { useAtomValue, useSetAtom } from "jotai"
 import styled from "styled-components"
-import type { RenderedParameter, RenderedValue } from "../types/model"
+import type { RenderedParameter, EvaluatedValue } from "../types/model"
 import { fmtNum, mathName, paramExprOnlyToLatex } from "../utils/exprToLatex"
 import {
     fileBaseUriAtom,
@@ -171,7 +171,7 @@ function esc(s: string): string {
 }
 
 
-function formatValue(value: RenderedValue): string {
+function formatValue(value: EvaluatedValue): string {
     switch (value.type) {
         case "boolean":  return String(value.value)
         case "string":   return `"${value.value}"`
@@ -393,11 +393,11 @@ function substitutePlaceholders(src: string, parameters: RenderedParameter[] | u
 }
 
 /**
- * Formats a `RenderedValue` as a LaTeX-safe string for use inside a math
+ * Formats a `EvaluatedValue` as a LaTeX-safe string for use inside a math
  * block.  Units are wrapped in `\mathrm{}` so they render upright.
  */
-function formatValueLatex(value: RenderedValue): string {
-    const num = (v: number) => fmtNum(v)
+function formatValueLatex(value: EvaluatedValue): string {
+    const num = (v: Parameters<typeof fmtNum>[0]) => fmtNum(v)
     switch (value.type) {
         case "boolean": return String(value.value)
         case "string":  return `\\text{${value.value}}`

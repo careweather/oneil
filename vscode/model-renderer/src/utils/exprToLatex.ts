@@ -9,15 +9,16 @@
  */
 
 import type {
-    BinaryOpAst,
-    ComparisonOpAst,
-    ExprAst,
-    FunctionNameAst,
-    LiteralAst,
-    ParameterValueAst,
-    PiecewiseExprAst,
-    UnaryOpAst,
-    VariableAst,
+    BinaryOp,
+    ComparisonOp,
+    Expr,
+    FloatValue,
+    FunctionName,
+    Literal,
+    ParameterValue,
+    PiecewiseExpr,
+    UnaryOp,
+    Variable,
 } from "../types/model"
 import { mathName, mathNameWithRef } from "./mathName"
 export { mathName, mathNameWithRef } from "./mathName"
@@ -58,38 +59,26 @@ type Prec = number
 // ── Public entry points ───────────────────────────────────────────────────────
 
 /**
- * Converts a single `ExprAst` to a LaTeX string.
+ * Converts a single `Expr` to a LaTeX string.
  *
  * Use this for test expressions, which are bare `Expr` nodes rather than
  * `ParameterValue` wrappers.
  *
  * @example
  * ```ts
- * exprAstToLatex({ ComparisonOp: { span: 0, op: "less_than", left: ..., right: ..., rest_chained: [] } })
+ * exprToLatexString({ ComparisonOp: { span: 0, op: "less_than", left: ..., right: ..., rest_chained: [] } })
  * // → "mass < 100"
  * ```
  */
-export function exprAstToLatex(ast: ExprAst): string {
+export function exprToLatexString(ast: Expr): string {
     return exprToLatex(ast, 0)
 }
 
 /**
- * Converts a `ParameterValueAst` to a LaTeX string.
- *
- * For `Simple` values renders `expr\,\mathrm{unit}` (unit optional).
- * For `Piecewise` values renders a `\begin{cases}…\end{cases}` block.
- *
- * @example
- * ```ts
- * paramValueToLatex({ Simple: [{ Literal: { span: 0, value: { Number: 9.81 } } }, "m/s^2"] })
- * // → "9.81\\,\\mathrm{m/s^2}"
- * ```
- */
-/**
  * Core conversion: renders `ast` to LaTeX, optionally appending the unit
  * suffix. Assumes `_paramLatexNameLookup` is already set by the caller.
  */
-function renderParameterAst(ast: ParameterValueAst, withUnit: boolean): string {
+function renderParameterValue(ast: ParameterValue, withUnit: boolean): string {
     if ("Simple" in ast) {
         const [expr, unit] = ast.Simple
         // Pass 0 as the parent precedence so the top-level expression is never
@@ -102,10 +91,22 @@ function renderParameterAst(ast: ParameterValueAst, withUnit: boolean): string {
     return withUnit && unit != null ? `${body}\\,\\mathrm{${escapeUnit(unit)}}` : body
 }
 
-export function paramValueToLatex(ast: ParameterValueAst, lookup?: RenderNameLookup): string {
+/**
+ * Converts a `ParameterValue` to a LaTeX string.
+ *
+ * For `Simple` values renders `expr\,\mathrm{unit}` (unit optional).
+ * For `Piecewise` values renders a `\begin{cases}…\end{cases}` block.
+ *
+ * @example
+ * ```ts
+ * paramValueToLatex({ Simple: [{ Literal: { span: 0, value: { Number: 9.81 } } }, "m/s^2"] })
+ * // → "9.81\\,\\mathrm{m/s^2}"
+ * ```
+ */
+export function paramValueToLatex(ast: ParameterValue, lookup?: RenderNameLookup): string {
     _paramLatexNameLookup = lookup
     try {
-        return renderParameterAst(ast, true)
+        return renderParameterValue(ast, true)
     } finally {
         _paramLatexNameLookup = undefined
     }
@@ -117,10 +118,10 @@ export function paramValueToLatex(ast: ParameterValueAst, lookup?: RenderNameLoo
  * unit string) is displayed right next to the equation — there is no need to
  * repeat the unit inside the LaTeX.
  */
-export function paramExprOnlyToLatex(ast: ParameterValueAst, lookup?: RenderNameLookup): string {
+export function paramExprOnlyToLatex(ast: ParameterValue, lookup?: RenderNameLookup): string {
     _paramLatexNameLookup = lookup
     try {
-        return renderParameterAst(ast, false)
+        return renderParameterValue(ast, false)
     } finally {
         _paramLatexNameLookup = undefined
     }
@@ -136,7 +137,7 @@ export function paramExprOnlyToLatex(ast: ParameterValueAst, lookup?: RenderName
  * // → true
  * ```
  */
-export function isSimpleLiteral(ast: ParameterValueAst): boolean {
+export function isSimpleLiteral(ast: ParameterValue): boolean {
     if ("Piecewise" in ast) return false
     const [expr] = ast.Simple
     return "Literal" in expr
@@ -144,7 +145,7 @@ export function isSimpleLiteral(ast: ParameterValueAst): boolean {
 
 // ── Piecewise ─────────────────────────────────────────────────────────────────
 
-function piecewiseToLatex(pieces: PiecewiseExprAst[]): string {
+function piecewiseToLatex(pieces: PiecewiseExpr[]): string {
     const rows = pieces
         .map((p) => `${exprToLatex(p.expr, PREC.atom)} & \\text{if } ${exprToLatex(p.if_expr, PREC.atom)}`)
         .join(" \\\\ ")
@@ -153,7 +154,7 @@ function piecewiseToLatex(pieces: PiecewiseExprAst[]): string {
 
 // ── Expression ────────────────────────────────────────────────────────────────
 
-function exprToLatex(expr: ExprAst, parentPrec: Prec): string {
+function exprToLatex(expr: Expr, parentPrec: Prec): string {
     if ("Literal" in expr) {
         return literalToLatex(expr.Literal.value)
     }
@@ -193,12 +194,18 @@ function exprToLatex(expr: ExprAst, parentPrec: Prec): string {
         return `${inner}\\,\\left[\\mathrm{${escapeUnit(expr.UnitCast.unit)}}\\right]`
     }
 
+    if ("Fallback" in expr) {
+        // Source operator is `?` (evaluate left, then right if needed).
+        const inner = `${exprToLatex(expr.Fallback.left, PREC.addSub)} \\mathbin{?} ${exprToLatex(expr.Fallback.right, PREC.addSub)}`
+        return maybeParen(inner, PREC.addSub, parentPrec)
+    }
+
     return "?"
 }
 
 // ── Literals ──────────────────────────────────────────────────────────────────
 
-function literalToLatex(lit: LiteralAst): string {
+function literalToLatex(lit: Literal): string {
     if ("Number" in lit) return formatNumber(lit.Number)
     if ("String" in lit) return `\\text{${escapeText(lit.String)}}`
     return `\\text{${lit.Boolean}}`
@@ -210,12 +217,12 @@ function literalToLatex(lit: LiteralAst): string {
  * If `expr` is a numeric literal that can be expressed as a simple fraction
  * (denominator up to 12), returns the LaTeX fraction string. Otherwise `null`.
  */
-function fractionExponent(expr: ExprAst): string | null {
+function fractionExponent(expr: Expr): string | null {
     if (!("Literal" in expr)) return null
     const lit = expr.Literal.value
     if (!("Number" in lit)) return null
     const n = lit.Number
-    if (Number.isInteger(n)) return null
+    if (typeof n === "object" || Number.isInteger(n)) return null
 
     const MAX_DENOM = 12
     for (let d = 2; d <= MAX_DENOM; d++) {
@@ -231,7 +238,7 @@ function fractionExponent(expr: ExprAst): string | null {
 
 // ── Binary operators ──────────────────────────────────────────────────────────
 
-function binaryOpToLatex(op: BinaryOpAst, left: ExprAst, right: ExprAst, parentPrec: Prec): string {
+function binaryOpToLatex(op: BinaryOp, left: Expr, right: Expr, parentPrec: Prec): string {
     switch (op) {
         case "add": {
             const inner = `${exprToLatex(left, PREC.addSub)} + ${exprToLatex(right, PREC.addSub)}`
@@ -275,7 +282,7 @@ function binaryOpToLatex(op: BinaryOpAst, left: ExprAst, right: ExprAst, parentP
 
 // ── Unary operators ───────────────────────────────────────────────────────────
 
-function unaryOpToLatex(op: UnaryOpAst, operand: ExprAst, parentPrec: Prec): string {
+function unaryOpToLatex(op: UnaryOp, operand: Expr, parentPrec: Prec): string {
     switch (op) {
         case "neg": {
             const inner = `-${exprToLatex(operand, PREC.unary)}`
@@ -290,7 +297,7 @@ function unaryOpToLatex(op: UnaryOpAst, operand: ExprAst, parentPrec: Prec): str
 
 // ── Variables ─────────────────────────────────────────────────────────────────
 
-function variableToLatex(v: VariableAst): string {
+function variableToLatex(v: Variable): string {
     if ("Parameter" in v) {
         const renderName = _paramLatexNameLookup?.(v.Parameter.parameter_name)
         return renderName ?? mathName(v.Parameter.parameter_name)
@@ -309,7 +316,7 @@ function variableToLatex(v: VariableAst): string {
 
 // ── Function calls ────────────────────────────────────────────────────────────
 
-function functionCallToLatex(name: FunctionNameAst, args: ExprAst[]): string {
+function functionCallToLatex(name: FunctionName, args: Expr[]): string {
     const argsLatex = args.map((a) => exprToLatex(a, PREC.atom))
 
     if ("Builtin" in name) {
@@ -356,7 +363,7 @@ function functionCallToLatex(name: FunctionNameAst, args: ExprAst[]): string {
 
 // ── Comparison operators ──────────────────────────────────────────────────────
 
-function comparisonSym(op: ComparisonOpAst): string {
+function comparisonSym(op: ComparisonOp): string {
     switch (op) {
         case "eq":             return "="
         case "not_eq":         return "\\neq"
@@ -373,7 +380,20 @@ function maybeParen(inner: string, ownPrec: Prec, parentPrec: Prec): string {
     return ownPrec < parentPrec ? `\\left(${inner}\\right)` : inner
 }
 
-function formatNumber(n: number): string {
+/**
+ * Renders a wire float (finite number or `{ float_special: ... }`) as LaTeX.
+ */
+function formatNumber(n: FloatValue): string {
+    if (typeof n === "object") {
+        switch (n.float_special) {
+            case "NAN":
+                return "\\text{NaN}"
+            case "INFINITY":
+                return "\\infty"
+            case "NEGATIVE_INFINITY":
+                return "-\\infty"
+        }
+    }
     if (!isFinite(n)) return n > 0 ? "\\infty" : "-\\infty"
     if (Number.isInteger(n) && Math.abs(n) < 1e9) return String(n)
     const abs = Math.abs(n)
@@ -393,8 +413,11 @@ function trimTrailingZeros(s: string): string {
 }
 
 /**
- * Formats a finite number to 4 significant figures, stripping trailing zeros
- * and a bare decimal point. Passes through non-finite values (Inf, NaN) as-is.
+ * Formats a wire float (or numeric string) to 4 significant figures, stripping
+ * trailing zeros and a bare decimal point.
+ *
+ * Special floats from `oneil_shared::serde::f64` become `"NaN"` / `"Infinity"` /
+ * `"-Infinity"`. Other non-finite values pass through as-is.
  *
  * ```ts
  * fmtNum(1.5000) // "1.5"
@@ -402,7 +425,17 @@ function trimTrailingZeros(s: string): string {
  * fmtNum(1.23e-10) // "1.23e-10"
  * ```
  */
-export function fmtNum(n: number | string): string {
+export function fmtNum(n: FloatValue | string): string {
+    if (typeof n === "object") {
+        switch (n.float_special) {
+            case "NAN":
+                return "NaN"
+            case "INFINITY":
+                return "Infinity"
+            case "NEGATIVE_INFINITY":
+                return "-Infinity"
+        }
+    }
     const num = typeof n === "number" ? n : parseFloat(n)
     if (!isFinite(num)) return String(n)
     const s = num.toPrecision(4)

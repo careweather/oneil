@@ -7,7 +7,7 @@
  */
 
 import { atom } from "jotai"
-import type { ParameterValueAst, RenderedNode, RenderedPoolEntry, RenderedValue } from "../../types/model"
+import type { ParameterValue, RenderedNode, RenderedPoolEntry, EvaluatedValue } from "../../types/model"
 import { buildAliasToModelPath, extractDependencyKeys } from "../../utils/extractDependencies"
 import { paramKey } from "../../utils/instancePath"
 import { computeUsedParams, GRAPH_USED_PARAMS_MODE, type UsedParamSets } from "../../utils/computeUsedParams"
@@ -29,7 +29,7 @@ export interface ParamLookupEntry {
     name: string
     renderName: string | null
     label: string
-    value: RenderedValue
+    value: EvaluatedValue
 }
 
 /** Flat map: `paramKey → { name, label, value }` for the whole tree + ref pool. */
@@ -47,8 +47,8 @@ export interface FullParamLookupEntry {
     renderName: string | null
     label: string
     note: string | null
-    value: RenderedValue
-    expression: ParameterValueAst | null
+    value: EvaluatedValue
+    expression: ParameterValue | null
     instancePath: string[]
 }
 
@@ -73,7 +73,7 @@ function buildFullParamLookup(
                 label: p.label,
                 note: p.note,
                 value: p.value,
-                expression: p.expression as ParameterValueAst | null,
+                expression: p.expression,
                 instancePath: node.instance_path,
             })
         }

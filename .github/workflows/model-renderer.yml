@@ -1,0 +1,44 @@
+name: model-renderer
+
+on:
+  push:
+    paths:
+      - "vscode/model-renderer/**"
+      - "packages/ts-interfaces/**"
+      - ".github/workflows/model-renderer.yml"
+      - "src-rs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    paths:
+      - "vscode/model-renderer/**"
+      - "packages/ts-interfaces/**"
+      - ".github/workflows/model-renderer.yml"
+      - "src-rs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode/model-renderer
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: vscode/model-renderer/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck / build
+        run: npm run build
+
+      - name: Test
+        run: npm test

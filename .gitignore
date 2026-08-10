@@ -26,3 +26,4 @@ oncmp_config.toml
 
 # Node (GitHub Action review scripts)
 node_modules/
+/dist

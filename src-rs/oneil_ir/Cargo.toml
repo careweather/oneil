@@ -14,12 +14,16 @@ readme = "README.md"
 
 [features]
 test-helpers = []
+# Derives `ts_rs::TS` on JSON-facing IR types for `packages/ts-interfaces`
+# codegen. See `docs/CODING_STANDARDS.md` (Generated TypeScript Bindings).
+ts-bindings = ["dep:ts-rs", "oneil_shared/ts-bindings"]
 
 [dependencies]
 oneil_shared = { path = "../oneil_shared" }
 oneil_output = { path = "../oneil_output" }
 indexmap = { workspace = true }
 serde = { workspace = true }
+ts-rs = { workspace = true, optional = true }
 
 [lints]
 workspace = true

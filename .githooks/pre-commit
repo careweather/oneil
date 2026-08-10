@@ -18,3 +18,19 @@ while IFS= read -r f; do
     [[ -z "$f" ]] && continue
     git diff --quiet -- "$f" || git add "$f"
 done <<< "$(git diff --cached --name-only -- '*.rs')"
+
+# Keep `oneil-ts-interfaces` in sync with Rust Serde DTOs (ts-rs). Fail the
+# commit if codegen breaks; stage any regenerated output so drift can't land.
+echo "» Regenerating TypeScript wire bindings..."
+./scripts/generate-ts-interfaces.sh
+
+generated_paths=(
+    packages/ts-interfaces/src/generated
+    packages/ts-interfaces/src/index.ts
+)
+
+if ! git diff --quiet -- "${generated_paths[@]}" \
+    || [[ -n "$(git ls-files --others --exclude-standard -- packages/ts-interfaces/src/generated)" ]]; then
+    echo "  Staging updated packages/ts-interfaces bindings..."
+    git add -- "${generated_paths[@]}"
+fi

@@ -12,7 +12,7 @@
  * always shown regardless of reachability.
  */
 
-import type { ParameterValueAst, RenderedNode, RenderedPoolEntry } from "../types/model"
+import type { ParameterValue, RenderedNode, RenderedPoolEntry } from "../types/model"
 import {
     extractDependencyKeys,
     extractDepsFromExpr,
@@ -40,7 +40,7 @@ export type GraphUsedParamsMode = "transitive" | "direct_submodel"
  */
 export const GRAPH_USED_PARAMS_MODE: GraphUsedParamsMode = "direct_submodel"
 
-type ParamEntry = { expression: ParameterValueAst | null; instancePath: string[] }
+type ParamEntry = { expression: ParameterValue | null; instancePath: string[] }
 
 /**
  * Dependency `depKey` is directly referenced from outside its owner's instance
@@ -74,7 +74,7 @@ function collectDirectExternalRefs(
         const ip = node.instance_path
         for (const p of node.parameters) {
             noteDirectExternalDeps(
-                extractDependencyKeys(p.expression as ParameterValueAst | null, ip, aliasToModelPath),
+                extractDependencyKeys(p.expression, ip, aliasToModelPath),
                 ip,
                 paramIndex,
                 direct,
@@ -108,7 +108,7 @@ function buildParamIndex(root: RenderedNode, referencePool: RenderedPoolEntry[])
         const ip = node.instance_path
         for (const p of node.parameters) {
             paramIndex.set(paramKey(ip, p.name), {
-                expression: p.expression as ParameterValueAst | null,
+                expression: p.expression,
                 instancePath: ip,
             })
         }

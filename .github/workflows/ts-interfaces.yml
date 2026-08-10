@@ -1,0 +1,41 @@
+name: ts-interfaces
+
+on:
+  push:
+    paths:
+      - "packages/ts-interfaces/**"
+      - ".github/workflows/ts-interfaces.yml"
+      - "scripts/generate-ts-interfaces.sh"
+      - "scripts/check-ts-interfaces.sh"
+      - "src-rs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    paths:
+      - "packages/ts-interfaces/**"
+      - ".github/workflows/ts-interfaces.yml"
+      - "scripts/generate-ts-interfaces.sh"
+      - "scripts/check-ts-interfaces.sh"
+      - "src-rs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  check-generated-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-ts-bindings-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check generated TypeScript bindings are up to date
+        run: ./scripts/check-ts-interfaces.sh

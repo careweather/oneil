@@ -31,7 +31,6 @@ use oneil_frontend::{InstanceGraph, InstancedModel};
 use oneil_ir::{self as ir, SectionItem};
 use oneil_runtime::{Runtime, output};
 use oneil_shared::paths::ModelPath;
-use oneil_shared::serde::f64 as f64_serde;
 use oneil_shared::symbols::{ParameterName, ReferenceName};
 use serde::Serialize;
 
@@ -39,6 +38,7 @@ use serde::Serialize;
 
 /// Top-level response containing the main instance tree plus any referenced models.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct RenderedTree {
     /// The primary model's rendered tree.
     pub root: RenderedNode,
@@ -50,6 +50,7 @@ pub struct RenderedTree {
 
 /// An entry in the reference pool: a fully rendered model that was referenced.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct RenderedPoolEntry {
     /// Alias under which this model was first referenced in the main tree.
     pub alias: String,
@@ -59,6 +60,7 @@ pub struct RenderedPoolEntry {
 
 /// One evaluated model instance in the tree.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct RenderedNode {
     /// Absolute file path of this model.
     pub model_path: String,
@@ -87,6 +89,7 @@ pub struct RenderedNode {
 /// A named section within a model, carrying an optional note and an ordered
 /// list of parameter/test references.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct RenderedSection {
     /// The section header label (e.g. `"Geometry"`).
     pub label: String,
@@ -98,6 +101,7 @@ pub struct RenderedSection {
 
 /// A reference to a parameter or test within a section.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RenderedSectionItem {
     /// References a parameter by name.
@@ -114,6 +118,7 @@ pub enum RenderedSectionItem {
 
 /// One evaluated test result.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct RenderedTest {
     /// Whether the test passed.
     pub passed: bool,
@@ -130,6 +135,7 @@ pub struct RenderedTest {
 
 /// A design file that contributed at least one parameter to a node.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct AppliedDesign {
     /// Short display name derived from the design file stem (no path, no extension).
     pub design_name: String,
@@ -140,6 +146,7 @@ pub struct AppliedDesign {
 
 /// A submodel child with its fully rendered subtree.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct RenderedChild {
     /// Alias under which the submodel was declared.
     pub alias: String,
@@ -149,6 +156,7 @@ pub struct RenderedChild {
 
 /// A non-submodel `ref` cross-link (graph edge only, no subtree).
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct RenderedReference {
     /// Alias under which this reference was declared.
     pub alias: String,
@@ -158,6 +166,7 @@ pub struct RenderedReference {
 
 /// One evaluated parameter with its IR expression and documentation.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct RenderedParameter {
     /// Source identifier (e.g. `mass`).
     pub name: String,
@@ -178,8 +187,12 @@ pub struct RenderedParameter {
     /// form (plain text, `KaTeX`, etc.). `null` when IR was unavailable.
     pub expression: Option<ir::ParameterValue>,
     /// Evaluated value.
-    pub value: RenderedValue,
+    pub value: output::EvaluatedValue,
     /// Print level: `"none"`, `"trace"`, or `"performance"`.
+    #[cfg_attr(
+        feature = "ts-bindings",
+        ts(type = "\"none\" | \"trace\" | \"performance\"")
+    )]
     pub print_level: &'static str,
     /// Byte offsets of the expression in the source file.
     pub expr_span: ExprSpan,
@@ -189,6 +202,7 @@ pub struct RenderedParameter {
 
 /// Records that a design contributed this parameter.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct DesignMark {
     /// Short file-stem name of the design (no path or extension).
     pub design_name: String,
@@ -204,6 +218,7 @@ pub struct DesignMark {
 /// `RenderedNode::model_path`. The webview uses `file` to route "jump to source"
 /// actions correctly. For synthetic/fallback spans `file` is `null`.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
 pub struct ExprSpan {
     /// Absolute path of the source file that contains this expression.
     ///
@@ -213,42 +228,6 @@ pub struct ExprSpan {
     pub start: usize,
     /// End byte offset.
     pub end: usize,
-}
-
-/// Serializable evaluated value.
-#[derive(Debug, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum RenderedValue {
-    /// A boolean.
-    Boolean {
-        /// The boolean value.
-        value: bool,
-    },
-    /// A string.
-    String {
-        /// The string value.
-        value: String,
-    },
-    /// A dimensionless number (scalar or interval).
-    Number {
-        /// Scalar value, or interval lower bound.
-        #[serde(with = "f64_serde")]
-        value: f64,
-        /// Interval upper bound, `null` for scalars.
-        #[serde(serialize_with = "f64_option::serialize")]
-        max: Option<f64>,
-    },
-    /// A number with a display unit.
-    MeasuredNumber {
-        /// Scalar value, or interval lower bound (in display unit).
-        #[serde(with = "f64_serde")]
-        value: f64,
-        /// Interval upper bound, `null` for scalars (in display unit).
-        #[serde(serialize_with = "f64_option::serialize")]
-        max: Option<f64>,
-        /// Display unit string (e.g. `"kg"`, `"m/s^2"`).
-        unit: String,
-    },
 }
 
 // ── Private: phase-1 owned eval data ─────────────────────────────────────────
@@ -268,7 +247,7 @@ struct EvalNode {
 struct EvalParam {
     name: String,
     label: String,
-    value: RenderedValue,
+    value: output::EvaluatedValue,
     print_level: &'static str,
     expr_span: ExprSpan,
 }
@@ -377,47 +356,13 @@ fn collect_eval_param(param: &output::Parameter) -> EvalParam {
     EvalParam {
         name: param.ident.as_str().to_string(),
         label: param.label.as_str().to_string(),
-        value: convert_value(&param.value),
+        value: output::EvaluatedValue::from(&param.value),
         print_level: match param.print_level {
             output::PrintLevel::None => "none",
             output::PrintLevel::Trace => "trace",
             output::PrintLevel::Performance => "performance",
         },
         expr_span: expr_span_from(&param.expr_span),
-    }
-}
-
-/// Converts an `output::Value` to a serializable `RenderedValue`.
-fn convert_value(value: &output::Value) -> RenderedValue {
-    match value {
-        output::Value::Boolean(b) => RenderedValue::Boolean { value: *b },
-        output::Value::String(s) => RenderedValue::String { value: s.clone() },
-        output::Value::Number(n) => match n {
-            output::Number::Scalar(v) => RenderedValue::Number {
-                value: *v,
-                max: None,
-            },
-            output::Number::Interval(i) => RenderedValue::Number {
-                value: i.min(),
-                max: Some(i.max()),
-            },
-        },
-        output::Value::MeasuredNumber(mn) => {
-            let (number, unit) = mn.clone().into_number_and_unit();
-            let unit_str = format!("{unit}");
-            match number {
-                output::Number::Scalar(v) => RenderedValue::MeasuredNumber {
-                    value: v,
-                    max: None,
-                    unit: unit_str,
-                },
-                output::Number::Interval(i) => RenderedValue::MeasuredNumber {
-                    value: i.min(),
-                    max: Some(i.max()),
-                    unit: unit_str,
-                },
-            }
-        }
     }
 }
 
@@ -654,25 +599,5 @@ fn assemble_node(
         children,
         references,
         applied_designs,
-    }
-}
-
-mod f64_option {
-    use oneil_shared::serde::f64;
-    use serde::Serializer;
-
-    /// Serializes `None` as `null` and `Some` values with the shared `f64` serializer.
-    #[expect(
-        clippy::ref_option,
-        reason = "serde `serialize_with` passes `&Option<T>`"
-    )]
-    pub fn serialize<S>(value: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match value {
-            None => serializer.serialize_none(),
-            Some(value) => f64::serialize(value, serializer),
-        }
     }
 }

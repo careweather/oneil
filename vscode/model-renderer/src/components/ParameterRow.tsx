@@ -4,7 +4,7 @@
  */
 import type React from "react"
 import styled, { css } from "styled-components"
-import type { ParameterValueAst, RenderedParameter, RenderedValue } from "../types/model"
+import type { ParameterValue, RenderedParameter, EvaluatedValue } from "../types/model"
 import { fmtNum, isSimpleLiteral, mathName, paramExprOnlyToLatex } from "../utils/exprToLatex"
 import katex from "katex"
 import { useCallback, useMemo } from "react"
@@ -308,8 +308,8 @@ export const ParameterRowLi = styled.li<{
  * so that `9.810` → `"9.81"` and `5.97e24` → `"5.97e+24"`.
  */
 
-/** Renders a `RenderedValue` union as a human-readable string. */
-export function ValueDisplay({ value }: { value: RenderedValue }) {
+/** Renders a `EvaluatedValue` union as a human-readable string. */
+export function ValueDisplay({ value }: { value: EvaluatedValue }) {
     switch (value.type) {
         case "boolean":
             return <>{String(value.value)}</>
@@ -331,7 +331,7 @@ export function ValueDisplay({ value }: { value: RenderedValue }) {
 // ── ExprDisplay ───────────────────────────────────────────────────────────────
 
 /**
- * Renders a `ParameterValueAst` using KaTeX in MathML mode.
+ * Renders a `ParameterValue` using KaTeX in MathML mode.
  *
  * MathML output lets the browser's native math layout engine handle subscript
  * and superscript positioning, which avoids the vlist/inline-table alignment
@@ -342,7 +342,7 @@ export function ValueDisplay({ value }: { value: RenderedValue }) {
  * expression are rendered using their render-name (if defined) rather than
  * the auto-derived `mathName`.
  */
-export function ExprDisplay({ expr, instancePath }: { expr: ParameterValueAst; instancePath?: string[] }) {
+export function ExprDisplay({ expr, instancePath }: { expr: ParameterValue; instancePath?: string[] }) {
     const globalLookup = useAtomValue(renderNameLookupAtom)
     const html = useMemo(() => {
         const lookup = instancePath
@@ -374,7 +374,7 @@ export interface DepLabelEntry {
     /** Optional LaTeX render-name; used instead of auto-deriving from `name` when set. */
     renderName: string | null
     label: string
-    value: RenderedValue
+    value: EvaluatedValue
 }
 
 // ── NameDisplay ───────────────────────────────────────────────────────────────
@@ -416,9 +416,9 @@ export interface ParamRowContentProps {
     /** Human-readable label */
     label: string
     /** Optional expression AST */
-    expression: ParameterValueAst | null
+    expression: ParameterValue | null
     /** Evaluated value */
-    value: RenderedValue
+    value: EvaluatedValue
     /** Optional note content */
     note: string | null
     /** Whether to show notes inline */

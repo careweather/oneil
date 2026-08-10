@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 /// A name for a built-in value (e.g. "pi", "e").
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-bindings", ts(type = "string"))]
 #[serde(transparent)]
 pub struct BuiltinValueName(String);
 
@@ -47,6 +49,8 @@ impl From<&str> for BuiltinValueName {
 
 /// A name for a built-in function (e.g. "sin", "max").
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-bindings", ts(type = "string"))]
 #[serde(transparent)]
 pub struct BuiltinFunctionName(String);
 
@@ -90,6 +94,8 @@ impl From<&str> for BuiltinFunctionName {
 
 /// A name for a Python function (from an imported module).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-bindings", ts(type = "string"))]
 #[serde(transparent)]
 pub struct PyFunctionName(String);
 
@@ -133,6 +139,8 @@ impl From<&str> for PyFunctionName {
 
 /// A name for a parameter in a model.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-bindings", ts(type = "string"))]
 #[serde(transparent)]
 pub struct ParameterName(String);
 
@@ -176,6 +184,8 @@ impl From<&str> for ParameterName {
 
 /// A name for a reference to another model.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-bindings", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-bindings", ts(type = "string"))]
 #[serde(transparent)]
 pub struct ReferenceName(String);
 

@@ -1,0 +1,27 @@
+{
+  "name": "model-test-report-action",
+  "private": true,
+  "description": "GitHub Action: run Oneil model tests and (optionally) diff base vs. head results",
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.mjs --production",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "check-dist": "npm run build && git diff --exit-code -- dist"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/exec": "^3.0.0",
+    "oneil-ts-interfaces": "file:../../packages/ts-interfaces"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@types/node": "^26.1.2",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.8.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.31.1",
+    "vitest": "^4.1.10"
+  }
+}

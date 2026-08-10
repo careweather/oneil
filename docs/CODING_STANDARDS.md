@@ -292,6 +292,35 @@ span, and vice versa.
 This also has the side effect of making code easier to write since you have to
 enforce less invariants at run time.
 
+## JSON Wire Types
+
+When emitting JSON for external consumers (LSP webview, `oneil test --format
+json`, etc.), put shared *leaf* DTOs in one place and reuse them:
+
+- evaluated values → `oneil_output::EvaluatedValue`
+- diagnostic severity → `oneil_shared::error::DiagnosticKind`
+
+Envelope types (`RenderedTree`, `TestReport`, …) can differ per consumer.
+Do not hand-copy leaf shapes between crates.
+
+## Generated TypeScript Bindings
+
+TypeScript types for those JSON wire formats are generated with `ts-rs` into
+`packages/ts-interfaces` (`oneil-ts-interfaces`). Do not hand-edit
+`packages/ts-interfaces/src/generated/`.
+
+```sh
+./scripts/generate-ts-interfaces.sh   # regenerate
+./scripts/check-ts-interfaces.sh      # CI drift check
+```
+
+The pre-commit hook regenerates and stages these bindings whenever Rust files
+are staged. CI still runs `./scripts/check-ts-interfaces.sh` as a backstop.
+
+Opt into Rust-side derives with the `ts-bindings` Cargo feature. Opaque Serde
+helpers (e.g. special floats) need an explicit `#[ts(type = "...")]` so the
+generated types match the wire shape.
+
 ## Testing
 
 ### Test Kinds
