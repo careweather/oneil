@@ -9,11 +9,29 @@ mod tests {
     use oneil_cli::json_test_report::{self, TestOutcome};
     use oneil_runtime::{CacheReadPolicy, CacheWritePolicy, Runtime};
     use oneil_shared::paths::ModelPath;
+    use serde_json::json;
 
     fn fixture_path(name: &str) -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures")
             .join(name)
+    }
+
+    /// Replaces absolute `model_path` values with their file names so the
+    /// CI JSON contract can be asserted without baking in host paths.
+    fn with_portable_model_paths(mut value: serde_json::Value) -> serde_json::Value {
+        if let Some(models) = value.get_mut("models").and_then(|models| models.as_array_mut()) {
+            for model in models {
+                if let Some(path) = model.get("model_path").and_then(|path| path.as_str()) {
+                    let file_name = PathBuf::from(path).file_name().map_or_else(
+                        || path.to_string(),
+                        |name| name.to_string_lossy().into_owned(),
+                    );
+                    model["model_path"] = json!(file_name);
+                }
+            }
+        }
+        value
     }
 
     #[test]
@@ -69,10 +87,62 @@ mod tests {
             "the failing test depends on `f`"
         );
 
-        // Round-trips through `serde_json` without panicking or losing data
-        // (this is the exact call the CLI makes for `oneil test --format json`).
-        let json = serde_json::to_string_pretty(&report).expect("serialize");
-        assert!(json.contains("\"result\": \"fail\""));
+        // Guard the CI-facing wire contract (`oneil test --format json`):
+        // serialize exactly as the CLI does, then compare the full schema.
+        let actual = with_portable_model_paths(
+            serde_json::to_value(&report).expect("test report only contains JSON-safe types"),
+        );
+        let expected = json!({
+            "success": false,
+            "diagnostics": [],
+            "models": [
+                {
+                    "model_path": "mixed_tests.on",
+                    "test_count": 2,
+                    "passed_count": 1,
+                    "tests": [
+                        {
+                            "expression": "f > t",
+                            "span": {
+                                "start": { "offset": 238, "line": 8, "column": 7 },
+                                "end": { "offset": 243, "line": 8, "column": 12 }
+                            },
+                            "result": "pass",
+                            "dependencies": []
+                        },
+                        {
+                            "expression": "f < t",
+                            "span": {
+                                "start": { "offset": 250, "line": 9, "column": 7 },
+                                "end": { "offset": 255, "line": 9, "column": 12 }
+                            },
+                            "result": "fail",
+                            "dependencies": [
+                                {
+                                    "name": "f",
+                                    "value": {
+                                        "type": "measured_number",
+                                        "value": 49.050_000_000_000_004,
+                                        "max": null,
+                                        "unit": "N"
+                                    }
+                                },
+                                {
+                                    "name": "t",
+                                    "value": {
+                                        "type": "measured_number",
+                                        "value": 10.0,
+                                        "max": null,
+                                        "unit": "N"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -85,6 +155,7 @@ mod tests {
         let report = json_test_report::build_report(&errors_vec, model_opt, false, false);
 
         assert!(report.success);
+        assert_eq!(report.models.len(), 1);
         assert_eq!(report.models[0].passed_count, report.models[0].test_count);
     }
 }

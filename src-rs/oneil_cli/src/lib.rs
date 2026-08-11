@@ -709,15 +709,16 @@ fn handle_test_command(args: TestArgs) {
 
             // Skip printing model results on error unless partial results were
             // requested (matches the original early-return behavior).
-            if saw_error && !display_partial_results {
+            let skip_model_results = saw_error && !display_partial_results;
+            if skip_model_results {
                 false
             } else {
+                let test_print_config = TestPrintConfig {
+                    with_header,
+                    recursive,
+                    print_utils_config,
+                };
                 let tests_passed = model_opt.is_none_or(|model_ref| {
-                    let test_print_config = TestPrintConfig {
-                        with_header,
-                        recursive,
-                        print_utils_config,
-                    };
                     print_model_result::print_test_results(model_ref, &test_print_config)
                 });
                 !saw_error && tests_passed
