@@ -20,7 +20,10 @@ mod tests {
     /// Replaces absolute `model_path` values with their file names so the
     /// CI JSON contract can be asserted without baking in host paths.
     fn with_portable_model_paths(mut value: serde_json::Value) -> serde_json::Value {
-        if let Some(models) = value.get_mut("models").and_then(|models| models.as_array_mut()) {
+        if let Some(models) = value
+            .get_mut("models")
+            .and_then(|models| models.as_array_mut())
+        {
             for model in models {
                 if let Some(path) = model.get("model_path").and_then(|path| path.as_str()) {
                     let file_name = PathBuf::from(path).file_name().map_or_else(
