@@ -1,81 +1,22 @@
 # Appendix C: Continuous Integration
 
-Once your models declare [`test:`](./06-tests.md) checks, you can run them in
-CI the same way you run them locally. This appendix shows how to wire Oneil
-into a GitHub Actions workflow for a model repository.
+Once your models declare [`test:`](./06-tests.md) checks, run them in CI the
+same way you run them locally. This appendix is for **model repositories**
+(repos that contain `.on` / `.one` files).
 
-## What to run
+Pin Action refs and Oneil versions to the same release tag (for example
+`v1.0.0`) so CI does not silently move under you.
 
-```sh
-oneil test path/to/model.on
-oneil test --recursive path/to/model.on   # include tests in imported submodels
-oneil test --format json path/to/model.on # machine-readable report for tooling
-```
+## Recommended: `model-test-report`
 
-`oneil test` exits with status **1** if there were any error diagnostics or any
-failing test, and **0** otherwise — so a bare `oneil test …` step already fails
-the job when something is wrong.
-
-JSON mode (`--format json`) prints a structured report (diagnostics plus
-per-test pass/fail, with dependency values on failures). Prefer that when a
-script or Action will parse the result; keep the default text format for
-humans reading the log.
-
-Install a released CLI binary (see [Installation](./02-installation.md)) or
-build from a pinned Oneil ref in the workflow. Pin the Oneil version your
-models are validated against so CI does not silently move under you.
-
-## Minimal workflow: run tests on every push
-
-```yaml
-name: Oneil model tests
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Oneil
-        run: |
-          TAG=v1.0.0
-          ARCHIVE="oneil-${TAG}-x86_64-unknown-linux-gnu.tar.gz"
-          curl -fsSL \
-            "https://github.com/careweather/oneil/releases/download/${TAG}/${ARCHIVE}" \
-            -o oneil.tar.gz
-          tar -xzf oneil.tar.gz
-          sudo mv oneil /usr/local/bin/
-          oneil --version
-
-      # Only needed if models import Python functions:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Run model tests
-        run: |
-          # Adjust paths to your entry-point models.
-          oneil test --recursive model/radar.on
-```
-
-Discovering every entry-point model is project-specific. Many repos keep
-top-level `.on` / `.one` files under a `model/` directory; loop over those, or
-call out a fixed list in the workflow.
-
-## Recommended: `model-test-report` Action
-
-For richer CI output — especially on pull requests — use the
+Use
 [`careweather/oneil/actions/model-test-report`](https://github.com/careweather/oneil/tree/main/actions/model-test-report)
-Action. It installs a pinned Oneil ref, runs `oneil test --format json` on
-discovered models, writes a Markdown report to the job summary, and can
-**diff head vs. base** so the report highlights regressions and fixes rather
-than only a raw pass/fail count.
+as the default CI integration. It installs a pinned Oneil, runs
+`oneil test --format json` on discovered models, writes a Markdown report to
+the job summary, and can **diff a PR head against its base** so the report
+highlights regressions and fixes rather than only a raw pass/fail count.
 
-Pin the Action ref and `oneil-ref` to the **same** Oneil version (for example
-both `v1.0.0`).
-
-### Single checkout
+### Single checkout (push / PR)
 
 ```yaml
 name: Oneil model tests
@@ -99,8 +40,8 @@ jobs:
           model-dir: model
 ```
 
-The Action builds Oneil from `oneil-ref` (so the calling workflow must install
-Rust first). It does not install Python itself — add `setup-python` only when
+The Action builds Oneil from `oneil-ref`, so the calling workflow must install
+Rust first. It does not install Python itself — add `setup-python` only when
 models call into Python.
 
 ### Compare a PR against its base
@@ -170,17 +111,64 @@ Auto-discovery only considers **top-level** `.on` / `.one` files in
 via imports are covered when the Action runs `oneil test --recursive` on those
 entry points. Design files (`.one`) that declare their own tests are included.
 
-For the full input/output reference, see the
+Full reference:
 [Action README](https://github.com/careweather/oneil/blob/main/actions/model-test-report/README.md).
+
+## Install the CLI: `install-oneil`
+
+When you need `oneil` on `PATH` for custom steps (or a minimal workflow of your
+own), use
+[`careweather/oneil/actions/install-oneil`](https://github.com/careweather/oneil/tree/main/actions/install-oneil).
+It downloads the pre-built CLI from a GitHub Release for the runner’s OS and
+architecture — no Rust toolchain required.
+
+```yaml
+name: Oneil model tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: careweather/oneil/actions/install-oneil@v1.0.0
+        with:
+          version: v1.0.0
+
+      # Only needed if models import Python functions:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: oneil test --recursive model/radar.on
+```
+
+`oneil test` exits with status **1** if there were any error diagnostics or any
+failing test, and **0** otherwise. Use `--format json` when a later step will
+parse the report.
+
+| Input | Purpose |
+|-------|---------|
+| `version` | Release tag to install (required), e.g. `v1.0.0` |
+| `github-token` | Optional; defaults to the job token |
+
+Outputs: `version` (from `oneil --version`) and `oneil-path`.
+
+Full reference:
+[Action README](https://github.com/careweather/oneil/blob/main/actions/install-oneil/README.md).
 
 ## Tips
 
-- **Pin versions.** Treat Oneil like a compiler: bump `oneil-ref` (and the
-  Action tag) deliberately when you adopt a new release.
+- **Prefer `model-test-report` for model repos.** Use `install-oneil` when you
+  need a plain CLI for scripts or a hand-rolled test loop.
+- **Pin versions.** Treat Oneil like a compiler: bump Action tags and
+  `oneil-ref` / `version` together when you adopt a new release.
 - **Keep tests close to requirements.** CI is most useful when `test:` lines
   encode margins and constraints you care about — see [Tests](./06-tests.md).
 - **Python models.** If imports need packages, install them in the workflow
   before the Action (or before `oneil test`).
-- **Other CI systems.** Install a release binary (or build from source), then
-  run `oneil test --recursive …` and rely on the exit code; use
-  `--format json` if you want to parse results yourself.
+- **Other CI systems.** Download a release binary from
+  [Releases](https://github.com/careweather/oneil/releases) (see
+  [Installation](./02-installation.md)), then run `oneil test --recursive …`
+  and rely on the exit code.

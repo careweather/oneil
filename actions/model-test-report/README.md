@@ -11,6 +11,9 @@ that newly fail or newly pass — instead of only a raw pass/fail count.
 The Markdown report is written to the job summary (and optionally to a file /
 step output) so you can post it as a PR comment or upload it as an artifact.
 
+If you only need the `oneil` binary on `PATH` (without discovery / reporting),
+use [`install-oneil`](../install-oneil/README.md) instead.
+
 ## Usage
 
 ### Simple: just run the current checkout's tests

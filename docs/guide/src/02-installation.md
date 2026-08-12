@@ -15,6 +15,10 @@ page for:
 
 Pushing a version tag (for example `v1.0.0`) runs the Release workflow, which
 builds these archives and attaches them to the GitHub Release for that tag.
+In GitHub Actions, prefer
+[`careweather/oneil/actions/install-oneil`](https://github.com/careweather/oneil/tree/main/actions/install-oneil)
+(or [`model-test-report`](https://github.com/careweather/oneil/tree/main/actions/model-test-report)
+for full model-repo CI) — see [Appendix C](./c-ci-setup.md).
 
 ### Linux / macOS
 
