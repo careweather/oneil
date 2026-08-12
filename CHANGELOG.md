@@ -34,7 +34,8 @@ Oneil.
 - **cli**: `oneil test --format json` prints a machine-readable JSON report
   (diagnostics plus per-test pass/fail results, with dependency values for
   failures).
-- **docs**: User guide Appendix C documents the Continuous Integration setup.
+- **docs**: User guide Appendix C shows how to run Oneil model tests in CI
+  (including the `model-test-report` GitHub Action).
 
 ### Changed
 

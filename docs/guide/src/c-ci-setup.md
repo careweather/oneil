@@ -1,93 +1,187 @@
 # Appendix C: Continuous Integration
 
-Oneil’s GitHub Actions workflows live under [`.github/workflows/`](https://github.com/careweather/oneil/tree/main/.github/workflows).
-They keep the Rust toolchain, editor packages, generated TypeScript bindings,
-and release artifacts in sync. This appendix is a map of what runs when — not a
-substitute for reading the workflow YAML itself.
+Once your models declare [`test:`](./06-tests.md) checks, you can run them in
+CI the same way you run them locally. This appendix shows how to wire Oneil
+into a GitHub Actions workflow for a **model repository** (a repo that
+contains `.on` / `.one` files, not the Oneil language repo itself).
 
-Locally, point git at [`.githooks/`](https://github.com/careweather/oneil/tree/main/.githooks)
-(`git config core.hooksPath .githooks`) so format, clippy, and TypeScript
-binding regeneration run before you push. CI will still enforce the same
-checks.
+## What to run
 
-## Rust core
+```sh
+oneil test path/to/model.on
+oneil test --recursive path/to/model.on   # include tests in imported submodels
+oneil test --format json path/to/model.on # machine-readable report for tooling
+```
 
-| Workflow | When it runs | What it does |
-|----------|--------------|--------------|
-| `rust.yml` | Every push and pull request | `cargo build`, `cargo test`, `clippy`, and `rustfmt --check` with warnings denied |
-| `rust-pr.yml` | Pull requests | Timed `cargo fuzz` runs for `oneil_output` targets, plus an unused-dependency check (`cargo-udeps`) |
+`oneil test` exits with status **1** if there were any error diagnostics or any
+failing test, and **0** otherwise — so a bare `oneil test …` step already fails
+the job when something is wrong.
 
-Fuzz targets are listed explicitly in `rust-pr.yml`. Failures upload fuzz
-artifacts for debugging. Unit and integration tests intentionally skip fuzz
-targets so `cargo test` does not run forever.
+JSON mode (`--format json`) prints a structured report (diagnostics plus
+per-test pass/fail, with dependency values on failures). Prefer that when a
+script or Action will parse the result; keep the default text format for
+humans reading the log.
 
-## Generated TypeScript bindings
+Install a released CLI binary (see [Installation](./02-installation.md)) or
+build from a pinned Oneil ref in the workflow. Pin the Oneil version your
+models are validated against so CI does not silently move under you.
 
-JSON wire types used by the LSP rendered view and by `oneil test --format json`
-are generated with `ts-rs` into `packages/ts-interfaces`.
+## Minimal workflow: run tests on every push
 
-| Workflow | When it runs | What it does |
-|----------|--------------|--------------|
-| `ts-interfaces.yml` | Changes under `src-rs/`, `packages/ts-interfaces/`, or the generate/check scripts | Runs `./scripts/check-ts-interfaces.sh` so committed bindings match the Rust types |
+```yaml
+name: Oneil model tests
+on: [push, pull_request]
 
-Regenerate locally with `./scripts/generate-ts-interfaces.sh` (also invoked by
-the pre-commit hook when Rust files are staged).
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-## VS Code model renderer
+      - name: Install Oneil
+        run: |
+          TAG=v1.0.0
+          ARCHIVE="oneil-${TAG}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL \
+            "https://github.com/careweather/oneil/releases/download/${TAG}/${ARCHIVE}" \
+            -o oneil.tar.gz
+          tar -xzf oneil.tar.gz
+          sudo mv oneil /usr/local/bin/
+          oneil --version
 
-| Workflow | When it runs | What it does |
-|----------|--------------|--------------|
-| `model-renderer.yml` | Changes under `vscode/model-renderer/`, `packages/ts-interfaces/`, or Rust sources | `npm ci`, build/typecheck, and Vitest for the rendered-view webview |
+      # Only needed if models import Python functions:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-## Downstream model-test-report Action
+      - name: Run model tests
+        run: |
+          # Adjust paths to your entry-point models.
+          oneil test --recursive model/radar.on
+```
 
-The reusable Action at `actions/model-test-report` installs a pinned Oneil ref,
-runs `oneil test --format json`, and can diff base vs. head results for
-downstream model repos. See that Action’s README for consumer usage.
+Discovering every entry-point model is project-specific. Many repos keep
+top-level `.on` / `.one` files under a `model/` directory; loop over those, or
+call out a fixed list in the workflow.
 
-| Workflow | When it runs | What it does |
-|----------|--------------|--------------|
-| `model-test-report-action.yml` | Changes under `actions/model-test-report/`, related scripts, or Rust sources | Typecheck, lint, test, and `npm run check-dist` so the committed `dist/` bundle stays current |
+## Recommended: `model-test-report` Action
 
-## Releases
+For richer CI output — especially on pull requests — use the
+[`careweather/oneil/actions/model-test-report`](https://github.com/careweather/oneil/tree/main/actions/model-test-report)
+Action. It installs a pinned Oneil ref, runs `oneil test --format json` on
+discovered models, writes a Markdown report to the job summary, and can
+**diff head vs. base** so the report highlights regressions and fixes rather
+than only a raw pass/fail count.
 
-| Workflow | When it runs | What it does |
-|----------|--------------|--------------|
-| `release.yml` | Push of a version tag (`v*`, e.g. `v1.0.0`) | Builds the `oneil` CLI for Linux (`x86_64`), Windows (`x86_64`), and macOS (`aarch64` and `x86_64`), then creates a GitHub Release with those archives and notes from `CHANGELOG.md` |
+Pin the Action ref and `oneil-ref` to the **same** Oneil version (for example
+both `v1.0.0`).
 
-### Cutting a release
+### Single checkout
 
-1. Bump versions (`Cargo.toml` workspace version, `pyproject.toml`, VS Code /
-   related packages as needed) and update `CHANGELOG.md` for the new version.
-2. Merge that change to the branch you release from (typically `main`).
-3. Create and push an annotated tag matching the version:
+```yaml
+name: Oneil model tests
+on: [push, pull_request]
 
-   ```sh
-   git tag -a v1.0.0 -m "Oneil 1.0.0"
-   git push origin v1.0.0
-   ```
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-4. The Release workflow builds the binaries and publishes
-   [GitHub Releases](https://github.com/careweather/oneil/releases) assets named
-   like `oneil-v1.0.0-<target>.tar.gz` / `.zip`. Users install them via
-   [Installation](./02-installation.md#option-1-download-a-release-from-github).
+      - uses: dtolnay/rust-toolchain@stable
+      # Only needed if models import Python functions:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-## Docs site
+      - uses: careweather/oneil/actions/model-test-report@v1.0.0
+        with:
+          oneil-ref: v1.0.0
+          model-dir: model
+```
 
-| Workflow | When it runs | What it does |
-|----------|--------------|--------------|
-| `guide.yml` | Push to `gh-pages` (or manual `workflow_dispatch`) | Builds this mdBook guide and deploys it to GitHub Pages |
+The Action builds Oneil from `oneil-ref` (so the calling workflow must install
+Rust first). It does not install Python itself — add `setup-python` only when
+models call into Python.
 
-## Automated reviews
+### Compare a PR against its base
 
-These jobs use the Cursor CLI. They need repository secrets (`CURSOR_API_KEY`,
-and for the weekly job a `WEEKLY_QUALITY_PAT`) and are advisory or
-maintenance-oriented rather than merge gates for ordinary contributors.
+```yaml
+name: Oneil model test report
+on:
+  pull_request:
 
-| Workflow | When it runs | What it does |
-|----------|--------------|--------------|
-| `coding-standards-review.yml` | PRs that touch `src-rs/` | Posts a sticky PR comment reviewing the diff against `docs/CODING_STANDARDS.md` (does not fail on style findings) |
-| `weekly-quality-review.yml` | Mondays (UTC) or manual dispatch | Picks a random crate and focus, writes a quality review, and opens a PR |
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-Coding-standards review skips PRs whose head branch starts with
-`weekly-quality/`, so the weekly agent is not reviewed by itself.
+      - uses: actions/checkout@v4
+        with:
+          path: head
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - uses: careweather/oneil/actions/model-test-report@v1.0.0
+        id: report
+        with:
+          oneil-ref: v1.0.0
+          head-dir: head
+          base-dir: base
+          model-dir: model
+          head-label: ${{ github.event.pull_request.head.ref }}
+          base-label: ${{ github.event.pull_request.base.ref }}
+          report-path: oneil-test-report.md
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oneil-test-report
+          path: ${{ steps.report.outputs.report-path }}
+```
+
+With `base-dir` set, the Action fails the job when there are **regressions**,
+new failures, or new diagnostics (not merely because the base branch already
+had failing tests). Outputs include `has-problems`, `report` (Markdown), and
+`report-path` for posting a PR comment or uploading an artifact.
+
+### Useful inputs
+
+| Input | Purpose |
+|-------|---------|
+| `oneil-ref` | Tag / branch / SHA of Oneil to install (required) |
+| `model-dir` | Directory of `.on` / `.one` files (default `model`) |
+| `models` | Explicit comma-separated file list (skips auto-discovery) |
+| `skip-models` | Files to exclude from auto-discovery |
+| `timeout-seconds` | Per-model timeout (default `120`) |
+| `fail-on-problems` | Set `false` to report without failing the job |
+| `report-path` | Also write the Markdown report to a file |
+
+Auto-discovery only considers **top-level** `.on` / `.one` files in
+`model-dir` that declare at least one `test:` block. Submodel tests reached
+via imports are covered when the Action runs `oneil test --recursive` on those
+entry points. Design files (`.one`) that declare their own tests are included.
+
+For the full input/output reference, see the
+[Action README](https://github.com/careweather/oneil/blob/main/actions/model-test-report/README.md).
+
+## Tips
+
+- **Pin versions.** Treat Oneil like a compiler: bump `oneil-ref` (and the
+  Action tag) deliberately when you adopt a new release.
+- **Keep tests close to requirements.** CI is most useful when `test:` lines
+  encode margins and constraints you care about — see [Tests](./06-tests.md).
+- **Python models.** If imports need packages, install them in the workflow
+  before the Action (or before `oneil test`).
+- **Other CI systems.** Install a release binary (or build from source), then
+  run `oneil test --recursive …` and rely on the exit code; use
+  `--format json` if you want to parse results yourself.
