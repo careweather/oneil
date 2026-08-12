@@ -2,8 +2,7 @@
 
 Once your models declare [`test:`](./06-tests.md) checks, you can run them in
 CI the same way you run them locally. This appendix shows how to wire Oneil
-into a GitHub Actions workflow for a **model repository** (a repo that
-contains `.on` / `.one` files, not the Oneil language repo itself).
+into a GitHub Actions workflow for a model repository.
 
 ## What to run
 

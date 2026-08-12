@@ -1,6 +1,7 @@
-# Build and publish release artifacts for Linux, Windows, and macOS.
-# Trigger: push a version tag matching `v*` (e.g. `v1.0.0`).
-# Uploads platform archives to the GitHub Release for that tag.
+# Build and publish release artifacts when a version tag is pushed (e.g. `v1.0.0`).
+#
+# Primary artifact: the Rust `oneil` CLI for Linux, Windows, and macOS.
+# Deprecated: optional Python wheels (`import oneil`) for compatibility.
 
 name: Release
 
@@ -13,8 +14,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build (${{ matrix.triple }})
+  # --- Primary: Rust CLI -------------------------------------------------
+  build-cli:
+    name: CLI (${{ matrix.triple }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -44,9 +46,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # PyO3 links against the system Python even for the CLI binary (default
-      # features include `python-lib`). Ensure headers/libs are present.
-      - name: Set up Python
+      # The CLI still links PyO3 so models can call Python functions. Headers
+      # are only a build-time dependency; the published artifact is the Rust
+      # binary, not a Python package.
+      - name: Set up Python (build-time for PyO3)
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -58,10 +61,11 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-release-${{ matrix.triple }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-release-cli-${{ matrix.triple }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build release binary
-        run: cargo build --release -p oneil
+      - name: Build release CLI
+        # `rust-lib` only: ship the compiler/CLI, not the `python-lib` cdylib.
+        run: cargo build --release -p oneil --no-default-features --features rust-lib
 
       - name: Create archive (Linux/macOS)
         if: matrix.archive == 'tar.gz'
@@ -79,22 +83,50 @@ jobs:
           Copy-Item target/release/oneil.exe release/oneil.exe
           Compress-Archive -Path "release/oneil.exe" -DestinationPath "${{ matrix.asset_name }}.zip"
 
-      - name: Upload artifact
+      - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.triple }}
+          name: cli-${{ matrix.triple }}
           path: ${{ matrix.asset_name }}.${{ matrix.archive }}
+
+  # --- Deprecated: Python package wheels ---------------------------------
+  build-python-wheels:
+    name: Python wheels (deprecated)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install maturin
+        run: pip install "maturin>=1.0,<2.0"
+
+      - name: Build wheels
+        run: maturin build --release --out dist
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels
+          path: dist/*.whl
 
   release:
     name: Create release
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build-cli, build-python-wheels]
     permissions:
       contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -102,8 +134,8 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Extract changelog section for this tag
-        id: changelog
+      - name: Build release notes
+        id: notes
         env:
           TAG: ${{ github.ref_name }}
         run: |
@@ -119,18 +151,40 @@ jobs:
           header = f"## [{version}]"
           start = text.find(header)
           if start < 0:
-              out_path.write_text(
-                  f"Release {version}. See CHANGELOG.md for details.\n",
-                  encoding="utf-8",
-              )
+              changelog = f"Release {version}. See CHANGELOG.md for details.\n"
           else:
               rest = text[start + len(header) :]
               nl = rest.find("\n")
               body = rest[nl + 1 :] if nl >= 0 else rest
               end = body.find("\n## [")
               section = body if end < 0 else body[:end]
-              out_path.write_text(section.strip() + "\n", encoding="utf-8")
-          print(f"Wrote release notes for {version} ({out_path.stat().st_size} bytes)")7          PY
+              changelog = section.strip() + "\n"
+
+          notes = f"""{changelog}
+          ## CLI binaries
+
+          Download the archive for your platform and put `oneil` on your `PATH`:
+
+          - `oneil-v{version}-x86_64-unknown-linux-gnu.tar.gz`
+          - `oneil-v{version}-x86_64-pc-windows-msvc.zip`
+          - `oneil-v{version}-aarch64-apple-darwin.tar.gz` (Apple Silicon)
+          - `oneil-v{version}-x86_64-apple-darwin.tar.gz` (Intel macOS)
+
+          See the [installation guide](https://github.com/careweather/oneil/blob/main/docs/guide/src/02-installation.md).
+
+          ## Deprecated: Python package
+
+          Wheels for `pip install` / `import oneil` are attached for compatibility
+          only and are **deprecated**. Prefer the Rust CLI above. If you still need
+          the library, install a wheel from this release or build with maturin from
+          source (see Appendix A in the user guide).
+          """
+          # Dedent the f-string block above (leading spaces from YAML heredoc style).
+          import textwrap
+
+          out_path.write_text(textwrap.dedent(notes).strip() + "\n", encoding="utf-8")
+          print(f"Wrote release notes ({out_path.stat().st_size} bytes)")
+          PY
           echo "path=${OUT}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
@@ -139,7 +193,7 @@ jobs:
           draft: false
           prerelease: false
           make_latest: true
-          body_path: ${{ steps.changelog.outputs.path }}
+          body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: true
           files: artifacts/*
         env:

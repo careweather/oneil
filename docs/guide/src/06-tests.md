@@ -93,3 +93,6 @@ Cells required for target voltage: n_req = 12
 
 test: config == 'series' and n_cells == n_req
 ```
+
+To run these checks automatically in a model repository's CI, see
+[Appendix C: Continuous Integration](./c-ci-setup.md).

@@ -105,7 +105,7 @@ build.
 2. Build and install the `oneil` binary (requires Rust):
 
    ```sh
-   cargo install --path src-rs/oneil
+   cargo install --path src-rs/oneil --no-default-features --features rust-lib
    ```
 
    This places the `oneil` executable in `~/.cargo/bin` (or
@@ -148,11 +148,14 @@ cargo run -p oneil -- path/to/model.on
 
 - **VS Code / Cursor**: Install the [Oneil extension](https://marketplace.visualstudio.com/items?itemName=careweather.oneil) from the Marketplace for LSP and syntax highlighting.
 
-## Install Oneil Python library
+## Deprecated: Install Oneil Python library
 
-To install the `oneil` package into your current Python environment from a
-checkout of the repository, run `pip install .` from the **project root** (the
-directory that contains `pyproject.toml`):
+> **Deprecated.** The supported way to use Oneil is the Rust CLI (Option 1).
+> The `import oneil` Python package remains available for compatibility but is
+> not the primary deliverable. Prefer calling `oneil` from the shell or from
+> your own scripts.
+
+Release tags may still attach platform wheels. To install from a checkout:
 
 ```sh
 git clone https://github.com/careweather/oneil.git
@@ -160,12 +163,14 @@ cd oneil
 pip install .
 ```
 
-After installation you can `import oneil` in Python.
+After installation you can `import oneil` in Python. See
+[Appendix A: Python API](./a-python-api.md).
 
 > [!NOTE]
-> `pip install .` alone does not install the CLI. Use **Option 2**
-> (`./install.sh`) or **Option 3** (`cargo install --path src-rs/oneil`) if you
-> want both the CLI and the library.
+> `pip install .` alone does not install the CLI. Use **Option 1** (release
+> binary), **Option 2** (`./install.sh`), or **Option 3**
+> (`cargo install --path src-rs/oneil --no-default-features --features rust-lib`)
+> for the compiler.
 
 ## Uninstalling Oneil
 

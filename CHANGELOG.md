@@ -18,9 +18,10 @@ Oneil.
 
 ### Added
 
-- **ci**: Release workflow publishes CLI binaries for Linux, Windows, and macOS
-  (including Intel and Apple Silicon) when a `v*` tag is pushed; release notes
-  are taken from `CHANGELOG.md`.
+- **ci**: Release workflow publishes Rust CLI binaries for Linux, Windows, and
+  macOS when a `v*` tag is pushed; optional Python wheels are attached as a
+  **deprecated** compatibility artifact. Release notes are taken from
+  `CHANGELOG.md`.
 - **docs**: Installation guide documents downloading pre-built release binaries.
 - **ci**: Added `actions/model-test-report`, a TypeScript GitHub Action for
   downstream model repos: installs a pinned `oneil` ref, runs `oneil test
@@ -39,9 +40,10 @@ Oneil.
 
 ### Changed
 
-- **Breaking:** Oneil on `main` is now the Rust implementation (CLI, Python
-  bindings via maturin/PyO3, LSP, and VS Code extension). The previous pure-
-  Python codebase is no longer shipped from this branch.
+- **Breaking:** Oneil on `main` is now the Rust implementation (CLI, LSP, and
+  VS Code extension). The previous pure-Python codebase is no longer shipped
+  from this branch. The `import oneil` Python package remains available but is
+  **deprecated**; prefer the CLI.
 - **cli**: `oneil test` now exits with status 1 if there were any error
   diagnostics or any test failed
 

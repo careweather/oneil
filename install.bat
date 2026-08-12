@@ -100,16 +100,12 @@ if errorlevel 1 (
 
 :do_cargo_install
 echo Installing Oneil CLI with Cargo...
-if "%NO_PYTHON%"=="1" (
-  cargo install --force --path "%ONEIL_PKG%" --no-default-features --features rust-lib
-) else (
-  cargo install --force --path "%ONEIL_PKG%"
-)
+cargo install --force --path "%ONEIL_PKG%" --no-default-features --features rust-lib
 if errorlevel 1 exit /b 1
 
 if "%NO_PYTHON%"=="1" goto finish
 
-echo Installing Oneil Python package...
+echo Installing Oneil Python package (deprecated)...
 pushd "%SCRIPT_DIR%"
 if "%EDITABLE%"=="1" (
   %PYTHON_CMD% -m pip install -e .

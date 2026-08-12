@@ -123,14 +123,10 @@ EOF
 fi
 
 echo "Installing Oneil CLI with Cargo..."
-if [[ "$NO_PYTHON" == true ]]; then
-	cargo install --force --path "$ONEIL_PKG" --no-default-features --features rust-lib
-else
-	cargo install --force --path "$ONEIL_PKG"
-fi
+cargo install --force --path "$ONEIL_PKG" --no-default-features --features rust-lib
 
 if [[ "$NO_PYTHON" == false ]]; then
-	echo "Installing Oneil Python package..."
+	echo "Installing Oneil Python package (deprecated)..."
 	cd "$SCRIPT_DIR"
 	if [[ "$EDITABLE" == true ]]; then
 		"$PYTHON_CMD" -m pip install -e .
