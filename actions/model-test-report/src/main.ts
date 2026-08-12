@@ -1,10 +1,11 @@
 /**
- * Entrypoint for the `model-test-report` action: installs a pinned `oneil`
- * ref, runs `oneil test --format json` against one or two checkouts, and
- * (when both are given) diffs base vs. head for regressions/fixes.
+ * Entrypoint for the `model-test-report` action: expects `oneil` already on
+ * `PATH` (the composite `action.yml` installs it via `install-oneil`), runs
+ * `oneil test --format json` against one or two checkouts, and (when both are
+ * given) diffs base vs. head for regressions/fixes.
  *
- * Toolchain setup (Rust, Python) and checking out the two refs are the
- * calling workflow's job — see `README.md` for a full example.
+ * Checking out the model repo(s) and optional Python setup are the calling
+ * workflow's job — see `README.md` for a full example.
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -13,7 +14,7 @@ import path from "node:path";
 import * as core from "@actions/core";
 
 import { compareTestReports } from "./compare.js";
-import { installOneil, runAllModels } from "./oneil.js";
+import { ensureOneilAvailable, runAllModels } from "./oneil.js";
 import { renderMarkdownReport } from "./report.js";
 
 function splitList(value: string): string[] {
@@ -24,7 +25,6 @@ function splitList(value: string): string[] {
 }
 
 async function run(): Promise<void> {
-  const oneilRef = core.getInput("oneil-ref", { required: true });
   const headDir = core.getInput("head-dir") || ".";
   const baseDir = core.getInput("base-dir") || null;
   const modelDir = core.getInput("model-dir") || "model";
@@ -36,7 +36,7 @@ async function run(): Promise<void> {
   const headLabel = core.getInput("head-label") || "head";
   const baseLabel = core.getInput("base-label") || (baseDir === null ? null : "base");
 
-  await installOneil(oneilRef, path.join(process.cwd(), ".oneil-src"));
+  await ensureOneilAvailable();
 
   const discoverOptions = { modelDir, models, skip: skipModels };
 

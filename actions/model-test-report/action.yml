@@ -7,8 +7,16 @@ branding:
 
 inputs:
   oneil-ref:
-    description: "Git ref (tag/branch/sha) of careweather/oneil to install and test with."
+    description: >-
+      Oneil release tag to install and test with (e.g. v1.0.0). Must match a
+      published GitHub Release; installed via the sibling install-oneil Action.
     required: true
+  github-token:
+    description: >-
+      Optional token for downloading release assets (raises API rate limits).
+      Defaults to the job token.
+    required: false
+    default: ${{ github.token }}
   head-dir:
     description: "Directory containing the head checkout to test."
     required: false
@@ -53,11 +61,37 @@ inputs:
 outputs:
   has-problems:
     description: '"true" if there are regressions, new failures, new diagnostics, or (with no base-dir) any head failure.'
+    value: ${{ steps.report.outputs.has-problems }}
   report:
     description: "The rendered Markdown report, e.g. for posting as a PR comment."
+    value: ${{ steps.report.outputs.report }}
   report-path:
     description: "Echoes the report-path input, for convenience in later steps (e.g. actions/upload-artifact)."
+    value: ${{ steps.report.outputs.report-path }}
 
 runs:
-  using: "node24"
-  main: "dist/index.cjs"
+  using: composite
+  steps:
+    - name: Install Oneil CLI
+      uses: ../install-oneil
+      with:
+        version: ${{ inputs.oneil-ref }}
+        github-token: ${{ inputs.github-token }}
+
+    - name: Run model test report
+      id: report
+      shell: bash
+      env:
+        # @actions/core getInput("oneil-ref") reads INPUT_ONEIL-REF (spaces→_, case↑).
+        INPUT_ONEIL-REF: ${{ inputs.oneil-ref }}
+        INPUT_HEAD-DIR: ${{ inputs.head-dir }}
+        INPUT_BASE-DIR: ${{ inputs.base-dir }}
+        INPUT_MODEL-DIR: ${{ inputs.model-dir }}
+        INPUT_MODELS: ${{ inputs.models }}
+        INPUT_SKIP-MODELS: ${{ inputs.skip-models }}
+        INPUT_TIMEOUT-SECONDS: ${{ inputs.timeout-seconds }}
+        INPUT_REPORT-PATH: ${{ inputs.report-path }}
+        INPUT_FAIL-ON-PROBLEMS: ${{ inputs.fail-on-problems }}
+        INPUT_HEAD-LABEL: ${{ inputs.head-label }}
+        INPUT_BASE-LABEL: ${{ inputs.base-label }}
+      run: node "${GITHUB_ACTION_PATH}/dist/index.cjs"

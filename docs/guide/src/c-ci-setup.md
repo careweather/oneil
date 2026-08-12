@@ -11,10 +11,12 @@ Pin Action refs and Oneil versions to the same release tag (for example
 
 Use
 [`careweather/oneil/actions/model-test-report`](https://github.com/careweather/oneil/tree/main/actions/model-test-report)
-as the default CI integration. It installs a pinned Oneil, runs
-`oneil test --format json` on discovered models, writes a Markdown report to
-the job summary, and can **diff a PR head against its base** so the report
-highlights regressions and fixes rather than only a raw pass/fail count.
+as the default CI integration. It installs a released Oneil CLI (via
+[`install-oneil`](https://github.com/careweather/oneil/tree/main/actions/install-oneil)),
+runs `oneil test --format json` on discovered models, writes a Markdown
+report to the job summary, and can **diff a PR head against its base** so the
+report highlights regressions and fixes rather than only a raw pass/fail
+count. No Rust toolchain is required.
 
 ### Single checkout (push / PR)
 
@@ -28,7 +30,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
       # Only needed if models import Python functions:
       - uses: actions/setup-python@v5
         with:
@@ -39,10 +40,6 @@ jobs:
           oneil-ref: v1.0.0
           model-dir: model
 ```
-
-The Action builds Oneil from `oneil-ref`, so the calling workflow must install
-Rust first. It does not install Python itself — add `setup-python` only when
-models call into Python.
 
 ### Compare a PR against its base
 
@@ -57,7 +54,6 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -98,7 +94,7 @@ had failing tests). Outputs include `has-problems`, `report` (Markdown), and
 
 | Input | Purpose |
 |-------|---------|
-| `oneil-ref` | Tag / branch / SHA of Oneil to install (required) |
+| `oneil-ref` | Release tag to install (required), e.g. `v1.0.0` |
 | `model-dir` | Directory of `.on` / `.one` files (default `model`) |
 | `models` | Explicit comma-separated file list (skips auto-discovery) |
 | `skip-models` | Files to exclude from auto-discovery |
@@ -118,9 +114,8 @@ Full reference:
 
 When you need `oneil` on `PATH` for custom steps (or a minimal workflow of your
 own), use
-[`careweather/oneil/actions/install-oneil`](https://github.com/careweather/oneil/tree/main/actions/install-oneil).
-It downloads the pre-built CLI from a GitHub Release for the runner’s OS and
-architecture — no Rust toolchain required.
+[`careweather/oneil/actions/install-oneil`](https://github.com/careweather/oneil/tree/main/actions/install-oneil)
+directly. `model-test-report` already uses it internally.
 
 ```yaml
 name: Oneil model tests

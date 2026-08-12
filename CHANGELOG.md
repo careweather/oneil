@@ -25,10 +25,10 @@ Oneil.
 - **docs**: Installation guide documents downloading pre-built release binaries.
 - **ci**: Added `actions/install-oneil`, a composite GitHub Action that installs
   a released Oneil CLI binary onto `PATH`.
-- **ci**: Added `actions/model-test-report`, a TypeScript GitHub Action for
-  downstream model repos: installs a pinned `oneil` ref, runs `oneil test
-  --format json`, and — when given both a head and base checkout — reports
-  regressions and fixes rather than just a pass/fail count. See
+- **ci**: Added `actions/model-test-report`, a GitHub Action for downstream
+  model repos: installs a released CLI via `install-oneil`, runs
+  `oneil test --format json`, and — when given both a head and base checkout —
+  reports regressions and fixes rather than just a pass/fail count. See
   `actions/model-test-report/README.md`.
 - **ci**: TypeScript bindings for JSON wire formats (`TestReport`,
   `RenderedTree`, shared leaves) are generated with `ts-rs` into

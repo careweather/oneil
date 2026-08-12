@@ -1,13 +1,12 @@
 /**
- * Installing `oneil` and running `oneil test --format json` against a
- * directory of model files, aggregated into one {@link TestReport}-shaped
- * result per checkout (head or base).
+ * Running `oneil test --format json` against a directory of model files,
+ * aggregated into one {@link TestReport}-shaped result per checkout (head or
+ * base).
  *
- * Toolchain setup (Rust, Python) is intentionally *not* this module's job —
- * the calling workflow sets those up with `dtolnay/rust-toolchain` /
- * `actions/setup-python`, exactly as it would for any other Rust/Python CI
- * step. This module only knows how to install a specific `oneil` ref and run
- * its `test` subcommand.
+ * Installing the CLI is the composite `action.yml`'s job (via
+ * `../install-oneil`). This module only verifies `oneil` is on `PATH` and
+ * runs its `test` subcommand. Optional Python setup for models that import
+ * Python remains the calling workflow's responsibility.
  */
 
 import { readdir, readFile } from "node:fs/promises";
@@ -18,37 +17,15 @@ import * as core from "@actions/core";
 import { parseTestReport, type ReportDiagnostic, type TestReport } from "./schema.js";
 import { run } from "./process.js";
 
-export const ONEIL_REPOSITORY = "https://github.com/careweather/oneil.git";
-
-/** Clones `oneilRef` into `cloneDir` and installs it via its own `install.sh`, unless a matching version is already on `PATH`. */
-export async function installOneil(oneilRef: string, cloneDir: string): Promise<void> {
-  const installed = await currentOneilVersion();
-  const normalizedRef = oneilRef.replace(/^v/, "");
-
-  if (installed !== null && installed.includes(normalizedRef)) {
-    core.info(`Using already-installed oneil ${installed}`);
-    return;
-  }
-
-  core.info(`Installing oneil ${oneilRef}...`);
-  const clone = await run("git", ["clone", "--depth", "1", "--branch", oneilRef, ONEIL_REPOSITORY, cloneDir], {
-    cwd: process.cwd(),
-    timeoutMs: 5 * 60 * 1000,
-  });
-  if (clone.exitCode !== 0) {
-    throw new Error(`failed to clone oneil@${oneilRef}:\n${clone.stderr}`);
-  }
-
-  const install = await run("bash", [path.join(cloneDir, "install.sh")], {
-    cwd: cloneDir,
-    timeoutMs: 15 * 60 * 1000,
-  });
-  if (install.exitCode !== 0) {
-    throw new Error(`failed to install oneil@${oneilRef}:\n${install.stdout}\n${install.stderr}`);
-  }
-
+/** Confirms `oneil` is on `PATH` after the composite install step. */
+export async function ensureOneilAvailable(): Promise<void> {
   const version = await currentOneilVersion();
-  core.info(`Installed oneil ${version ?? "(unknown version)"}`);
+  if (version === null) {
+    throw new Error(
+      "`oneil` was not found on PATH; the composite action should have installed it via install-oneil",
+    );
+  }
+  core.info(`Using oneil ${version}`);
 }
 
 async function currentOneilVersion(): Promise<string | null> {
