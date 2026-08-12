@@ -118,5 +118,40 @@ describe("compareTestReports", () => {
 
     expect(comparison.hasProblems).toBe(true);
     expect(comparison.newDiagnostics).toHaveLength(1);
+    expect(comparison.stillPresentDiagnostics).toHaveLength(0);
+  });
+
+  it("tracks a diagnostic present on both base and head as stillPresent, not a problem", () => {
+    const diagnostic = { kind: "error" as const, path: "compass.on", message: "expected parameter or test", line: 37, column: 5 };
+    const base: TestReport = {
+      ...report([{ path: "compass.on", tests: [] }]),
+      success: false,
+      diagnostics: [diagnostic],
+    };
+    const head: TestReport = {
+      ...report([{ path: "compass.on", tests: [] }]),
+      success: false,
+      diagnostics: [diagnostic],
+    };
+
+    const comparison = compareTestReports(head, base);
+
+    expect(comparison.hasProblems).toBe(false);
+    expect(comparison.newDiagnostics).toHaveLength(0);
+    expect(comparison.stillPresentDiagnostics).toHaveLength(1);
+    expect(comparison.stillPresentDiagnostics[0]?.path).toBe("compass.on");
+  });
+
+  it("lists head diagnostics as stillPresent when there's no base", () => {
+    const head: TestReport = {
+      ...report([{ path: "altimeter.on", tests: [] }]),
+      success: false,
+      diagnostics: [{ kind: "error", path: "altimeter.on", message: "parameter AntElOff is not defined", line: 40, column: 66 }],
+    };
+
+    const comparison = compareTestReports(head, null);
+
+    expect(comparison.stillPresentDiagnostics).toHaveLength(1);
+    expect(comparison.newDiagnostics).toHaveLength(0);
   });
 });

@@ -81,4 +81,24 @@ describe("renderMarkdownReport", () => {
     expect(markdown).toContain("No changes in test results.");
     expect(markdown).toContain("no base to compare against");
   });
+
+  it("lists still-present diagnostics that are unchanged from base", () => {
+    const diagnostic = {
+      kind: "error" as const,
+      path: "compass.on",
+      message: "expected parameter or test",
+      line: 37,
+      column: 5,
+    };
+    const base: TestReport = { success: false, diagnostics: [diagnostic], models: [] };
+    const head: TestReport = { success: false, diagnostics: [diagnostic], models: [] };
+
+    const comparison = compareTestReports(head, base);
+    const markdown = renderMarkdownReport(head, comparison, "pr-branch", "main");
+
+    expect(markdown).toContain("Still present diagnostics");
+    expect(markdown).toContain("compass.on:37:5");
+    expect(markdown).toContain("expected parameter or test");
+    expect(markdown).not.toContain("New diagnostics");
+  });
 });

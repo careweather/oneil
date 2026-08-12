@@ -3,7 +3,7 @@
  * key, to find regressions and fixes rather than just a raw pass/fail count.
  */
 
-import type { ReportDiagnostic, TestOutcome, TestReport } from "./schema.js";
+import type { ReportDiagnostic, TestOutcome, TestReport, TestReportEntry } from "./schema.js";
 
 export interface TestEntryRef {
   modelPath: string;
@@ -33,6 +33,14 @@ export interface Comparison {
   stillFailing: ComparisonEntry[];
   /** Diagnostics present on head that weren't present on base (by path + message). */
   newDiagnostics: ReportDiagnostic[];
+  /**
+   * Diagnostics present on both base and head (by path + message), or — in
+   * single-report mode — every head diagnostic. Models that fail to evaluate
+   * (parse/resolve errors) produce diagnostics with no test results; without
+   * this list they would vanish from the report whenever base has the same
+   * breakage.
+   */
+  stillPresentDiagnostics: ReportDiagnostic[];
   /** Whether this comparison should fail CI: any regression, new failure, or new diagnostic, or (with no base) a plain head failure. */
   hasProblems: boolean;
 }
@@ -46,7 +54,7 @@ function flattenTests(report: TestReport): Map<string, { ref: TestEntryRef; resu
   const flattened = new Map<string, { ref: TestEntryRef; result: TestOutcome }>();
 
   for (const model of report.models) {
-    model.tests.forEach((test, index) => {
+    model.tests.forEach((test: TestReportEntry, index: number) => {
       // Fall back to a positional label so tests with an unreadable
       // expression (see `TestReportEntry.expression`) still get a stable,
       // if less friendly, comparison key instead of colliding on `null`.
@@ -76,7 +84,7 @@ export function compareTestReports(head: TestReport, base: TestReport | null): C
       entries.push({ ...ref, status: result === "pass" ? "stable_pass" : "stable_fail", headResult: result, baseResult: null });
     }
 
-    return finalizeComparison(head.success, null, entries, []);
+    return finalizeComparison(head.success, null, entries, [], head.diagnostics);
   }
 
   const baseTests = flattenTests(base);
@@ -101,9 +109,14 @@ export function compareTestReports(head: TestReport, base: TestReport | null): C
   }
 
   const baseDiagnosticKeys = new Set(base.diagnostics.map(diagnosticKey));
-  const newDiagnostics = head.diagnostics.filter((diagnostic) => !baseDiagnosticKeys.has(diagnosticKey(diagnostic)));
+  const newDiagnostics = head.diagnostics.filter(
+    (diagnostic: ReportDiagnostic) => !baseDiagnosticKeys.has(diagnosticKey(diagnostic)),
+  );
+  const stillPresentDiagnostics = head.diagnostics.filter((diagnostic: ReportDiagnostic) =>
+    baseDiagnosticKeys.has(diagnosticKey(diagnostic)),
+  );
 
-  return finalizeComparison(head.success, base.success, entries, newDiagnostics);
+  return finalizeComparison(head.success, base.success, entries, newDiagnostics, stillPresentDiagnostics);
 }
 
 function transitionStatus(baseResult: TestOutcome, headResult: TestOutcome): ComparisonStatus {
@@ -117,6 +130,7 @@ function finalizeComparison(
   baseSuccess: boolean | null,
   entries: ComparisonEntry[],
   newDiagnostics: ReportDiagnostic[],
+  stillPresentDiagnostics: ReportDiagnostic[],
 ): Comparison {
   const byStatus = (status: ComparisonStatus) => entries.filter((entry) => entry.status === status);
 
@@ -127,6 +141,8 @@ function finalizeComparison(
   const removed = byStatus("removed");
   const stillFailing = byStatus("stable_fail");
 
+  // Unchanged diagnostics (like stillFailing tests) are surfaced in the
+  // report but do not fail CI on their own — only newly introduced ones do.
   const hasProblems =
     regressed.length > 0 ||
     newFailing.length > 0 ||
@@ -144,6 +160,7 @@ function finalizeComparison(
     removed,
     stillFailing,
     newDiagnostics,
+    stillPresentDiagnostics,
     hasProblems,
   };
 }

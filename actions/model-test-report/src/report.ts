@@ -1,7 +1,7 @@
 /** Renders a {@link Comparison} (see `compare.ts`) as a Markdown report. */
 
 import type { Comparison, ComparisonEntry } from "./compare.js";
-import type { FloatValue, TestReport, TestValue } from "./schema.js";
+import type { FloatValue, ReportDiagnostic, TestReport, TestValue } from "./schema.js";
 
 /** Formats a {@link FloatValue}, preserving special floats (`NaN`, `±Infinity`). */
 function formatFloat(value: FloatValue): string {
@@ -105,14 +105,10 @@ export function renderMarkdownReport(
     lines.push("");
   }
 
-  if (comparison.newDiagnostics.length > 0) {
-    lines.push(`### ⚠️ New diagnostics`, "");
-    for (const diagnostic of comparison.newDiagnostics) {
-      const location = diagnostic.line === null ? "" : `:${diagnostic.line}:${diagnostic.column ?? ""}`;
-      lines.push(`- **${diagnostic.kind}** at \`${diagnostic.path}${location}\`: ${diagnostic.message}`);
-    }
-    lines.push("");
-  }
+  lines.push(...renderDiagnosticList("⚠️ New diagnostics", comparison.newDiagnostics));
+
+  const stillPresentTitle = baseLabel === null ? "⚠️ Diagnostics" : "⚠️ Still present diagnostics (unchanged from base)";
+  lines.push(...renderDiagnosticList(stillPresentTitle, comparison.stillPresentDiagnostics));
 
   const anySectionRendered =
     comparison.regressed.length > 0 ||
@@ -121,7 +117,8 @@ export function renderMarkdownReport(
     comparison.newPassing.length > 0 ||
     comparison.stillFailing.length > 0 ||
     comparison.removed.length > 0 ||
-    comparison.newDiagnostics.length > 0;
+    comparison.newDiagnostics.length > 0 ||
+    comparison.stillPresentDiagnostics.length > 0;
 
   if (!anySectionRendered) {
     // Nothing else was rendered above; make that explicit rather than
@@ -130,4 +127,18 @@ export function renderMarkdownReport(
   }
 
   return lines.join("\n");
+}
+
+function renderDiagnosticList(title: string, diagnostics: ReportDiagnostic[]): string[] {
+  if (diagnostics.length === 0) {
+    return [];
+  }
+
+  const lines = [`### ${title}`, ""];
+  for (const diagnostic of diagnostics) {
+    const location = diagnostic.line === null ? "" : `:${diagnostic.line}:${diagnostic.column ?? ""}`;
+    lines.push(`- **${diagnostic.kind}** at \`${diagnostic.path}${location}\`: ${diagnostic.message}`);
+  }
+  lines.push("");
+  return lines;
 }
