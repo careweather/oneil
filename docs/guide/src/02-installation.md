@@ -11,7 +11,7 @@ page for:
 
 - **Linux** — `x86_64-unknown-linux-gnu`
 - **Windows** — `x86_64-pc-windows-msvc`
-- **macOS** — `aarch64-apple-darwin` (Apple Silicon) and `x86_64-apple-darwin` (Intel)
+- **macOS** — `aarch64-apple-darwin` (Apple Silicon)
 
 Pushing a version tag (for example `v1.0.0`) runs the Release workflow, which
 builds these archives and attaches them to the GitHub Release for that tag.
@@ -36,8 +36,7 @@ for full model-repo CI) — see [Appendix C](./c-ci-setup.md).
    # ensure ~/.local/bin is in your PATH
    ```
 
-   On Apple Silicon macOS, use the `aarch64-apple-darwin` archive; on Intel
-   macOS, use `x86_64-apple-darwin`.
+   On Apple Silicon macOS, use the `aarch64-apple-darwin` archive.
 
 4. Confirm:
 

@@ -73,7 +73,9 @@ runs:
   using: composite
   steps:
     - name: Install Oneil CLI
-      uses: ../install-oneil
+      # Must be org/repo/path@ref — relative paths like ../install-oneil fail when
+      # this Action is consumed from another repository.
+      uses: careweather/oneil/actions/install-oneil@${{ github.action_ref }}
       with:
         version: ${{ inputs.oneil-ref }}
         github-token: ${{ inputs.github-token }}

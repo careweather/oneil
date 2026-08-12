@@ -48,7 +48,6 @@ Pin the Action ref and `version` to the **same** release tag.
 | `ubuntu-*` (x86_64) | `oneil-<tag>-x86_64-unknown-linux-gnu.tar.gz` |
 | `windows-*` (x86_64) | `oneil-<tag>-x86_64-pc-windows-msvc.zip` |
 | `macos-*` (Apple Silicon) | `oneil-<tag>-aarch64-apple-darwin.tar.gz` |
-| `macos-*` (Intel) | `oneil-<tag>-x86_64-apple-darwin.tar.gz` |
 
 These archives are produced by the Oneil
 [Release](https://github.com/careweather/oneil/blob/main/.github/workflows/release.yml)

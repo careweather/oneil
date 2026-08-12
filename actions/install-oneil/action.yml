@@ -54,13 +54,8 @@ runs:
             archive="oneil-${ONEIL_VERSION}-${triple}.tar.gz"
             binary_name="oneil"
             ;;
-          macOS/X64)
-            triple="x86_64-apple-darwin"
-            archive="oneil-${ONEIL_VERSION}-${triple}.tar.gz"
-            binary_name="oneil"
-            ;;
           *)
-            echo "::error::Unsupported runner: ${RUNNER_OS}/${RUNNER_ARCH}"
+            echo "::error::Unsupported runner: ${RUNNER_OS}/${RUNNER_ARCH} (release binaries cover Linux x86_64, Windows x86_64, and Apple Silicon macOS)"
             exit 1
             ;;
         esac
