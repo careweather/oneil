@@ -1,13 +1,13 @@
 # Build and publish release artifacts for Linux, Windows, and macOS.
-# Runs on push of version tags (e.g. v0.15.0).
-# Uploads binaries to the GitHub Release and attaches artifacts to the workflow run.
+# Trigger: push a version tag matching `v*` (e.g. `v1.0.0`).
+# Uploads platform archives to the GitHub Release for that tag.
 
 name: Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,6 +32,10 @@ jobs:
             triple: aarch64-apple-darwin
             archive: tar.gz
             asset_name: oneil-${{ github.ref_name }}-aarch64-apple-darwin
+          - runner: macos-13
+            triple: x86_64-apple-darwin
+            archive: tar.gz
+            asset_name: oneil-${{ github.ref_name }}-x86_64-apple-darwin
 
     steps:
       - name: Checkout
@@ -39,6 +43,13 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      # PyO3 links against the system Python even for the CLI binary (default
+      # features include `python-lib`). Ensure headers/libs are present.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -82,15 +93,53 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
+      - name: Extract changelog section for this tag
+        id: changelog
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          OUT="${RUNNER_TEMP}/release-notes.md"
+          python3 - "$VERSION" "$OUT" <<'PY'
+          import pathlib
+          import sys
+
+          version, out_path = sys.argv[1], pathlib.Path(sys.argv[2])
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          header = f"## [{version}]"
+          start = text.find(header)
+          if start < 0:
+              out_path.write_text(
+                  f"Release {version}. See CHANGELOG.md for details.\n",
+                  encoding="utf-8",
+              )
+          else:
+              rest = text[start + len(header) :]
+              nl = rest.find("\n")
+              body = rest[nl + 1 :] if nl >= 0 else rest
+              end = body.find("\n## [")
+              section = body if end < 0 else body[:end]
+              out_path.write_text(section.strip() + "\n", encoding="utf-8")
+          print(f"Wrote release notes for {version} ({out_path.stat().st_size} bytes)")7          PY
+          echo "path=${OUT}" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          draft: false
+          prerelease: false
+          make_latest: true
+          body_path: ${{ steps.changelog.outputs.path }}
           generate_release_notes: true
           files: artifacts/*
         env:

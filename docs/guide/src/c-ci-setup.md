@@ -53,10 +53,24 @@ downstream model repos. See that Action’s README for consumer usage.
 
 | Workflow | When it runs | What it does |
 |----------|--------------|--------------|
-| `release.yml` | Push of a version tag (`v*`, e.g. `v1.0.0`) | Cross-builds the `oneil` CLI for Linux, Windows, and macOS and attaches archives to the GitHub Release |
+| `release.yml` | Push of a version tag (`v*`, e.g. `v1.0.0`) | Builds the `oneil` CLI for Linux (`x86_64`), Windows (`x86_64`), and macOS (`aarch64` and `x86_64`), then creates a GitHub Release with those archives and notes from `CHANGELOG.md` |
 
-Tagging is the release trigger; bump versions in `Cargo.toml` / `pyproject.toml`
-(and related packages) in the same change set as the changelog entry.
+### Cutting a release
+
+1. Bump versions (`Cargo.toml` workspace version, `pyproject.toml`, VS Code /
+   related packages as needed) and update `CHANGELOG.md` for the new version.
+2. Merge that change to the branch you release from (typically `main`).
+3. Create and push an annotated tag matching the version:
+
+   ```sh
+   git tag -a v1.0.0 -m "Oneil 1.0.0"
+   git push origin v1.0.0
+   ```
+
+4. The Release workflow builds the binaries and publishes
+   [GitHub Releases](https://github.com/careweather/oneil/releases) assets named
+   like `oneil-v1.0.0-<target>.tar.gz` / `.zip`. Users install them via
+   [Installation](./02-installation.md#option-1-download-a-release-from-github).
 
 ## Docs site
 

@@ -18,6 +18,10 @@ Oneil.
 
 ### Added
 
+- **ci**: Release workflow publishes CLI binaries for Linux, Windows, and macOS
+  (including Intel and Apple Silicon) when a `v*` tag is pushed; release notes
+  are taken from `CHANGELOG.md`.
+- **docs**: Installation guide documents downloading pre-built release binaries.
 - **ci**: Added `actions/model-test-report`, a TypeScript GitHub Action for
   downstream model repos: installs a pinned `oneil` ref, runs `oneil test
   --format json`, and — when given both a head and base checkout — reports
@@ -30,6 +34,7 @@ Oneil.
 - **cli**: `oneil test --format json` prints a machine-readable JSON report
   (diagnostics plus per-test pass/fail results, with dependency values for
   failures).
+- **docs**: User guide Appendix C documents the Continuous Integration setup.
 
 ### Changed
 

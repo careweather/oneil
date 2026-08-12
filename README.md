@@ -32,28 +32,32 @@ Oneil makes it easier than ever to build, debug, explore, and version-control mo
 
 ## Requirements
 
-Oneil has only been tested on Linux. Instructions for Oneil assume you are on Linux.
+Pre-built binaries are available for Linux, Windows, and macOS. Building from
+source has been primarily tested on Linux.
 
 ## Quickstart
 
-To run the Rust version of Oneil locally:
+Download a pre-built CLI from the
+[latest GitHub Release](https://github.com/careweather/oneil/releases/latest),
+or build from source:
 
 1. [Install Rust and Cargo](https://www.rust-lang.org/tools/install) if you haven't already.
 
-2. Clone the repository and navigate to the Rust project directory:
+2. Clone the repository:
 
    ```sh
-   git clone git@github.com/careweather/oneil.git
+   git clone git@github.com:careweather/oneil.git
    cd oneil
    ```
 
-3. Build and run the project:
+3. Build and run:
 
    ```sh
    cargo run -- path/to/your/model.on
    ```
 
-See [Installation](docs/installation.md) for installing the `oneil` binary from a release or from source.
+See [Installation](docs/guide/src/02-installation.md) for downloading a release
+binary or installing from source (including the Python package).
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details on how to work on Oneil code.
 
