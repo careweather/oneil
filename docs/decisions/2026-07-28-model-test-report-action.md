@@ -32,7 +32,7 @@ in this repo**, consumed as `careweather/oneil/actions/model-test-report@<ref>`.
   a given `oneil-ref` input are inherently compatible — no separate release
   process to keep in sync.
 - **Standard JS-action packaging.** TypeScript source in `src/`, bundled by
-  `esbuild` into a committed `dist/index.cjs` (`runs: using: node20, main:
+  `esbuild` into a committed `dist/index.cjs` (`runs: using: node24, main:
   dist/index.cjs`) — the same approach used by `actions/checkout` and most
   marketplace actions, and already familiar from `vscode/esbuild.mjs`. `.cjs`
   (not `.js`) because the package is `"type": "module"` for the TypeScript

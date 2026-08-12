@@ -141,7 +141,7 @@ npm run build   # writes dist/index.cjs, which must be committed
 ```
 
 `dist/index.cjs` is a committed build artifact (the standard packaging for a
-`runs: using: node20` action) — run `npm run check-dist` (or the CI workflow)
+`runs: using: node24` action) — run `npm run check-dist` (or the CI workflow)
 to verify it's up to date with `src/`.
 
 ### Regenerating TypeScript bindings

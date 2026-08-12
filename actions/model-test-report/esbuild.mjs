@@ -1,6 +1,6 @@
 /**
  * Bundles the action into a single CommonJS file (`dist/index.js`), the
- * standard packaging for a `runs: using: node20` GitHub Action so consumers
+ * standard packaging for a `runs: using: node24` GitHub Action so consumers
  * don't need to run `npm install` themselves.
  *
  * Mirrors `vscode/esbuild.mjs`'s structure.
@@ -19,7 +19,7 @@ await esbuild.build({
   // so this runs correctly regardless of the nearest package.json's `type`.
   outfile: "dist/index.cjs",
   platform: "node",
-  target: "node20",
+  target: "node24",
   format: "cjs",
   sourcemap: !production,
   minify: production,
