@@ -23,6 +23,8 @@ Oneil.
   **deprecated** compatibility artifact. Release notes are taken from
   `CHANGELOG.md`.
 - **docs**: Installation guide documents downloading pre-built release binaries.
+- **ci**: Added `actions/install-oneil`, a composite GitHub Action that installs
+  a released Oneil CLI binary onto `PATH`.
 - **ci**: Added `actions/model-test-report`, a TypeScript GitHub Action for
   downstream model repos: installs a pinned `oneil` ref, runs `oneil test
   --format json`, and — when given both a head and base checkout — reports
@@ -35,8 +37,8 @@ Oneil.
 - **cli**: `oneil test --format json` prints a machine-readable JSON report
   (diagnostics plus per-test pass/fail results, with dependency values for
   failures).
-- **docs**: User guide Appendix C shows how to run Oneil model tests in CI
-  (including the `model-test-report` GitHub Action).
+- **docs**: User guide Appendix C shows how to run Oneil model tests in CI,
+  leading with `model-test-report` and covering `install-oneil`.
 
 ### Changed
 
