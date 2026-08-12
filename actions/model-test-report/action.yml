@@ -73,13 +73,15 @@ runs:
   using: composite
   steps:
     - name: Install Oneil CLI
-      # Nested uses must be org/repo/path@ref (relative ../install-oneil fails
-      # cross-repo). github.* is unavailable here; inputs.oneil-ref is.
-      # Pin the Action tag and oneil-ref to the same release.
-      uses: careweather/oneil/actions/install-oneil@${{ inputs.oneil-ref }}
-      with:
-        version: ${{ inputs.oneil-ref }}
-        github-token: ${{ inputs.github-token }}
+      # Nested `uses:` cannot take dynamic refs in composite Actions, and
+      # relative `../install-oneil` is resolved against the *caller* repo.
+      # The whole oneil checkout is on disk next to this Action, so run the
+      # shared install script from the sibling directory instead.
+      shell: bash
+      env:
+        ONEIL_VERSION: ${{ inputs.oneil-ref }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: bash "${GITHUB_ACTION_PATH}/../install-oneil/install.sh"
 
     - name: Run model test report
       id: report
