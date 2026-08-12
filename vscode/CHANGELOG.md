@@ -8,6 +8,10 @@
 
 ## Unreleased
 
+## v1.0.0 - 2026-08-12
+
+- Align extension version with Oneil 1.0.0 (Rust implementation on `main`)
+
 ## v0.3.0 - 2026-06-29
 
 - Syntax highlighting update

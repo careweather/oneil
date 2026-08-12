@@ -1,7 +1,7 @@
 {
   "name": "oneil-ts-interfaces",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Generated TypeScript types for Oneil JSON wire formats (test report + LSP rendered view)",
   "type": "module",
   "exports": {
