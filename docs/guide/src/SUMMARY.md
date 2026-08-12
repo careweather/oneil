@@ -14,3 +14,4 @@
 
 [Appendix A: Python API](./a-python-api.md)
 [Appendix B: Using AI](./b-using-ai.md)
+[Appendix C: Continuous Integration](./c-ci-setup.md)
