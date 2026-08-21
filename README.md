@@ -57,8 +57,9 @@ or build from source:
    ```
 
 See [Installation](docs/guide/src/02-installation.md) for downloading a release
-binary or installing from source. The Python library (`import oneil`) is
-documented in [Appendix A](docs/guide/src/a-python-api.md).
+binary, installing with Nix (`nix run github:careweather/oneil`), or building
+from source. The Python library (`import oneil`) is documented in
+[Appendix A](docs/guide/src/a-python-api.md).
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more details on how to work on Oneil code.
 

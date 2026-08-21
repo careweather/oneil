@@ -14,7 +14,7 @@ The CLI does not ship Python. Each archive is linked against a specific **Python
 
 - **homebrew** — `brew install python@3.12` (macOS)
 - **system** — python.org 3.12 on macOS, distro `libpython3.12` on Linux, or Python 3.12 on `PATH` on Windows
-- **uv** — `uv python install 3.12`. The extension sets the library search path when it launches the CLI. For a `PATH` install, prefer Homebrew/system or [build from source](#option-2-install-from-source-using-the-install-script) so the binary is linked to *your* uv prefix.
+- **uv** — `uv python install 3.12`. The extension sets the library search path when it launches the CLI. For a `PATH` install, prefer Homebrew/system or [build from source](#option-3-install-from-source-using-the-install-script) so the binary is linked to *your* uv prefix.
 
 Pushing a version tag (for example `v1.0.0`) runs the Release workflow, which builds these archives and attaches them to the GitHub Release for that tag. In GitHub Actions, prefer [`careweather/oneil/actions/install-oneil`](https://github.com/careweather/oneil/tree/main/actions/install-oneil) (or [`model-test-report`](https://github.com/careweather/oneil/tree/main/actions/model-test-report) for full model-repo CI) — see [Appendix C](./c-ci-setup.md).
 
@@ -59,6 +59,37 @@ To pick the archive yourself:
    oneil --version
    ```
 
+## Option 2: Nix
+
+If you use [Nix](https://nixos.org/download/) with flakes enabled, you can run or install Oneil without a separate Rust or Python setup. The flake links against CPython 3.12 from nixpkgs and includes it at runtime.
+
+Run without installing:
+
+```sh
+nix run github:careweather/oneil -- --help
+nix run github:careweather/oneil -- path/to/model.on
+```
+
+Install into your profile:
+
+```sh
+nix profile install github:careweather/oneil
+oneil --version
+```
+
+From a local checkout, `nix build` and `nix run` use the same package (`packages.oneil`). For NixOS or home-manager, apply the flake overlay and add `pkgs.oneil`:
+
+```nix
+{
+  inputs.oneil.url = "github:careweather/oneil";
+
+  # NixOS: overlays go on nixpkgs, then e.g. environment.systemPackages = [ pkgs.oneil ];
+  # home-manager: nixpkgs.overlays = [ inputs.oneil.overlays.default ];
+}
+```
+
+The first build compiles from source. Contributors can use `nix develop` in the repository for the Rust toolchain, Python 3.12, and VS Code extension tools.
+
 ## Prerequisites for building from source
 
 The options below build Oneil yourself. You will need:
@@ -75,7 +106,7 @@ The options below build Oneil yourself. You will need:
 
   Helper `.py` files can `import oneil` because the CLI includes the [Python library](./a-python-api.md).
 
-## Option 2: Install from source using the install script
+## Option 3: Install from source using the install script
 
 From the repository root, the install script builds the **Rust CLI** with default features (so models can [`import`](./11-importing-python.md) `.py` files and those files can `import oneil`).
 
@@ -89,7 +120,7 @@ On Windows, use `install.bat`.
 
 You need **Python 3.12** (`uv python install 3.12` or `brew install python@3.12`). The script prefers `uv python find 3.12`, then Homebrew `python@3.12`.
 
-## Option 3: Install from source with Cargo
+## Option 4: Install from source with Cargo
 
 Use this if you want the latest development version or need to customize the build.
 
@@ -116,7 +147,7 @@ Use this if you want the latest development version or need to customize the bui
    oneil --version
    ```
 
-## Option 4: Run from the repository (development)
+## Option 5: Run from the repository (development)
 
 For day-to-day development without installing:
 
@@ -132,6 +163,7 @@ cargo run -p oneil -- path/to/model.on
 ## Updating
 
 - **Release binary**: download the newer archive from [Releases](https://github.com/careweather/oneil/releases) and replace the previous `oneil` binary on your `PATH`.
+- **Nix profile**: `nix profile upgrade oneil` (or re-run `nix profile install github:careweather/oneil`).
 - **From source**: pull the latest code (or check out the new tag), then re-run `./install.sh` or `cargo install --path src/oneil`.
 
 ## Editor and tooling (optional)
@@ -144,6 +176,8 @@ cargo run -p oneil -- path/to/model.on
 ## Uninstalling Oneil
 
 If Oneil was installed as a release binary, delete the release binary.
+
+If Oneil was installed with Nix, run `nix profile remove oneil` (or remove `pkgs.oneil` from your NixOS / home-manager configuration).
 
 If Oneil was installed from source, run `cargo uninstall oneil`.
 
