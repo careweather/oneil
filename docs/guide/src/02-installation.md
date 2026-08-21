@@ -82,6 +82,23 @@ To install it, add the flake overlay and `pkgs.oneil` to your NixOS or home-mana
 }
 ```
 
+The overlay also provides the VS Code / Cursor extension as
+`pkgs.vscode-extensions.careweather.oneil`. That package defaults
+`oneil.serverPath` to the flake-built CLI, so the editor uses the same
+CPython-linked binary as `pkgs.oneil` instead of downloading a GitHub
+Release. Example with home-manager:
+
+```nix
+{
+  # nixpkgs.overlays = [ inputs.oneil.overlays.default ];
+  # programs.vscode.profiles.default.extensions = [
+  #   pkgs.vscode-extensions.careweather.oneil
+  # ];
+}
+```
+
+You can also build the extension with `nix build github:careweather/oneil#oneil-vscode`.
+
 The first evaluation compiles from source. Contributors can use `nix develop` in the repository for the Rust toolchain, Python 3.12, and VS Code extension tools.
 
 ## Prerequisites for building from source
@@ -163,7 +180,7 @@ cargo run -p oneil -- path/to/model.on
 ## Editor and tooling (optional)
 
 
-- **VS Code / Cursor**: Install the [Oneil extension](https://marketplace.visualstudio.com/items?itemName=careweather.oneil) from the Marketplace for LSP and syntax highlighting. The extension can download the Oneil CLI from [GitHub Releases](https://github.com/careweather/oneil/releases) (Command Palette: “Oneil: Install or Update CLI”, or “Oneil: Select CLI Version…” to install a different published tag). It picks the Homebrew, system, or uv archive that matches the Python 3.12 on the machine. Set `oneil.serverPath` only when you want to force a local build; that setting disables managed updates.
+- **VS Code / Cursor**: Install the [Oneil extension](https://marketplace.visualstudio.com/items?itemName=careweather.oneil) from the Marketplace for LSP and syntax highlighting, or install `pkgs.vscode-extensions.careweather.oneil` from this flake (see [Option 2: Nix](#option-2-nix)). The Marketplace extension can download the Oneil CLI from [GitHub Releases](https://github.com/careweather/oneil/releases) (Command Palette: “Oneil: Install or Update CLI”, or “Oneil: Select CLI Version…” to install a different published tag). It picks the Homebrew, system, or uv archive that matches the Python 3.12 on the machine. Set `oneil.serverPath` only when you want to force a local build; that setting disables managed updates. The Nix package already sets `oneil.serverPath` to the flake-built CLI.
 
 - **Vim**: See the [Vim support](https://github.com/careweather/oneil#vim-support) section in the main README for syntax highlighting.
 

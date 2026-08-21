@@ -14,8 +14,13 @@
       "aarch64-darwin"
     ];
 
-    flake.overlays.default = final: _prev: {
+    flake.overlays.default = final: prev: {
       oneil = inputs.self.packages.${final.stdenv.hostPlatform.system}.oneil;
+      vscode-extensions = prev.vscode-extensions // {
+        careweather = (prev.vscode-extensions.careweather or { }) // {
+          oneil = inputs.self.packages.${final.stdenv.hostPlatform.system}.oneil-vscode;
+        };
+      };
     };
 
     perSystem = { pkgs, self', ... }:
@@ -67,6 +72,9 @@
             platforms = pkgs.lib.platforms.unix;
             mainProgram = "oneil";
           };
+        };
+        packages.oneil-vscode = pkgs.callPackage ./nix/vscode-extension.nix {
+          inherit (self'.packages) oneil;
         };
         packages.default = self'.packages.oneil;
       };
