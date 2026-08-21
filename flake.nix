@@ -33,6 +33,21 @@
         src = ./.;
         nativeBuildInputs = [ pkgs.python3 ]; # used by PyO3
         cargoLock.lockFile = ./Cargo.lock;
+
+        meta = {
+          description = "Design specification language for rapid, comprehensive system modeling";
+          longDescription = ''
+            Oneil is a design specification language for modeling systems as
+            collections of parameters. Models can evaluate corresponding
+            designs (value assignments), with built-in unit handling, tests,
+            and a command-line interface for tracing calculations.
+          '';
+          homepage = "https://github.com/careweather/oneil";
+          changelog = "https://github.com/careweather/oneil/releases";
+          license = pkgs.lib.licenses.mpl20;
+          platforms = [ "x86_64-linux" "aarch64-linux" ];
+          mainProgram = "oneil";
+        };
       };
     };
   };
