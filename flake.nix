@@ -7,7 +7,12 @@
   };
 
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } {
-    systems = [ "x86_64-linux" "aarch64-linux" ];
+    systems = [
+      "x86_64-linux"
+      "aarch64-linux"
+      "x86_64-darwin"
+      "aarch64-darwin"
+    ];
 
     perSystem = { pkgs, system, ... }: {
       devShells.default = pkgs.mkShell {
@@ -45,7 +50,7 @@
           homepage = "https://github.com/careweather/oneil";
           changelog = "https://github.com/careweather/oneil/releases";
           license = pkgs.lib.licenses.mpl20;
-          platforms = [ "x86_64-linux" "aarch64-linux" ];
+          platforms = pkgs.lib.platforms.unix;
           mainProgram = "oneil";
         };
       };
