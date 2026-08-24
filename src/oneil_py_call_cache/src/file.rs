@@ -31,10 +31,6 @@ pub enum FileCache {
 
 impl FileCache {
     /// Creates a new empty file cache.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `CARGO_PKG_VERSION` is not a valid semver string.
     #[must_use]
     pub const fn new(
         module_path: PythonPath,
@@ -177,5 +173,217 @@ impl From<u64> for ImportHash {
 impl From<ImportHash> for u64 {
     fn from(hash: ImportHash) -> Self {
         hash.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use oneil_output::{Number, Value};
+    use oneil_shared::{
+        paths::{ModelPath, PythonPath},
+        symbols::PyFunctionName,
+    };
+    use serde_json::json;
+
+    use super::{FileCache, ImportHash};
+    use crate::{FunctionCall, FunctionCallResult, ReadCacheError};
+
+    static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    /// Creates a unique temporary directory for cache file I/O tests.
+    fn unique_temp_dir() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "oneil_py_call_cache_{}_{}",
+            std::process::id(),
+            TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    /// Removes `dir` after a test, ignoring cleanup failures.
+    fn remove_temp_dir(dir: &Path) {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Builds a cache with one successful call for serde and I/O tests.
+    fn sample_file_cache() -> FileCache {
+        let mut cache = FileCache::new(
+            PythonPath::from_str_no_ext("module"),
+            ImportHash::from(1),
+            BTreeSet::from([PathBuf::from("dep.py")]),
+        );
+        cache.function_calls_mut().insert(
+            PyFunctionName::from("f"),
+            vec![FunctionCall {
+                root_models: BTreeSet::from([ModelPath::from_str_no_ext("model")]),
+                inputs: vec![Value::Number(Number::Scalar(1.0))],
+                output: FunctionCallResult::Success(Value::Number(Number::Scalar(2.0))),
+            }],
+        );
+        cache
+    }
+
+    #[test]
+    fn import_hash_display_is_16_lowercase_hex_digits() {
+        let hash = ImportHash::from(0xAB);
+
+        let displayed = hash.to_string();
+
+        assert_eq!(displayed, "00000000000000ab");
+    }
+
+    #[test]
+    fn import_hash_serializes_as_16_lowercase_hex_digits() {
+        let hash = ImportHash::from(1);
+
+        let json = serde_json::to_value(hash).expect("serialize");
+
+        assert_eq!(json, json!("0000000000000001"));
+    }
+
+    #[test]
+    fn import_hash_deserializes_short_hex() {
+        let json = json!("1");
+
+        let hash: ImportHash = serde_json::from_value(json).expect("deserialize");
+
+        assert_eq!(hash, 1_u64);
+    }
+
+    #[test]
+    fn import_hash_deserializes_uppercase_hex() {
+        let json = json!("AB");
+
+        let hash: ImportHash = serde_json::from_value(json).expect("deserialize");
+
+        assert_eq!(u64::from(hash), 0xAB);
+    }
+
+    #[test]
+    fn import_hash_rejects_empty_hex_string() {
+        let json = json!("");
+
+        let error = serde_json::from_value::<ImportHash>(json).expect_err("empty hex");
+
+        assert!(error.to_string().contains("empty hexadecimal string"));
+    }
+
+    #[test]
+    fn import_hash_rejects_non_hex_string() {
+        let json = json!("zz");
+
+        serde_json::from_value::<ImportHash>(json).expect_err("non-hex");
+    }
+
+    #[test]
+    fn import_hash_rejects_hex_that_overflows_u64() {
+        let json = json!("10000000000000000");
+
+        serde_json::from_value::<ImportHash>(json).expect_err("overflow");
+    }
+
+    #[test]
+    fn import_hash_round_trips_through_json() {
+        let hash = ImportHash::from(u64::MAX);
+
+        let json = serde_json::to_value(hash).expect("serialize");
+        let round_tripped: ImportHash = serde_json::from_value(json).expect("deserialize");
+
+        assert_eq!(round_tripped, hash);
+    }
+
+    #[test]
+    fn file_cache_serializes_as_versioned_v1_document() {
+        let cache = sample_file_cache();
+
+        let json = serde_json::to_value(&cache).expect("serialize");
+
+        assert_eq!(
+            json,
+            json!({
+                "version": "v1",
+                "module_path": "module.py",
+                "hash": "0000000000000001",
+                "dependencies": ["dep.py"],
+                "function_calls": {
+                    "f": [{
+                        "root_models": ["model.on"],
+                        "inputs": [1.0],
+                        "output": 2.0
+                    }]
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn file_cache_rejects_unknown_version() {
+        let json = json!({
+            "version": "v2",
+            "module_path": "module.py",
+            "hash": "0000000000000001",
+            "dependencies": [],
+            "function_calls": {}
+        });
+
+        serde_json::from_value::<FileCache>(json).expect_err("unknown version");
+    }
+
+    #[test]
+    fn file_cache_getters_return_constructor_fields() {
+        let module_path = PythonPath::from_str_no_ext("module");
+        let hash = ImportHash::from(7);
+        let dependencies = BTreeSet::from([PathBuf::from("dep.py")]);
+        let cache = FileCache::new(module_path.clone(), hash, dependencies.clone());
+
+        assert_eq!(cache.module_path(), &module_path);
+        assert_eq!(cache.hash(), hash);
+        assert_eq!(cache.dependencies(), &dependencies);
+        assert!(cache.function_calls().is_empty());
+    }
+
+    #[test]
+    fn write_to_path_round_trips_through_read_from_path() {
+        let dir = unique_temp_dir();
+        let path = dir.join("nested").join("module.json");
+        let cache = sample_file_cache();
+
+        cache.write_to_path(&path).expect("write");
+        let loaded = FileCache::read_from_path(&path).expect("read");
+
+        assert_eq!(loaded, cache);
+        remove_temp_dir(&dir);
+    }
+
+    #[test]
+    fn read_from_path_returns_io_error_when_file_is_missing() {
+        let dir = unique_temp_dir();
+        let path = dir.join("missing.json");
+
+        let error = FileCache::read_from_path(&path).expect_err("missing file");
+
+        let ReadCacheError::Io(_) = error else {
+            panic!("Expected Io, got {error:?}");
+        };
+        remove_temp_dir(&dir);
+    }
+
+    #[test]
+    fn read_from_path_returns_serde_error_for_invalid_json() {
+        let dir = unique_temp_dir();
+        let path = dir.join("module.json");
+        std::fs::write(&path, "{not valid json").expect("write invalid json");
+
+        let error = FileCache::read_from_path(&path).expect_err("invalid json");
+
+        let ReadCacheError::Serde(_) = error else {
+            panic!("Expected Serde, got {error:?}");
+        };
+        remove_temp_dir(&dir);
     }
 }

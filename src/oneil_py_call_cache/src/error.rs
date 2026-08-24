@@ -55,3 +55,43 @@ impl std::error::Error for ReadCacheError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error as _;
+    use std::io;
+
+    use super::{ReadCacheError, WriteCacheError};
+
+    #[test]
+    fn write_cache_io_error_display_includes_source() {
+        let error = WriteCacheError::Io(io::Error::other("disk full"));
+
+        let message = error.to_string();
+
+        assert_eq!(message, "failed to write cache file: disk full");
+        assert!(error.source().is_some());
+    }
+
+    #[test]
+    fn read_cache_io_error_display_includes_source() {
+        let error = ReadCacheError::Io(io::Error::other("not found"));
+
+        let message = error.to_string();
+
+        assert_eq!(message, "failed to read cache file: not found");
+        assert!(error.source().is_some());
+    }
+
+    #[test]
+    fn read_cache_serde_error_display_includes_source() {
+        let serde_error = serde_json::from_str::<serde_json::Value>("{")
+            .expect_err("invalid json should fail to parse");
+        let error = ReadCacheError::Serde(serde_error);
+
+        let message = error.to_string();
+
+        assert!(message.starts_with("failed to deserialize cache from JSON:"));
+        assert!(error.source().is_some());
+    }
+}
