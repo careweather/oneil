@@ -366,6 +366,13 @@ impl LanguageServer for Backend {
             return Ok(None);
         }
 
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!("execute_command {}", params.command),
+            )
+            .await;
+
         let uri_str = params
             .arguments
             .first()

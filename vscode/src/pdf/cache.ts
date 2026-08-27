@@ -116,7 +116,10 @@ export async function downloadAndCache(url: string, title: string): Promise<vsco
                 await vscode.workspace.fs.writeFile(destUri, bytes)
             } catch (err) {
                 try { await vscode.workspace.fs.delete(destUri) } catch { /* ignore */ }
-                throw new Error(`Failed to write cache file: ${err instanceof Error ? err.message : String(err)}`)
+                throw new Error(
+                    `Failed to write cache file: ${err instanceof Error ? err.message : String(err)}`,
+                    { cause: err },
+                )
             }
 
             return destUri

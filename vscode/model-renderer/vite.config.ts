@@ -1,6 +1,18 @@
+import { createRequire } from "module"
+import { dirname, resolve } from "path"
 import { defineConfig, type Plugin } from "vite"
 import react from "@vitejs/plugin-react"
-import { resolve } from "path"
+
+const require = createRequire(import.meta.url)
+
+/**
+ * Resolves `dep` as installed for `fromPackage`, including when npm nests it
+ * under that package instead of hoisting it.
+ */
+function resolvedDepFrom(fromPackage: string, dep: string): string {
+    const fromDir = dirname(require.resolve(`${fromPackage}/package.json`))
+    return dirname(require.resolve(`${dep}/package.json`, { paths: [fromDir] }))
+}
 
 /**
  * Rollup plugin that removes legacy TTF and WOFF KaTeX font variants from the
@@ -27,14 +39,11 @@ export default defineConfig({
     plugins: [react(), dropLegacyKaTeXFonts()],
     resolve: {
         alias: {
-            // react-pdf bundles its own pdfjs-dist internally.  Aliasing ensures
-            // that `new URL("pdfjs-dist/...", import.meta.url)` in PdfPane.tsx
-            // resolves to the same version react-pdf uses (currently 5.4.296),
-            // preventing the "API version does not match Worker version" error.
-            "pdfjs-dist": resolve(
-                __dirname,
-                "node_modules/react-pdf/node_modules/pdfjs-dist",
-            ),
+            // react-pdf depends on a specific pdfjs-dist. Aliasing ensures that
+            // `new URL("pdfjs-dist/...", import.meta.url)` in pdfWorker.ts
+            // resolves to that same copy, preventing the "API version does not
+            // match Worker version" error.
+            "pdfjs-dist": resolvedDepFrom("react-pdf", "pdfjs-dist"),
         },
     },
     // Use relative asset paths so KaTeX fonts resolve correctly inside the
@@ -42,7 +51,7 @@ export default defineConfig({
     base: "./",
     build: {
         // Output into the extension's out directory so the panel can load it.
-        outDir: resolve(__dirname, "../out/model-renderer"),
+        outDir: resolve(import.meta.dirname, "../out/model-renderer"),
         emptyOutDir: true,
         // This is a VS Code webview loaded from disk, not a web app served
         // over a network, so Vite's default 500 kB threshold is not meaningful.
@@ -51,7 +60,7 @@ export default defineConfig({
         // a separate file so VS Code's webview can serve it via localResourceRoots.
         assetsInlineLimit: 0,
         rollupOptions: {
-            input: resolve(__dirname, "index.html"),
+            input: resolve(import.meta.dirname, "index.html"),
             output: {
                 // Single deterministic filenames — the panel HTML references
                 // these exact paths via vscode.Uri.joinPath.

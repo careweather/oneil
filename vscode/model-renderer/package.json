@@ -14,24 +14,25 @@
   },
   "dependencies": {
     "citation-js": "^0.7.22",
-    "jotai": "^2.12.3",
-    "katex": "^0.16.22",
-    "marked": "^18.0.3",
+    "jotai": "^2.20.3",
+    "katex": "^0.16.47",
+    "marked": "^18.0.11",
     "oneil-ts-interfaces": "file:../../packages/ts-interfaces",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-katex": "^3.0.1",
-    "react-pdf": "^10.4.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-katex": "^3.1.0",
+    "react-pdf": "^10.5.0",
     "reactflow": "^11.11.4",
-    "styled-components": "^6.4.1"
+    "styled-components": "^6.5.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
-    "@vitejs/plugin-react": "^4.4.1",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.3",
-    "vitest": "^4.1.6"
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }

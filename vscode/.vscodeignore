@@ -11,6 +11,8 @@ docs/**
 src/**
 tsconfig.json
 esbuild.mjs
+eslint.config.mjs
+vitest.config.mts
 
 # Extension dependencies — bundled, so node_modules is not needed at runtime
 node_modules/**

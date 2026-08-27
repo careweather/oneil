@@ -47,7 +47,10 @@ export async function fetchPdfBytes(url: string): Promise<Uint8Array> {
     try {
         response = await fetch(url, { redirect: "follow" })
     } catch (err) {
-        throw new Error(`Network error fetching PDF: ${err instanceof Error ? err.message : String(err)}`)
+        throw new Error(
+            `Network error fetching PDF: ${err instanceof Error ? err.message : String(err)}`,
+            { cause: err },
+        )
     }
 
     if (!response.ok) {
@@ -58,7 +61,10 @@ export async function fetchPdfBytes(url: string): Promise<Uint8Array> {
     try {
         buffer = await response.arrayBuffer()
     } catch (err) {
-        throw new Error(`Failed to read response body: ${err instanceof Error ? err.message : String(err)}`)
+        throw new Error(
+            `Failed to read response body: ${err instanceof Error ? err.message : String(err)}`,
+            { cause: err },
+        )
     }
 
     const bytes = new Uint8Array(buffer)
