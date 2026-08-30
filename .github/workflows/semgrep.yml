@@ -1,0 +1,40 @@
+name: Semgrep
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: Semgrep / changed findings
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: semgrep/semgrep:1.175.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan changed code
+        env:
+          SEMGREP_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha }}
+        run: |
+          semgrep scan \
+            --config "p/rust" \
+            --config "p/typescript" \
+            --config "p/python" \
+            --baseline-commit "$SEMGREP_BASELINE_COMMIT" \
+            --exclude "target" \
+            --exclude "node_modules" \
+            --exclude "dist" \
+            --exclude "out" \
+            --exclude "coverage" \
+            --exclude "src/oneil_wasm/pkg" \
+            --jobs 2 \
+            --oss-only \
+            --metrics=off \
+            --error \
+            .
