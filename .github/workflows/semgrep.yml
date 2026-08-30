@@ -12,20 +12,47 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
-      image: semgrep/semgrep:1.175.0
+      image: semgrep/semgrep:1.175.0@sha256:b94b53d02fd4a022f9eac4e2af1380f5c3c4c21400e79d3336bdff1d1db5e796
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+
+      - name: Fetch reviewed Semgrep rules
+        env:
+          SEMGREP_PACKS: |
+            rust 3a769ea74a51ff71b66adc8de48af2baf7623db8940b08cba190b03cb7259ae7
+            typescript 63fbcca1826e787ca43282bf139ccec16745ad6551c87850b9ccee9ca9f98c0b
+            python 31c1dfa46e8ddd97f9ac98c607ddd77b20a2c3356d7ec987359961d47ec27035
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          from urllib.parse import urlparse
+          from urllib.request import urlopen
+
+          output = Path(os.environ["RUNNER_TEMP"]) / "semgrep-rules"
+          output.mkdir(parents=True, exist_ok=True)
+          for entry in os.environ["SEMGREP_PACKS"].splitlines():
+              name, expected = entry.split()
+              with urlopen(f"https://semgrep.dev/c/p/{name}", timeout=30) as response:
+                  if urlparse(response.geturl()).hostname != "semgrep.dev":
+                      raise RuntimeError("Semgrep rules redirected outside semgrep.dev")
+                  content = response.read()
+              if hashlib.sha256(content).hexdigest() != expected:
+                  raise RuntimeError(f"Semgrep rules changed for {name}")
+              (output / f"{name}.yml").write_bytes(content)
+          PY
 
       - name: Scan changed code
         env:
           SEMGREP_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha }}
         run: |
           semgrep scan \
-            --config "p/rust" \
-            --config "p/typescript" \
-            --config "p/python" \
+            --config "$RUNNER_TEMP/semgrep-rules/rust.yml" \
+            --config "$RUNNER_TEMP/semgrep-rules/typescript.yml" \
+            --config "$RUNNER_TEMP/semgrep-rules/python.yml" \
             --baseline-commit "$SEMGREP_BASELINE_COMMIT" \
             --exclude "target" \
             --exclude "node_modules" \
@@ -36,5 +63,6 @@ jobs:
             --jobs 2 \
             --oss-only \
             --metrics=off \
+            --strict \
             --error \
             .

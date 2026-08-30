@@ -141,6 +141,24 @@ pull requests:
 - **Unused dependencies** — `cargo udeps` on nightly to catch crates that are
   declared but unused.
 
+### Semgrep (pull requests)
+
+[`.github/workflows/semgrep.yml`](.github/workflows/semgrep.yml) scans Rust,
+TypeScript, React, and Python changes with reviewed public Semgrep rules. It
+compares the pull request with its exact base commit. Existing findings do not
+block unrelated changes.
+
+To reproduce the scan locally:
+
+1. Install the pinned CLI with `pipx install semgrep==1.175.0`.
+2. Fetch the public `p/rust`, `p/typescript`, and `p/python` configurations.
+3. Verify their SHA-256 values against the values in the workflow.
+4. Run `semgrep scan` with those local files, `--strict`, `--error`, and
+   `--baseline-commit "$(git merge-base HEAD origin/main)"`.
+
+The workflow uses only read access. It does not require a Semgrep account or
+token.
+
 ### Coding standards review (advisory)
 
 [`.github/workflows/coding-standards-review.yml`](.github/workflows/coding-standards-review.yml)
