@@ -12,7 +12,6 @@ categories.workspace = true
 readme = "README.md"
 
 [dependencies]
-indexmap = { workspace = true }
 oneil_output = { path = "../oneil_output" }
 oneil_python = { path = "../oneil_python" }
 oneil_shared = { path = "../oneil_shared" }
