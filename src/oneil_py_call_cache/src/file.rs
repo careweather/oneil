@@ -194,6 +194,28 @@ mod tests {
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+    const SAMPLE_FILE_CACHE_V1_JSON: &str = r#"{
+  "version": "v1",
+  "module_path": "module.py",
+  "hash": "0000000000000001",
+  "dependencies": [
+    "dep.py"
+  ],
+  "function_calls": {
+    "f": [
+      {
+        "root_models": [
+          "model.on"
+        ],
+        "inputs": [
+          1.0
+        ],
+        "output": 2.0
+      }
+    ]
+  }
+}"#;
+
     /// Creates a unique temporary directory for cache file I/O tests.
     fn unique_temp_dir() -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
@@ -288,13 +310,21 @@ mod tests {
     }
 
     #[test]
-    fn import_hash_round_trips_through_json() {
+    fn import_hash_serializes_u64_max() {
         let hash = ImportHash::from(u64::MAX);
 
         let json = serde_json::to_value(hash).expect("serialize");
-        let round_tripped: ImportHash = serde_json::from_value(json).expect("deserialize");
 
-        assert_eq!(round_tripped, hash);
+        assert_eq!(json, json!("ffffffffffffffff"));
+    }
+
+    #[test]
+    fn import_hash_deserializes_u64_max() {
+        let json = json!("ffffffffffffffff");
+
+        let hash: ImportHash = serde_json::from_value(json).expect("deserialize");
+
+        assert_eq!(hash, u64::MAX);
     }
 
     #[test]
@@ -335,28 +365,74 @@ mod tests {
     }
 
     #[test]
-    fn file_cache_getters_return_constructor_fields() {
+    fn file_cache_module_path_returns_constructor_field() {
         let module_path = PythonPath::from_str_no_ext("module");
-        let hash = ImportHash::from(7);
-        let dependencies = BTreeSet::from([PathBuf::from("dep.py")]);
-        let cache = FileCache::new(module_path.clone(), hash, dependencies.clone());
+        let cache = FileCache::new(
+            module_path.clone(),
+            ImportHash::from(7),
+            BTreeSet::new(),
+        );
 
         assert_eq!(cache.module_path(), &module_path);
+    }
+
+    #[test]
+    fn file_cache_hash_returns_constructor_field() {
+        let hash = ImportHash::from(7);
+        let cache = FileCache::new(
+            PythonPath::from_str_no_ext("module"),
+            hash,
+            BTreeSet::new(),
+        );
+
         assert_eq!(cache.hash(), hash);
+    }
+
+    #[test]
+    fn file_cache_dependencies_return_constructor_field() {
+        let dependencies = BTreeSet::from([PathBuf::from("dep.py")]);
+        let cache = FileCache::new(
+            PythonPath::from_str_no_ext("module"),
+            ImportHash::from(7),
+            dependencies.clone(),
+        );
+
         assert_eq!(cache.dependencies(), &dependencies);
+    }
+
+    #[test]
+    fn file_cache_function_calls_are_empty_after_construction() {
+        let cache = FileCache::new(
+            PythonPath::from_str_no_ext("module"),
+            ImportHash::from(7),
+            BTreeSet::new(),
+        );
+
         assert!(cache.function_calls().is_empty());
     }
 
     #[test]
-    fn write_to_path_round_trips_through_read_from_path() {
+    fn write_to_path_writes_expected_v1_document() {
         let dir = unique_temp_dir();
         let path = dir.join("nested").join("module.json");
         let cache = sample_file_cache();
 
         cache.write_to_path(&path).expect("write");
+        let document = std::fs::read_to_string(&path).expect("read cache file");
+
+        assert_eq!(document, SAMPLE_FILE_CACHE_V1_JSON);
+        remove_temp_dir(&dir);
+    }
+
+    #[test]
+    fn read_from_path_reads_fixed_v1_document() {
+        let dir = unique_temp_dir();
+        let path = dir.join("module.json");
+        std::fs::write(&path, SAMPLE_FILE_CACHE_V1_JSON).expect("write fixture");
+
         let loaded = FileCache::read_from_path(&path).expect("read");
 
-        assert_eq!(loaded, cache);
+        assert_eq!(loaded, sample_file_cache());
         remove_temp_dir(&dir);
     }
 

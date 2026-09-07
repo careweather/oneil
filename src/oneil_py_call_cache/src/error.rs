@@ -64,27 +64,57 @@ mod tests {
     use super::{ReadCacheError, WriteCacheError};
 
     #[test]
-    fn write_cache_io_error_display_includes_source() {
+    fn write_cache_io_error_display_includes_io_message() {
         let error = WriteCacheError::Io(io::Error::other("disk full"));
 
         let message = error.to_string();
 
         assert_eq!(message, "failed to write cache file: disk full");
-        assert!(error.source().is_some());
     }
 
     #[test]
-    fn read_cache_io_error_display_includes_source() {
+    fn write_cache_io_error_source_matches_wrapped_error() {
+        let io_error = io::Error::other("disk full");
+        let expected_kind = io_error.kind();
+        let expected_message = io_error.to_string();
+        let error = WriteCacheError::Io(io_error);
+
+        let source = error.source().expect("I/O error should have a source");
+        let source = source
+            .downcast_ref::<io::Error>()
+            .expect("source should be an I/O error");
+
+        assert_eq!(source.kind(), expected_kind);
+        assert_eq!(source.to_string(), expected_message);
+    }
+
+    #[test]
+    fn read_cache_io_error_display_includes_io_message() {
         let error = ReadCacheError::Io(io::Error::other("not found"));
 
         let message = error.to_string();
 
         assert_eq!(message, "failed to read cache file: not found");
-        assert!(error.source().is_some());
     }
 
     #[test]
-    fn read_cache_serde_error_display_includes_source() {
+    fn read_cache_io_error_source_matches_wrapped_error() {
+        let io_error = io::Error::other("not found");
+        let expected_kind = io_error.kind();
+        let expected_message = io_error.to_string();
+        let error = ReadCacheError::Io(io_error);
+
+        let source = error.source().expect("I/O error should have a source");
+        let source = source
+            .downcast_ref::<io::Error>()
+            .expect("source should be an I/O error");
+
+        assert_eq!(source.kind(), expected_kind);
+        assert_eq!(source.to_string(), expected_message);
+    }
+
+    #[test]
+    fn read_cache_serde_error_display_includes_context() {
         let serde_error = serde_json::from_str::<serde_json::Value>("{")
             .expect_err("invalid json should fail to parse");
         let error = ReadCacheError::Serde(serde_error);
@@ -92,6 +122,24 @@ mod tests {
         let message = error.to_string();
 
         assert!(message.starts_with("failed to deserialize cache from JSON:"));
-        assert!(error.source().is_some());
+    }
+
+    #[test]
+    fn read_cache_serde_error_source_matches_wrapped_error() {
+        let serde_error = serde_json::from_str::<serde_json::Value>("{")
+            .expect_err("invalid json should fail to parse");
+        let expected_message = serde_error.to_string();
+        let expected_line = serde_error.line();
+        let expected_column = serde_error.column();
+        let error = ReadCacheError::Serde(serde_error);
+
+        let source = error.source().expect("serde error should have a source");
+        let source = source
+            .downcast_ref::<serde_json::Error>()
+            .expect("source should be a serde error");
+
+        assert_eq!(source.to_string(), expected_message);
+        assert_eq!(source.line(), expected_line);
+        assert_eq!(source.column(), expected_column);
     }
 }
