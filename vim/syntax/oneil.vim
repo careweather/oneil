@@ -100,7 +100,7 @@ syn region oneilTest start=/\_^\(\*\{1,2}\s*\)\{0,1}test/ end=/\_$/ contains=one
 
 syn keyword oneilIncludeKeyword use as contained import
 syn match oneilModule /\<[A-Za-z_][A-Za-z0-9_/]*\>/ contained
-syn match pythonModule /\<[A-Za-z_][A-Za-z0-9_./]*\>/ contained
+syn match pythonModule /\(\.\.\?\/\|[A-Za-z_][A-Za-z0-9_]*\/\)*[A-Za-z_][A-Za-z0-9_]*\>/ contained
 
 syn region oneilIncludeLine start=/\_^use/ end=/\_$/ transparent contains=oneilIncludeKeyword,oneilModule
 syn region oneilIncludeLine start=/\_^import/ end=/\_$/ transparent contains=oneilIncludeKeyword,pythonModule
