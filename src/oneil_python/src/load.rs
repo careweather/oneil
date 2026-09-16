@@ -117,11 +117,11 @@ fn lock_python_loads() -> MutexGuard<'static, ()> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-/// Snapshots `sys.path` and `sys.modules`, puts `module_directory` on `sys.path`,
-/// and restores both when dropped.
+/// Snapshots `sys.path`, puts `module_directory` on it, and drops only local
+/// sibling modules when finished.
 ///
-/// Local sibling imports (`import util`) then resolve from this file's folder
-/// and do not remain in the process-wide module cache after the load.
+/// Installed and virtualenv packages stay in `sys.modules` so a first `import
+/// numpy` is not unloaded and later re-imported as a second copy.
 fn isolate_import_state<'py>(
     py: Python<'py>,
     module_directory: &Path,
@@ -130,51 +130,106 @@ fn isolate_import_state<'py>(
     let path = sys.getattr("path")?.cast_into::<PyList>()?;
     let modules = sys.getattr("modules")?.cast_into::<PyDict>()?;
     let path_snapshot = path.call_method0("copy")?;
-    let modules_snapshot = modules.call_method0("copy")?;
-
-    evict_local_module_names(&modules, module_directory);
+    let evicted = evict_local_module_names(&modules, module_directory)?;
     path.insert(0, module_directory.as_os_str())?;
 
     Ok(IsolatedImportState {
         path,
         modules,
         path_snapshot,
-        modules_snapshot,
+        evicted,
+        module_directory: module_directory.to_path_buf(),
     })
 }
 
 /// Removes `sys.modules` entries whose names match `.py` files in `module_directory`.
-fn evict_local_module_names(modules: &Bound<'_, PyDict>, module_directory: &Path) {
+///
+/// Non-local modules that used those names (stdlib or site-packages) are returned
+/// so they can be put back after the load.
+fn evict_local_module_names(
+    modules: &Bound<'_, PyDict>,
+    module_directory: &Path,
+) -> PyResult<Vec<(String, Py<PyAny>)>> {
     let Ok(entries) = std::fs::read_dir(module_directory) else {
-        return;
+        return Ok(Vec::new());
     };
 
+    let mut evicted = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().is_some_and(|ext| ext == "py")
             && let Some(stem) = path.file_stem().and_then(|stem| stem.to_str())
+            && let Ok(Some(module)) = modules.get_item(stem)
         {
+            if !is_local_non_venv_module(&module, module_directory) {
+                evicted.push((stem.to_string(), module.unbind()));
+            }
             let _ = modules.del_item(stem);
         }
     }
+    Ok(evicted)
 }
 
-/// Restores the interpreter import state captured by [`isolate_import_state`].
+/// Drops the Oneil-loaded module and sibling imports from `sys.modules`.
+fn drop_local_modules(modules: &Bound<'_, PyDict>, module_directory: &Path) -> PyResult<()> {
+    let keys = modules
+        .iter()
+        .map(|(key, _value)| key.extract::<String>())
+        .collect::<PyResult<Vec<_>>>()?;
+
+    for key in keys {
+        if key == IMPORTED_MODULE_NAME {
+            let _ = modules.del_item(&key);
+            continue;
+        }
+        if let Ok(Some(module)) = modules.get_item(&key)
+            && is_local_non_venv_module(&module, module_directory)
+        {
+            let _ = modules.del_item(&key);
+        }
+    }
+    Ok(())
+}
+
+/// Returns whether `module` was loaded from `module_directory` and is not inside a venv.
+fn is_local_non_venv_module(module: &Bound<'_, PyAny>, module_directory: &Path) -> bool {
+    module
+        .getattr("__file__")
+        .ok()
+        .and_then(|file| file.extract::<String>().ok())
+        .is_some_and(|file| {
+            let file = PathBuf::from(file);
+            file.starts_with(module_directory) && !has_venv_component(&file)
+        })
+}
+
+/// Returns whether `path` contains a `venv` or `.venv` directory.
+fn has_venv_component(path: &Path) -> bool {
+    path.components().any(|component| {
+        matches!(component, Component::Normal(os_str) if os_str == "venv" || os_str == ".venv")
+    })
+}
+
+/// Restores `sys.path` and removes only local sibling modules from `sys.modules`.
 struct IsolatedImportState<'py> {
     path: Bound<'py, PyList>,
     modules: Bound<'py, PyDict>,
     path_snapshot: Bound<'py, PyAny>,
-    modules_snapshot: Bound<'py, PyAny>,
+    evicted: Vec<(String, Py<PyAny>)>,
+    module_directory: PathBuf,
 }
 
 impl IsolatedImportState<'_> {
-    /// Writes the snapshotted `sys.path` and `sys.modules` back onto the interpreter.
+    /// Restores `sys.path`, drops local modules, and puts back evicted non-local modules.
     fn restore(&self) -> PyResult<()> {
         self.path.call_method0("clear")?;
         self.path.call_method1("extend", (&self.path_snapshot,))?;
-        self.modules.call_method0("clear")?;
-        self.modules
-            .call_method1("update", (&self.modules_snapshot,))?;
+        drop_local_modules(&self.modules, &self.module_directory)?;
+        for (name, module) in &self.evicted {
+            if !self.modules.contains(name)? {
+                self.modules.set_item(name, module)?;
+            }
+        }
         Ok(())
     }
 }
@@ -296,9 +351,7 @@ impl ImportTracker {
     }
 
     pub fn is_local_venv_path(&self, file_path: &Path) -> bool {
-        file_path
-            .components()
-            .any(|component| matches!(component, Component::Normal(os_str) if os_str == "venv" || os_str == ".venv"))
+        has_venv_component(file_path)
     }
 }
 
@@ -358,7 +411,7 @@ mod tests {
     use oneil_shared::paths::PythonPath;
     use oneil_shared::symbols::PyFunctionName;
     use pyo3::Python;
-    use pyo3::types::PyAnyMethods;
+    use pyo3::types::{PyAnyMethods, PyDict, PyDictMethods, PyModule};
     use std::fs;
     use std::path::PathBuf;
 
@@ -435,6 +488,30 @@ mod tests {
         assert_eq!(call_int(&a, "run"), 1);
         assert_eq!(call_int(&b, "run"), 2);
         assert_eq!(call_int(&a, "run"), 1);
+    }
+
+    /// Installed and stdlib modules stay in `sys.modules` after a load.
+    #[test]
+    fn installed_modules_remain_cached_after_load() {
+        let module = load_fixture(fixture_dir("installed_modules").join("helpers.py"));
+        assert_eq!(call_int(&module, "circle_area"), 3);
+        assert!(
+            sys_modules_contains("math"),
+            "stdlib/site-packages modules should stay cached"
+        );
+        assert_eq!(call_int(&module, "late_math"), 3);
+    }
+
+    fn sys_modules_contains(name: &str) -> bool {
+        Python::attach(|py| {
+            let sys = PyModule::import(py, "sys").expect("sys should import");
+            let modules = sys
+                .getattr("modules")
+                .expect("sys.modules should exist")
+                .cast_into::<PyDict>()
+                .expect("sys.modules should be a dict");
+            modules.contains(name).expect("contains should not fail")
+        })
     }
 
     /// A user `inspect.py` does not replace the standard library `inspect` module.
