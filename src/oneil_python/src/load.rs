@@ -297,7 +297,7 @@ mod tests {
     use super::{load_python_import, python_module_name};
     use oneil_shared::paths::PythonPath;
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::path::PathBuf;
 
     #[test]
     fn module_name_is_file_stem() {
@@ -320,26 +320,13 @@ mod tests {
     /// Loads a `.py` file that `import`s another module in the same directory.
     #[test]
     fn loaded_module_can_import_sibling_python_files() {
-        let dir = std::env::temp_dir().join(format!(
-            "oneil-python-sibling-import-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("system clock should be after the unix epoch")
-                .as_nanos()
-        ));
-        fs::create_dir_all(&dir).expect("temp directory should be creatable");
-
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/sibling_import");
         let sibling_path = dir.join("util.py");
-        fs::write(&sibling_path, "def double(x):\n    return x * 2\n")
-            .expect("sibling python file should be writable");
-
         let main_path = dir.join("helpers.py");
-        let source = "import util\n\ndef run(x):\n    return util.double(x)\n";
-        fs::write(&main_path, source).expect("main python file should be writable");
+        let source = fs::read_to_string(&main_path).expect("helpers.py should be readable");
 
         let python_path = PythonPath::from_path_with_ext(&main_path);
-        let module = load_python_import(&python_path, source)
+        let module = load_python_import(&python_path, &source)
             .expect("python file should load while importing a sibling module");
 
         assert!(
@@ -359,7 +346,5 @@ mod tests {
             }),
             "sibling python file should be tracked as a local import"
         );
-
-        fs::remove_dir_all(&dir).expect("temp directory should be removable");
     }
 }

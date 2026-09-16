@@ -26,8 +26,8 @@ cargo run --quiet --example export_ts_interfaces -p oneil_cli --features oneil_c
 
 EOF
 
-  # Stable order for diffs.
-  for path in $(find "${generated_dir}" -maxdepth 1 -name '*.ts' -print | sort); do
+  # Locale-independent order so CI and local `en_US.UTF-8` sort the same.
+  for path in $(find "${generated_dir}" -maxdepth 1 -name '*.ts' -print | LC_ALL=C sort); do
     name="$(basename "${path}" .ts)"
     printf 'export type { %s } from "./generated/%s.js"\n' "${name}" "${name}"
   done
