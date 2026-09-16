@@ -16,7 +16,7 @@ Dotted Python-style names (`import foo.bar`) would collide with Oneil's `param.a
 
 Python imports use the same sibling-relative slash paths as model imports:
 
-```
+```ebnf
 ImportDecl = "import", [ DirectoryPath ], Identifier, EndOfLine ;
 ```
 
@@ -29,7 +29,7 @@ import ../testing/helpers
 import simulations/compass/simmodel/simgeom
 ```
 
-Bare `import functions` stays same-folder. Resolved paths collapse `.` and `..` for cache and duplicate keys. The loaded `.py` file's directory is placed on `sys.path` so that script can import other modules in its folder. The Python module `__name__` is the file stem.
+Bare `import functions` stays same-folder. Resolved paths collapse `.` and `..` for cache and duplicate keys. Each load isolates `sys.path` and `sys.modules` so a script can import other modules from its own folder without colliding with another folder's same-named files. The executed module uses a reserved `__name__` so a user `inspect.py` cannot replace the standard library.
 
 ## Consequences
 

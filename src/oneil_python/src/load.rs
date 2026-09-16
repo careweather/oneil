@@ -4,7 +4,7 @@ use std::{
     ffi::CString,
     iter,
     path::{Component, Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -36,15 +36,11 @@ pub fn load_python_import(
         .canonicalize()
         .expect("path should be directory that exists");
 
-    // get the module name from the file stem so directory components and `..`
-    // do not produce an invalid dotted module name
-    let module_name = python_module_name(path);
-
-    // convert the path and module name to C strings
+    // convert the path and reserved module name to C strings
     let path_str = path.as_path().to_string_lossy();
     let path_cstr = CString::new(path_str.as_bytes()).expect("path should not have a null byte");
-    let module_name_cstr =
-        CString::new(module_name).expect("module name should not have a null byte");
+    let module_name_cstr = CString::new(IMPORTED_MODULE_NAME)
+        .expect("reserved module name should not have a null byte");
 
     // convert the source to a C string
     let source_cstr = match CString::new(source) {
@@ -52,17 +48,17 @@ pub fn load_python_import(
         Err(_null_error) => return Err(LoadPythonImportError::SourceHasNullByte),
     };
 
+    let _load_guard = lock_python_loads();
     let functions = Python::attach(|py| {
         insert_oneil_module_into_python(py)?;
-        add_module_directory_to_sys_path(py, &module_directory)?;
+        // Bind stdlib `inspect` before the user directory is on `sys.path`.
+        let inspect_module = PyModule::import(py, "inspect")?;
+        let _import_state = isolate_import_state(py, &module_directory)?;
 
         // load the code module
         start_tracking_imports(py, &module_directory)?;
         let code_module = PyModule::from_code(py, &source_cstr, &path_cstr, &module_name_cstr)?;
         let imports = stop_tracking_imports(py)?;
-
-        // get the inspect module
-        let inspect_module = PyModule::import(py, "inspect")?;
 
         // get the functions from the code module
         let functions = code_module
@@ -106,15 +102,87 @@ pub fn load_python_import(
     }
 }
 
-/// Returns the Python `__name__` used when executing imported source.
+/// Python `__name__` for Oneil-loaded source.
 ///
-/// Directory components and `..` are omitted so `../testing/helpers.py` loads as `helpers`.
-fn python_module_name(path: &PythonPath) -> String {
-    path.as_path()
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .expect("python path should have a utf-8 file stem")
-        .to_string()
+/// A reserved identifier is used so a user file such as `inspect.py` does not
+/// replace the standard library module this loader needs for `getdoc`.
+const IMPORTED_MODULE_NAME: &str = "_oneil_import";
+
+static PYTHON_LOAD_LOCK: Mutex<()> = Mutex::new(());
+
+/// Serializes Python loads so isolated `sys.path` / `sys.modules` snapshots do not overlap.
+fn lock_python_loads() -> MutexGuard<'static, ()> {
+    PYTHON_LOAD_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Snapshots `sys.path` and `sys.modules`, puts `module_directory` on `sys.path`,
+/// and restores both when dropped.
+///
+/// Local sibling imports (`import util`) then resolve from this file's folder
+/// and do not remain in the process-wide module cache after the load.
+fn isolate_import_state<'py>(
+    py: Python<'py>,
+    module_directory: &Path,
+) -> PyResult<IsolatedImportState<'py>> {
+    let sys = PyModule::import(py, "sys")?;
+    let path = sys.getattr("path")?.cast_into::<PyList>()?;
+    let modules = sys.getattr("modules")?.cast_into::<PyDict>()?;
+    let path_snapshot = path.call_method0("copy")?;
+    let modules_snapshot = modules.call_method0("copy")?;
+
+    evict_local_module_names(&modules, module_directory);
+    path.insert(0, module_directory.as_os_str())?;
+
+    Ok(IsolatedImportState {
+        path,
+        modules,
+        path_snapshot,
+        modules_snapshot,
+    })
+}
+
+/// Removes `sys.modules` entries whose names match `.py` files in `module_directory`.
+fn evict_local_module_names(modules: &Bound<'_, PyDict>, module_directory: &Path) {
+    let Ok(entries) = std::fs::read_dir(module_directory) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "py")
+            && let Some(stem) = path.file_stem().and_then(|stem| stem.to_str())
+        {
+            let _ = modules.del_item(stem);
+        }
+    }
+}
+
+/// Restores the interpreter import state captured by [`isolate_import_state`].
+struct IsolatedImportState<'py> {
+    path: Bound<'py, PyList>,
+    modules: Bound<'py, PyDict>,
+    path_snapshot: Bound<'py, PyAny>,
+    modules_snapshot: Bound<'py, PyAny>,
+}
+
+impl IsolatedImportState<'_> {
+    /// Writes the snapshotted `sys.path` and `sys.modules` back onto the interpreter.
+    fn restore(&self) -> PyResult<()> {
+        self.path.call_method0("clear")?;
+        self.path.call_method1("extend", (&self.path_snapshot,))?;
+        self.modules.call_method0("clear")?;
+        self.modules
+            .call_method1("update", (&self.modules_snapshot,))?;
+        Ok(())
+    }
+}
+
+impl Drop for IsolatedImportState<'_> {
+    fn drop(&mut self) {
+        let _ = self.restore();
+    }
 }
 
 fn insert_oneil_module_into_python(py: Python<'_>) -> PyResult<()> {
@@ -128,15 +196,6 @@ fn insert_oneil_module_into_python(py: Python<'_>) -> PyResult<()> {
     // Insert oneil_python_module into sys.modules
     py_modules.set_item("oneil", oneil_module)?;
 
-    Ok(())
-}
-
-// this adds the module directory to the sys.path so that the module can import
-// other modules in the module directory
-fn add_module_directory_to_sys_path(py: Python<'_>, module_directory: &Path) -> PyResult<()> {
-    let sys = PyModule::import(py, "sys")?;
-    let path = sys.getattr("path")?.cast_into::<PyList>()?;
-    path.insert(0, module_directory.as_os_str())?;
     Ok(())
 }
 
@@ -294,40 +353,59 @@ impl Clone for ImportTracker {
 
 #[cfg(test)]
 mod tests {
-    use super::{load_python_import, python_module_name};
+    use super::{IMPORTED_MODULE_NAME, load_python_import};
+    use crate::function::PythonModule;
     use oneil_shared::paths::PythonPath;
+    use oneil_shared::symbols::PyFunctionName;
+    use pyo3::Python;
+    use pyo3::types::PyAnyMethods;
     use std::fs;
     use std::path::PathBuf;
 
-    #[test]
-    fn module_name_is_file_stem() {
-        let path = PythonPath::from_str_no_ext("helpers");
-        assert_eq!(python_module_name(&path), "helpers");
+    fn fixture_dir(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join(name)
     }
 
-    #[test]
-    fn module_name_ignores_directories() {
-        let path = PythonPath::from_str_no_ext("testing/helpers");
-        assert_eq!(python_module_name(&path), "helpers");
+    fn load_fixture(path: PathBuf) -> PythonModule {
+        let source = fs::read_to_string(&path).expect("fixture should be readable");
+        load_python_import(&PythonPath::from_path_with_ext(&path), &source)
+            .expect("fixture should load")
     }
 
-    #[test]
-    fn module_name_ignores_parent_directory() {
-        let path = PythonPath::from_str_no_ext("../testing/helpers");
-        assert_eq!(python_module_name(&path), "helpers");
+    fn call_int(module: &PythonModule, name: &str) -> i64 {
+        Python::attach(|py| {
+            let function = module
+                .get_function(&PyFunctionName::from(name))
+                .expect("function should exist");
+            function
+                .call(py, &[])
+                .expect("function should run")
+                .extract()
+                .expect("function should return an int")
+        })
+    }
+
+    fn call_str(module: &PythonModule, name: &str) -> String {
+        Python::attach(|py| {
+            let function = module
+                .get_function(&PyFunctionName::from(name))
+                .expect("function should exist");
+            function
+                .call(py, &[])
+                .expect("function should run")
+                .extract()
+                .expect("function should return a string")
+        })
     }
 
     /// Loads a `.py` file that `import`s another module in the same directory.
     #[test]
     fn loaded_module_can_import_sibling_python_files() {
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/sibling_import");
+        let dir = fixture_dir("sibling_import");
         let sibling_path = dir.join("util.py");
-        let main_path = dir.join("helpers.py");
-        let source = fs::read_to_string(&main_path).expect("helpers.py should be readable");
-
-        let python_path = PythonPath::from_path_with_ext(&main_path);
-        let module = load_python_import(&python_path, &source)
-            .expect("python file should load while importing a sibling module");
+        let module = load_fixture(dir.join("helpers.py"));
 
         assert!(
             module
@@ -345,6 +423,30 @@ mod tests {
                     || path.canonicalize().ok().as_ref() == Some(&sibling_canonical)
             }),
             "sibling python file should be tracked as a local import"
+        );
+    }
+
+    /// Same-stem modules in different folders keep their own sibling imports.
+    #[test]
+    fn same_stem_modules_use_their_own_sibling_imports() {
+        let a = load_fixture(fixture_dir("same_stem/a").join("helpers.py"));
+        let b = load_fixture(fixture_dir("same_stem/b").join("helpers.py"));
+
+        assert_eq!(call_int(&a, "run"), 1);
+        assert_eq!(call_int(&b, "run"), 2);
+        assert_eq!(call_int(&a, "run"), 1);
+    }
+
+    /// A user `inspect.py` does not replace the standard library `inspect` module.
+    #[test]
+    fn user_inspect_module_does_not_shadow_stdlib() {
+        assert_ne!(IMPORTED_MODULE_NAME, "inspect");
+
+        let module = load_fixture(fixture_dir("inspect_name").join("inspect.py"));
+        assert_eq!(call_str(&module, "tagged"), "user");
+        assert_eq!(
+            module.get_docs(),
+            Some("A user module whose file stem matches the stdlib `inspect` module.")
         );
     }
 }

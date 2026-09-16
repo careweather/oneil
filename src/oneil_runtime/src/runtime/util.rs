@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use indexmap::{IndexMap, IndexSet};
 use oneil_builtins::BuiltinRef;
 use oneil_frontend::{CompilationUnit, instance::graph::UnitGraphCache};
-use oneil_shared::paths::{ModelPath, PythonPath, SourcePath};
+use oneil_shared::paths::{ModelPath, SourcePath};
 
 use super::Runtime;
 use crate::{
@@ -39,7 +39,7 @@ impl Runtime {
     /// Clears the runtime's caches for a given path.
     ///
     /// If the path is a model path (`.on`), clears the AST, `InstanceGraph`s for compilation units, and eval caches for that path.
-    /// If the path is a Python path (`.py`), clears the Python import cache for that path.
+    /// If the path is a Python file or a local import of a cached Python module, that module is dropped from the Python import cache.
     ///
     /// This does not clear the source cache.
     pub fn clear_non_source_caches(&mut self, path: &SourcePath) {
@@ -56,15 +56,23 @@ impl Runtime {
         // users until the next eval re-composes.
         self.composed_graph = None;
 
-        if let Ok(python_path) = PythonPath::try_from(path.clone()) {
-            self.python_import_cache.remove(&python_path);
-        }
+        self.python_import_cache
+            .remove_path_and_dependents(path.as_path());
     }
 
-    /// Gets the paths to files that the runtime relies on.
+    /// Gets the paths to files that the runtime relies on, including local Python imports.
     #[must_use]
     pub fn get_watch_paths(&self) -> IndexSet<SourcePath> {
-        self.source_cache.paths().cloned().collect()
+        let mut paths: IndexSet<SourcePath> = self.source_cache.paths().cloned().collect();
+        for (python_path, result) in self.python_import_cache.iter() {
+            paths.insert(SourcePath::from(python_path));
+            if let Ok(module) = result {
+                for imported in module.get_imports() {
+                    paths.insert(SourcePath::new(imported.clone()));
+                }
+            }
+        }
+        paths
     }
 
     /// Gets the models that the runtime has loaded.
@@ -98,5 +106,64 @@ impl Runtime {
                 (path == param_model_path).then(|| model.path().clone())
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{CacheReadPolicy, CacheWritePolicy};
+    use indexmap::IndexSet;
+    use oneil_python::function::PythonModule;
+    use oneil_shared::paths::PythonPath;
+    use std::path::PathBuf;
+
+    fn runtime() -> Runtime {
+        Runtime::new(CacheReadPolicy::Never, CacheWritePolicy::Never)
+    }
+
+    /// Watch paths include local files imported by a cached Python module.
+    #[test]
+    fn watch_paths_include_python_sibling_imports() {
+        let mut runtime = runtime();
+        let helpers = PythonPath::from_str_no_ext("lib/helpers");
+        let util = PathBuf::from("lib/util.py");
+        let mut imports = IndexSet::new();
+        imports.insert(util.clone());
+        runtime.python_import_cache.insert(
+            helpers.clone(),
+            Ok(PythonModule::new(
+                None,
+                indexmap::IndexMap::new(),
+                imports,
+                0,
+            )),
+        );
+
+        let watches = runtime.get_watch_paths();
+        assert!(watches.contains(&SourcePath::from(&helpers)));
+        assert!(watches.contains(&SourcePath::new(util)));
+    }
+
+    /// Changing a sibling import drops the cached Python module that imported it.
+    #[test]
+    fn clearing_a_sibling_import_invalidates_the_importer() {
+        let mut runtime = runtime();
+        let helpers = PythonPath::from_str_no_ext("lib/helpers");
+        let util = PathBuf::from("lib/util.py");
+        let mut imports = IndexSet::new();
+        imports.insert(util.clone());
+        runtime.python_import_cache.insert(
+            helpers.clone(),
+            Ok(PythonModule::new(
+                None,
+                indexmap::IndexMap::new(),
+                imports,
+                0,
+            )),
+        );
+
+        runtime.clear_non_source_caches(&SourcePath::new(util));
+        assert!(runtime.python_import_cache.get_entry(&helpers).is_none());
     }
 }
