@@ -36,11 +36,12 @@ pub fn load_python_import(
         .canonicalize()
         .expect("path should be directory that exists");
 
-    // get the module name from the path
-    let path_str = path.as_path().to_string_lossy();
-    let module_name = path_str.trim_end_matches(".py").replace('/', ".");
+    // get the module name from the file stem so directory components and `..`
+    // do not produce an invalid dotted module name
+    let module_name = python_module_name(path);
 
     // convert the path and module name to C strings
+    let path_str = path.as_path().to_string_lossy();
     let path_cstr = CString::new(path_str.as_bytes()).expect("path should not have a null byte");
     let module_name_cstr =
         CString::new(module_name).expect("module name should not have a null byte");
@@ -103,6 +104,17 @@ pub fn load_python_import(
         }
         Err(e) => Err(LoadPythonImportError::CouldNotLoadPythonModule(e)),
     }
+}
+
+/// Returns the Python `__name__` used when executing imported source.
+///
+/// Directory components and `..` are omitted so `../testing/helpers.py` loads as `helpers`.
+fn python_module_name(path: &PythonPath) -> String {
+    path.as_path()
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .expect("python path should have a utf-8 file stem")
+        .to_string()
 }
 
 fn insert_oneil_module_into_python(py: Python<'_>) -> PyResult<()> {
@@ -277,5 +289,29 @@ impl Clone for ImportTracker {
             imports: Arc::clone(&self.imports),
             builtins_import_orig: self.builtins_import_orig.clone_ref(py),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::python_module_name;
+    use oneil_shared::paths::PythonPath;
+
+    #[test]
+    fn module_name_is_file_stem() {
+        let path = PythonPath::from_str_no_ext("helpers");
+        assert_eq!(python_module_name(&path), "helpers");
+    }
+
+    #[test]
+    fn module_name_ignores_directories() {
+        let path = PythonPath::from_str_no_ext("testing/helpers");
+        assert_eq!(python_module_name(&path), "helpers");
+    }
+
+    #[test]
+    fn module_name_ignores_parent_directory() {
+        let path = PythonPath::from_str_no_ext("../testing/helpers");
+        assert_eq!(python_module_name(&path), "helpers");
     }
 }

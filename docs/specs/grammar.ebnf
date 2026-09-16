@@ -58,7 +58,7 @@ NoteInterpolation = "{{", Identifier, ":", ( "equation" | "value" ), "}}" ;
 Section = "section", Label, EndOfLine, [ Note ], { ImportDecl | ApplyDecl | SubmodelDecl | DesignBodyParameterDecl | ParameterDecl | TestDecl } ;
 
 (* Imports *)
-ImportDecl = "import", Identifier, EndOfLine ;
+ImportDecl = "import", [ DirectoryPath ], Identifier, EndOfLine ;
 (* `submodel` imports the model both as a reference and as a submodel; *)
 (* `reference` imports it as a reference only. *)
 SubmodelDecl = ("submodel" | "reference"), [ DirectoryPath ], ModelInfo, [ SubmodelList ], EndOfLine ;

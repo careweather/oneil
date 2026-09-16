@@ -95,7 +95,8 @@ pub fn parse_complete(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError>
 fn import_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let (rest, import_token) = import.convert_errors().parse(input)?;
 
-    // TODO: allow a path here (ex. `import foo.bar`)
+    let (rest, directory_path) = opt_directory_path.parse(rest)?;
+
     let (rest, import_path_token) = identifier
         .or_fail_with(ParserError::import_missing_path(
             import_token.lexeme_span.clone(),
@@ -112,7 +113,12 @@ fn import_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
         Span::from_start_and_end(&import_token.lexeme_span, &end_of_line_token.lexeme_span);
     let whitespace_span = end_of_line_token.whitespace_span;
 
-    let import_path_str = Node::<String>::from(import_path_token);
+    let import_path_str = python_import_path_node(
+        &directory_path,
+        import_path_token.lexeme_str,
+        &import_path_token.lexeme_span,
+        import_path_token.whitespace_span.clone(),
+    );
 
     let import_node = Node::new(
         Import::new(import_path_str),
@@ -123,6 +129,27 @@ fn import_decl(input: InputSpan<'_>) -> Result<'_, DeclNode, ParserError> {
     let decl_node = Node::new(Decl::Import(import_node), node_span, whitespace_span);
 
     Ok((rest, decl_node))
+}
+
+/// Joins an optional directory path and file identifier into a sibling-relative import path.
+///
+/// The node's span covers the full written path, including `../` and directory segments.
+fn python_import_path_node(
+    directory_path: &[DirectoryNode],
+    file_name: &str,
+    file_span: &Span,
+    whitespace_span: Span,
+) -> Node<String> {
+    let mut parts: Vec<&str> = directory_path.iter().map(|d| d.as_str()).collect();
+    parts.push(file_name);
+    let path = parts.join("/");
+
+    let span = directory_path.first().map_or_else(
+        || file_span.clone(),
+        |first| Span::from_start_and_end(first.span(), file_span),
+    );
+
+    Node::new(path, span, whitespace_span)
 }
 
 /// Parses a top-level `design [path/to/]<model>` line (`.one` design files and wrong-file probe on `.on`).
@@ -693,6 +720,46 @@ mod tests {
             };
 
             assert_eq!(import_node.path().as_str(), "foo");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn import_decl_with_parent_directory() {
+            let input = InputSpan::new_extra("import ../functions\n", Config::default());
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::Import(ref import_node) = *decl else {
+                panic!("Expected import declaration");
+            };
+
+            assert_eq!(import_node.path().as_str(), "../functions");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn import_decl_with_nested_directory() {
+            let input = InputSpan::new_extra("import lib/helpers\n", Config::default());
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::Import(ref import_node) = *decl else {
+                panic!("Expected import declaration");
+            };
+
+            assert_eq!(import_node.path().as_str(), "lib/helpers");
+            assert_eq!(rest.fragment(), &"");
+        }
+
+        #[test]
+        fn import_decl_with_multiple_directories() {
+            let input =
+                InputSpan::new_extra("import simulations/compass/simgeom\n", Config::default());
+            let (rest, decl) = parse(input).expect("parsing should succeed");
+
+            let Decl::Import(ref import_node) = *decl else {
+                panic!("Expected import declaration");
+            };
+
+            assert_eq!(import_node.path().as_str(), "simulations/compass/simgeom");
             assert_eq!(rest.fragment(), &"");
         }
 
@@ -1553,6 +1620,7 @@ mod tests {
                 ("import\n", 6, MissingPath, 0, 6),
                 ("import 123\n", 7, MissingPath, 0, 6),
                 ("import foo@bar\n", 10, MissingEndOfLine, 7, 10),
+                ("import foo.bar\n", 10, MissingEndOfLine, 7, 10),
             ];
             for &(input_str, offset, ref import_kind, cs, ce) in cases {
                 assert_failure(

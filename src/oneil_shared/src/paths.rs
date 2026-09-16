@@ -1,7 +1,7 @@
 //! Path types for model and Python module locations.
 
 use std::convert::TryFrom;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -144,9 +144,43 @@ impl ModelPath {
     }
 
     /// Returns a path for a sibling Python module relative to the current model's path.
+    ///
+    /// `.` and `..` components are collapsed so `model/sim/foo.on` plus `../functions`
+    /// resolves to `model/functions.py`.
     #[must_use]
     pub fn get_sibling_python_path(&self, sibling_path: PythonPath) -> PythonPath {
-        PythonPath::new(self.join_sibling(sibling_path.into_path_buf()))
+        let joined = self.join_sibling(sibling_path.into_path_buf());
+        PythonPath::new(normalize_lexical(&joined))
+    }
+}
+
+/// Collapses `.` and `..` without touching the filesystem.
+///
+/// A leading `..` on a relative path is kept. `..` after a root directory is dropped.
+fn normalize_lexical(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => match out.components().next_back() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir | Component::Prefix(_)) => {}
+                Some(Component::ParentDir) | None => {
+                    out.push(component);
+                }
+                Some(Component::CurDir) => unreachable!("`.` is never pushed"),
+            },
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                out.push(component);
+            }
+        }
+    }
+    if out.as_os_str().is_empty() {
+        PathBuf::from(".")
+    } else {
+        out
     }
 }
 
@@ -511,5 +545,36 @@ mod serde_tests {
             err.to_string().contains("python module path"),
             "unexpected message: {err}"
         );
+    }
+}
+
+#[cfg(test)]
+mod sibling_python_path_tests {
+    use std::path::Path;
+
+    use super::{ModelPath, PythonPath};
+
+    #[test]
+    fn sibling_python_path_normalizes_parent_dir() {
+        let model = ModelPath::from_str_no_ext("model/sim/foo");
+        let sibling = PythonPath::from_str_no_ext("../functions");
+        let resolved = model.get_sibling_python_path(sibling);
+        assert_eq!(resolved.as_path(), Path::new("model/functions.py"));
+    }
+
+    #[test]
+    fn sibling_python_path_keeps_nested_directory() {
+        let model = ModelPath::from_str_no_ext("model/foo");
+        let sibling = PythonPath::from_str_no_ext("testing/helpers");
+        let resolved = model.get_sibling_python_path(sibling);
+        assert_eq!(resolved.as_path(), Path::new("model/testing/helpers.py"));
+    }
+
+    #[test]
+    fn sibling_python_path_keeps_leading_parent_dir() {
+        let model = ModelPath::from_str_no_ext("foo");
+        let sibling = PythonPath::from_str_no_ext("../functions");
+        let resolved = model.get_sibling_python_path(sibling);
+        assert_eq!(resolved.as_path(), Path::new("../functions.py"));
     }
 }

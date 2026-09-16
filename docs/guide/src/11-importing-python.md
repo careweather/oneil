@@ -5,11 +5,21 @@ Oneil can call functions defined in ordinary `.py` files. That uses the **Python
 For calculations or simulations that need Python, after you implement the function in python simply import the Python file into Oneil:
 
 ```oneil
-import <name of functions file>
+import <path to functions file>
 ```
 
-That file should simply define functions matching the name used in the
-parameter:
+The path is sibling-relative to the `.on` file (no `.py` extension), using the same slash form as `submodel` / `reference`:
+
+```oneil
+import functions
+import ../functions
+import ../testing/helpers
+import simulations/compass/simmodel/simgeom
+```
+
+`import functions` looks for `functions.py` next to the model. A model in a subfolder that needs the parent file writes `import ../functions`. Oneil puts the loaded `.py` file's directory on Python's `sys.path`, so that script can import other modules in the same folder.
+
+The imported file should define functions matching the names used in parameters:
 
 ```py
 import numpy as np
