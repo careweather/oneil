@@ -1,0 +1,8 @@
+# Model that imports a nested Python file which itself imports a sibling module.
+import lib/helpers
+
+Side: s = 3 :m
+Area: A = square_area(s) :m^2
+Floor area: min_area = 8 :m^2
+
+test: A > min_area

@@ -139,7 +139,12 @@ stdout:
   `g.planet` edge; reference tree of local `m`; recursive independents
   across the referenced planet
 
-## Test count summary (42 tests)
+### `python/` — Python interop (2 tests)
+
+- `python_square_area.on` + `py_helpers.py` — model calls a function from a sibling `.py`
+- `python_sibling_modules.on` + `lib/helpers.py` + `lib/util.py` — Oneil `import lib/helpers`; that file imports `util` from the same folder
+
+## Test count summary (43 tests)
 
 | Category                       | Tests |
 |--------------------------------|------:|
@@ -154,5 +159,6 @@ stdout:
 | Cycles (file, overlay, build)  | 3     |
 | Apply errors (local + chain)   | 4     |
 | Analysis (trees / independents)| 6     |
-| Other (designs, python, …)     | 12    |
-| **Total**                      | **42**|
+| Python                         | 2     |
+| Other (designs, …)             | 11    |
+| **Total**                      | **43**|

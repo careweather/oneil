@@ -294,8 +294,10 @@ impl Clone for ImportTracker {
 
 #[cfg(test)]
 mod tests {
-    use super::python_module_name;
+    use super::{load_python_import, python_module_name};
     use oneil_shared::paths::PythonPath;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn module_name_is_file_stem() {
@@ -313,5 +315,51 @@ mod tests {
     fn module_name_ignores_parent_directory() {
         let path = PythonPath::from_str_no_ext("../testing/helpers");
         assert_eq!(python_module_name(&path), "helpers");
+    }
+
+    /// Loads a `.py` file that `import`s another module in the same directory.
+    #[test]
+    fn loaded_module_can_import_sibling_python_files() {
+        let dir = std::env::temp_dir().join(format!(
+            "oneil-python-sibling-import-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock should be after the unix epoch")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).expect("temp directory should be creatable");
+
+        let sibling_path = dir.join("util.py");
+        fs::write(&sibling_path, "def double(x):\n    return x * 2\n")
+            .expect("sibling python file should be writable");
+
+        let main_path = dir.join("helpers.py");
+        let source = "import util\n\ndef run(x):\n    return util.double(x)\n";
+        fs::write(&main_path, source).expect("main python file should be writable");
+
+        let python_path = PythonPath::from_path_with_ext(&main_path);
+        let module = load_python_import(&python_path, source)
+            .expect("python file should load while importing a sibling module");
+
+        assert!(
+            module
+                .get_function_names()
+                .any(|name| name.as_str() == "run"),
+            "loaded module should expose `run`"
+        );
+
+        let sibling_canonical = sibling_path
+            .canonicalize()
+            .expect("sibling python file should exist");
+        assert!(
+            module.get_imports().iter().any(|path| {
+                path == &sibling_canonical
+                    || path.canonicalize().ok().as_ref() == Some(&sibling_canonical)
+            }),
+            "sibling python file should be tracked as a local import"
+        );
+
+        fs::remove_dir_all(&dir).expect("temp directory should be removable");
     }
 }
