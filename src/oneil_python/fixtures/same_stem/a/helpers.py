@@ -4,5 +4,7 @@ import util
 
 
 def run():
-    """Return this directory's `util.value()`."""
-    return util.value()
+    """Return this directory's `util.value()`, importing it at call time."""
+    import util as imported_util
+
+    return imported_util.value()

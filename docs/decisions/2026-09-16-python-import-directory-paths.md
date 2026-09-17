@@ -29,7 +29,7 @@ import ../testing/helpers
 import simulations/compass/simmodel/simgeom
 ```
 
-Bare `import functions` stays same-folder. Resolved paths collapse `.` and `..` for cache and duplicate keys. Each load puts that file's folder on `sys.path` and evicts only same-named local siblings from `sys.modules`, so `import util` finds the script's own folder without unloading site-packages or virtualenv modules. The executed module uses a reserved `__name__` so a user `inspect.py` cannot replace the standard library.
+Bare `import functions` stays same-folder. Resolved paths collapse `.` and `..` for cache and duplicate keys. Each load and each later function call puts that file's folder on `sys.path` and evicts only same-named local siblings from `sys.modules`, so `import util` finds the script's own folder even when the import happens inside a function. Installed packages and virtualenv modules stay cached. The executed module uses a reserved `__name__` so a user `inspect.py` cannot replace the standard library.
 
 ## Consequences
 

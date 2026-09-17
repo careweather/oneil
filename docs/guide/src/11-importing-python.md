@@ -17,7 +17,7 @@ import ../testing/helpers
 import simulations/compass/simmodel/simgeom
 ```
 
-`import functions` looks for `functions.py` next to the model. A model in a subfolder that needs the parent file writes `import ../functions`. While that file loads, Oneil puts its directory on Python's `sys.path` so the script can import other modules from its own folder. Installed packages and virtualenv modules stay on the existing `sys.path` and in `sys.modules`.
+`import functions` looks for `functions.py` next to the model. A model in a subfolder that needs the parent file writes `import ../functions`. While that file loads, and again when its functions run, Oneil puts its directory on Python's `sys.path` so the script can import other modules from its own folder. Installed packages and virtualenv modules stay on the existing `sys.path` and in `sys.modules`.
 
 The imported file should define functions matching the names used in parameters:
 

@@ -72,7 +72,7 @@ pub fn load_python_import(
                 let value = value.unbind();
                 Ok((
                     PyFunctionName::from(name),
-                    PythonFunction::new(value, docs, line_no),
+                    PythonFunction::new(value, docs, line_no, module_directory.clone()),
                 ))
             })
             .collect::<PyResult<IndexMap<_, _>>>()?;
@@ -110,8 +110,8 @@ const IMPORTED_MODULE_NAME: &str = "_oneil_import";
 
 static PYTHON_LOAD_LOCK: Mutex<()> = Mutex::new(());
 
-/// Serializes Python loads so isolated `sys.path` / `sys.modules` snapshots do not overlap.
-fn lock_python_loads() -> MutexGuard<'static, ()> {
+/// Serializes isolated `sys.path` / `sys.modules` snapshots so loads and calls do not overlap.
+pub(crate) fn lock_python_loads() -> MutexGuard<'static, ()> {
     PYTHON_LOAD_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -122,7 +122,7 @@ fn lock_python_loads() -> MutexGuard<'static, ()> {
 ///
 /// Installed and virtualenv packages stay in `sys.modules` so a first `import
 /// numpy` is not unloaded and later re-imported as a second copy.
-fn isolate_import_state<'py>(
+pub(crate) fn isolate_import_state<'py>(
     py: Python<'py>,
     module_directory: &Path,
 ) -> PyResult<IsolatedImportState<'py>> {
@@ -211,7 +211,7 @@ fn has_venv_component(path: &Path) -> bool {
 }
 
 /// Restores `sys.path` and removes only local sibling modules from `sys.modules`.
-struct IsolatedImportState<'py> {
+pub(crate) struct IsolatedImportState<'py> {
     path: Bound<'py, PyList>,
     modules: Bound<'py, PyDict>,
     path_snapshot: Bound<'py, PyAny>,
@@ -479,7 +479,14 @@ mod tests {
         );
     }
 
-    /// Same-stem modules in different folders keep their own sibling imports.
+    /// Sibling imports inside `run()` still resolve after `sys.path` is restored.
+    #[test]
+    fn call_resolves_sibling_imports_inside_run() {
+        let module = load_fixture(fixture_dir("sibling_import").join("helpers.py"));
+        assert_eq!(call_int(&module, "late_run"), 42);
+    }
+
+    /// Same-stem modules keep their own sibling imports, including imports inside `run()`.
     #[test]
     fn same_stem_modules_use_their_own_sibling_imports() {
         let a = load_fixture(fixture_dir("same_stem/a").join("helpers.py"));
