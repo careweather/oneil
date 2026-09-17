@@ -210,7 +210,7 @@ test: g_E*0.9 <= g_a <= g_E*1.1
 
 ## Importing Python
 
-Oneil allows users to import python code so that models can perform repetitive calculations or more complex calculations such as simulations. Import python code by using the syntax `import <python_file>` where `<python_file>` is the path to the python file without `.py`, relative to the model file. The path may include folders (`import ../functions`, `import lib/helpers`), matching `submodel`. Functions from that file can then be used in expressions.
+Oneil allows users to import python code so that models can perform repetitive calculations or more complex calculations such as simulations. Import python code by using the syntax `import <python_file>` where `<python_file>` is the path to the python file without `.py`, relative to the model file. The path may include folders (`import ../functions`, `import lib/helpers`), like `submodel` paths. Functions from that file can then be used in expressions.
 
 ```oneil
 import sphere_math
