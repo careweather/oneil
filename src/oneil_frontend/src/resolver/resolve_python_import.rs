@@ -354,6 +354,56 @@ mod tests {
     }
 
     #[test]
+    fn resolve_python_imports_parent_directory() {
+        let imports = [test_ast::ImportPythonNodeBuilder::build("../functions")];
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = test_model_path("subdir/test_model");
+
+        let active_path = test_model_path("subdir/test_model");
+        let mut external = TestExternalContext::new().with_python_imports_ok(["functions"]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
+
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&python_path("functions")));
+        assert!(
+            resolution_context
+                .get_active_model_python_import_errors()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn resolve_python_imports_nested_directory() {
+        let imports = [test_ast::ImportPythonNodeBuilder::build("testing/helpers")];
+        let import_refs: Vec<&ast::ImportNode> = imports.iter().collect();
+        let model_path = test_model_path("test_model");
+
+        let active_path = test_model_path("test_model");
+        let mut external = TestExternalContext::new().with_python_imports_ok(["testing/helpers"]);
+        let mut resolution_context = ResolutionContextBuilder::new()
+            .with_active_model(active_path)
+            .with_external_context(&mut external)
+            .build();
+
+        resolve_python_imports(&model_path, import_refs, &mut resolution_context);
+
+        let resolved = resolution_context.get_active_model_python_imports();
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved.contains_key(&python_path("testing/helpers")));
+        assert!(
+            resolution_context
+                .get_active_model_python_import_errors()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn resolve_python_imports_duplicate_imports() {
         // build the imports (same path twice)
         let imports = [

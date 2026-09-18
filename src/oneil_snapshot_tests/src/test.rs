@@ -387,6 +387,12 @@ fn python_square_area() {
     insta::assert_snapshot!(run_fixture("python/python_square_area.on"));
 }
 
+/// Snapshot for a nested Python import whose `.py` file imports a sibling module.
+#[test]
+fn python_sibling_modules() {
+    insta::assert_snapshot!(run_fixture("python/python_sibling_modules.on"));
+}
+
 // =============================================================================
 // Analysis: dependency tree, reference tree, independents
 // =============================================================================

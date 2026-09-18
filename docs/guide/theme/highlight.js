@@ -27,6 +27,8 @@ hljs.debugMode();
 hljs.registerLanguage("oneil", function (hljs) {
   "use strict";
   const IDENT_RE = hljs.UNDERSCORE_IDENT_RE;
+  // Sibling-relative Python import path: `functions`, `../functions`, `lib/helpers`.
+  const IMPORT_PATH_RE = /(?:(?:\.\.?|[A-Za-z_]\w*)\/)*[A-Za-z_]\w*/;
   const LABEL_RE = /[^()[\]{#~:= \t\n*$][^()[\]:=\n]*/;
   const END_OF_LINE_RE = /(?=#)|$/m; // the start of a comment is considered "end of line"
 
@@ -161,7 +163,7 @@ hljs.registerLanguage("oneil", function (hljs) {
           /^\s*/m,
           /import/,
           /\s+/,
-          IDENT_RE,
+          IMPORT_PATH_RE,
           RegExp(`\\s*(?=${END_OF_LINE_RE.source})`),
         ],
         beginScope: {

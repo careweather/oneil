@@ -286,9 +286,31 @@ impl PythonImportCache {
         self.entries.insert(path, result);
     }
 
-    /// Removes the cached entry for `path`, if present.
-    pub fn remove(&mut self, path: &PythonPath) {
-        self.entries.swap_remove(path);
+    /// Iterates cached Python import paths and their load results.
+    pub fn iter(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            &PythonPath,
+            &Result<oneil_python::function::PythonModule, PythonImportError>,
+        ),
+    > {
+        self.entries.iter()
+    }
+
+    /// Drops the entry for `path` and any module that imported `path`.
+    pub fn remove_path_and_dependents(&mut self, path: &std::path::Path) {
+        self.entries.retain(|cached, result| {
+            if cached.as_path() == path {
+                return false;
+            }
+            result.as_ref().map_or(true, |module| {
+                !module
+                    .get_imports()
+                    .iter()
+                    .any(|imported| imported.as_path() == path)
+            })
+        });
     }
 }
 

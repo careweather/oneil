@@ -55,27 +55,51 @@ pub struct PythonFunction {
     function: Arc<Py<PyAny>>,
     docs: Option<String>,
     line_no: Option<u32>,
+    module_directory: PathBuf,
 }
 
 impl PythonFunction {
-    pub fn new(function: Py<PyAny>, docs: Option<String>, line_no: Option<u32>) -> Self {
+    /// Wraps a loaded Python callable that should run with `module_directory` on `sys.path`.
+    pub fn new(
+        function: Py<PyAny>,
+        docs: Option<String>,
+        line_no: Option<u32>,
+        module_directory: PathBuf,
+    ) -> Self {
         let function = Arc::new(function);
         Self {
             function,
             docs,
             line_no,
+            module_directory,
         }
     }
 
     /// Calls the Python function with the given positional arguments.
+    ///
+    /// Sibling imports inside the function body resolve against `module_directory`.
+    /// The GIL is released before taking the import lock so this cannot deadlock
+    /// with a load that holds that lock and then attaches.
     pub fn call<'py>(
         &self,
         py: Python<'py>,
         args: &[Bound<'py, PyAny>],
     ) -> PyResult<Bound<'py, PyAny>> {
-        let callable = self.function.bind(py);
-        let args_tuple = PyTuple::new(py, args)?;
-        callable.call1(args_tuple)
+        let args: Vec<Py<PyAny>> = args.iter().map(|arg| arg.clone().unbind()).collect();
+        let result = py.detach(|| {
+            let _guard = crate::load::lock_python_loads();
+            Python::attach(|py| {
+                let _import_state = crate::load::isolate_import_state(py, &self.module_directory)?;
+                let callable = self.function.bind(py);
+                let bound_args = args
+                    .iter()
+                    .map(|arg| arg.bind(py).clone())
+                    .collect::<Vec<_>>();
+                let args_tuple = PyTuple::new(py, &bound_args)?;
+                callable.call1(args_tuple).map(|value| value.unbind())
+            })
+        })?;
+        Ok(result.into_bound(py))
     }
 
     /// Returns the documentation string for the function.
