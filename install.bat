@@ -71,10 +71,10 @@ if not exist "%ONEIL_PKG%\Cargo.toml" (
 )
 
 set "PYTHON_CMD="
-where uv >nul 2>&1
-if not errorlevel 1 (
-  for /f "usebackq delims=" %%P in (`uv python find 3.12 2^>nul`) do set "PYTHON_CMD=%%P"
-)
+call :try_uv 3.14
+if not defined PYTHON_CMD call :try_uv 3.12
+if not defined PYTHON_CMD call :try_on_path python3.14
+if not defined PYTHON_CMD call :try_on_path python3.12
 if not defined PYTHON_CMD (
   where python3 >nul 2>&1
   if not errorlevel 1 set "PYTHON_CMD=python3"
@@ -84,18 +84,18 @@ if not defined PYTHON_CMD (
   if not errorlevel 1 set "PYTHON_CMD=python"
 )
 if not defined PYTHON_CMD (
-  echo Error: Python 3.12 was not found ^(needed to link the Rust CLI's model Python support^). 1>&2
+  echo Error: Python 3.12 or 3.14 was not found ^(needed to link the Rust CLI's model Python support^). 1>&2
   echo. 1>&2
-  echo Install it with: uv python install 3.12 1>&2
+  echo Install it with: uv python install 3.14 1>&2
   exit /b 1
 )
 
 set "PYO3_PYTHON=%PYTHON_CMD%"
 
-%PYTHON_CMD% -c "import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)" >nul 2>&1
+%PYTHON_CMD% -c "import sys; sys.exit(0 if sys.version_info[:2] in ((3, 12), (3, 14)) else 1)" >nul 2>&1
 if errorlevel 1 (
-  for /f "usebackq delims=" %%V in (`%PYTHON_CMD% --version 2^>^&1`) do echo Error: Oneil supports Python 3.12. Found: %%V 1>&2
-  echo Install 3.12 with: uv python install 3.12 1>&2
+  for /f "usebackq delims=" %%V in (`%PYTHON_CMD% --version 2^>^&1`) do echo Error: Oneil supports Python 3.12 and 3.14. Found: %%V 1>&2
+  echo Install one with: uv python install 3.14 1>&2
   exit /b 1
 )
 
@@ -115,7 +115,9 @@ if "%WITH_PYTHON_COMPILER%"=="1" if not exist "%SCRIPT_DIR%pyproject.toml" (
   exit /b 1
 )
 
-echo Installing Rust Oneil CLI ^(default features: rust-lib + python-lib^)...
+echo Installing oneil and oneil-runner ^(default features: rust-lib + python-lib^)...
+cargo install --force --path "%SCRIPT_DIR%src\oneil_loader"
+if errorlevel 1 exit /b 1
 cargo install --force --path "%ONEIL_PKG%"
 if errorlevel 1 exit /b 1
 
@@ -170,6 +172,18 @@ echo.
 echo Prerequisites:
 echo   - Cargo ^(Rust^): https://rustup.rs/
 echo   - gcc ^(or MSVC with the windows-msvc Rust target; see error text if checks fail^)
-echo   - Python 3.12 development headers ^(uv python install 3.12^)
-echo   - For --with-python-package: Python 3.12 with pip
+echo   - Python 3.12 or 3.14 development headers ^(uv python install 3.14^)
+echo   - For --with-python-package: that same Python with pip
 goto :eof
+
+:try_uv
+where uv >nul 2>&1
+if errorlevel 1 exit /b 0
+for /f "usebackq delims=" %%P in (`uv python find %~1 2^>nul`) do set "PYTHON_CMD=%%P"
+exit /b 0
+
+:try_on_path
+where %~1 >nul 2>&1
+if errorlevel 1 exit /b 0
+set "PYTHON_CMD=%~1"
+exit /b 0

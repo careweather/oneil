@@ -1,6 +1,6 @@
 # Importing Python Functions
 
-Oneil can call functions defined in ordinary `.py` files. That uses the **Python 3.12 already installed on the machine** (the CLI does not ship Python). Helper modules may `import oneil` for `Interval`, `MeasuredNumber`, units, and builtins — the CLI injects that module into the installed interpreter (see [Appendix A](./a-python-api.md)).
+Oneil can call functions defined in ordinary `.py` files. That uses the **Python 3.12 or 3.14 already installed on the machine** (the CLI does not ship Python). The binary runs against the minor version it was built with. Helper modules may `import oneil` for `Interval`, `MeasuredNumber`, units, and builtins — the CLI injects that module into the installed interpreter (see [Appendix A](./a-python-api.md)).
 
 For calculations or simulations that need Python, after you implement the function in python simply import the Python file into Oneil:
 

@@ -29,7 +29,7 @@ We are actively working on expanding the capabilities of this extension. Upcomin
 
 - Visual Studio Code version 1.0.0 or higher
 - An Oneil CLI for the language server. The extension can **download it from GitHub Releases** (Command Palette: “Oneil: Install or Update CLI”, or accept the prompt when none is found). You can also put `oneil` on your PATH, set `ONEIL_PATH`, or set **Oneil: Server Path** to a local build.
-- **Python 3.12** for the release CLI (`brew install python@3.12`, the python.org 3.12 installer, or `uv python install 3.12`). The extension downloads the archive that matches that layout.
+- **Python 3.12 or 3.14** for the release CLI (`brew install python@3.14`, the python.org installer, or `uv python install 3.14`). The extension downloads the archive for the newest of those that is installed.
 
 >[!NOTE]
 > `oneil.serverPath` always wins over the extension-managed install. Clear it to use managed updates / version selection. Use **Oneil: Select CLI Version…** to install a different published release (re-downloads over the managed binary). Use **Oneil: Check for CLI Updates** to compare against the latest GitHub release.

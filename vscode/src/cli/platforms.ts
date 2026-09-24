@@ -3,7 +3,7 @@
  * Mirrors `actions/install-oneil/install.sh`.
  */
 
-import type { PythonFlavor } from "./python"
+import type { PythonMinor } from "./python"
 
 export type CliPlatform = {
     /** Rust target triple used in release asset names. */
@@ -46,10 +46,10 @@ export function resolveCliPlatform(
 }
 
 /**
- * Flavored archive name: `oneil-{tag}-{triple}-{flavor}.{ext}`.
+ * Versioned archive name: `oneil-{tag}-{triple}-py3.12.{ext}`.
  */
-export function cliArchiveName(platform: CliPlatform, tag: string, flavor: PythonFlavor): string {
-    return `oneil-${tag}-${platform.triple}-${flavor}.${platform.archiveExt}`
+export function cliArchiveName(platform: CliPlatform, tag: string, python: PythonMinor): string {
+    return `oneil-${tag}-${platform.triple}-py${python}.${platform.archiveExt}`
 }
 
 /**
@@ -60,14 +60,27 @@ export function cliUnflavoredArchiveName(platform: CliPlatform, tag: string): st
 }
 
 /**
- * Asset names to try for a tag, flavored first, then the unflavored fallback.
+ * Asset names to try for a tag.
+ *
+ * Current releases use `py3.12` / `py3.14`. Python 3.12 also tries the older
+ * layout flavors and the unflavored 1.x name.
  */
 export function cliAssetCandidates(
     platform: CliPlatform,
     tag: string,
-    flavor: PythonFlavor,
+    python: PythonMinor,
 ): string[] {
-    return [cliArchiveName(platform, tag, flavor), cliUnflavoredArchiveName(platform, tag)]
+    const names = [cliArchiveName(platform, tag, python)]
+    if (python === "3.12") {
+        const flavors = platform.triple.includes("apple")
+            ? ["homebrew", "uv", "system"]
+            : ["uv", "system"]
+        for (const flavor of flavors) {
+            names.push(`oneil-${tag}-${platform.triple}-${flavor}.${platform.archiveExt}`)
+        }
+        names.push(cliUnflavoredArchiveName(platform, tag))
+    }
+    return names
 }
 
 /** Human-readable list of platforms that publish CLI archives. */

@@ -95,74 +95,36 @@ case "${OS_NAME}/${ARCH_NAME}" in
     ;;
 esac
 
-detect_flavor() {
+python_minor_present() {
+  local minor="$1"
+  if command -v "python${minor}" >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v uv >/dev/null 2>&1 && uv python find "${minor}" >/dev/null 2>&1; then
+    return 0
+  fi
   if [[ "${OS_NAME}" == "macOS" ]] \
-    && [[ -e /opt/homebrew/opt/python@3.12/Frameworks/Python.framework/Versions/3.12/Python ]]; then
-    echo homebrew
-    return
+    && { [[ -e "/opt/homebrew/opt/python@${minor}/Frameworks/Python.framework/Versions/${minor}/Python" ]] \
+      || [[ -e "/Library/Frameworks/Python.framework/Versions/${minor}/Python" ]]; }; then
+    return 0
   fi
-
-  if command -v uv >/dev/null 2>&1 && uv python find 3.12 >/dev/null 2>&1; then
-    echo uv
-    return
+  if [[ "${OS_NAME}" == "Windows" ]] && py "-${minor}" -c "import sys" >/dev/null 2>&1; then
+    return 0
   fi
-
-  if [[ "${OS_NAME}" == "macOS" ]] \
-    && [[ -e /Library/Frameworks/Python.framework/Versions/3.12/Python ]]; then
-    echo system
-    return
-  fi
-
-  if [[ "${OS_NAME}" == "Linux" ]] \
-    && { [[ -e /usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0 ]] \
-      || [[ -e /usr/lib64/libpython3.12.so.1.0 ]] \
-      || command -v python3.12 >/dev/null 2>&1; }; then
-    echo system
-    return
-  fi
-
-  if [[ "${OS_NAME}" == "Windows" ]]; then
-    if py -3.12 -c "import sys" >/dev/null 2>&1 || python3.12 -c "import sys" >/dev/null 2>&1; then
-      echo system
-      return
-    fi
-  fi
+  return 1
 }
 
-python_libdir() {
-  local py="$1"
-  "${py}" -c 'import os, sys, sysconfig
-if sys.platform == "win32":
-    print(os.path.dirname(sys.executable))
-else:
-    print(sysconfig.get_config_var("LIBDIR") or "")
-'
-}
-
-export_lib_path() {
-  local py libdir
-  py="$1"
-  libdir="$(python_libdir "${py}")"
-  if [[ -z "${libdir}" ]]; then
-    return
+python_minor=""
+for candidate in 3.14 3.12; do
+  if python_minor_present "${candidate}"; then
+    python_minor="${candidate}"
+    break
   fi
-  if [[ "${OS_NAME}" == "macOS" ]]; then
-    export DYLD_LIBRARY_PATH="${libdir}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
-    if [[ -n "${GITHUB_ENV:-}" ]]; then
-      echo "DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}" >> "${GITHUB_ENV}"
-    fi
-  elif [[ "${OS_NAME}" == "Linux" ]]; then
-    export LD_LIBRARY_PATH="${libdir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-    if [[ -n "${GITHUB_ENV:-}" ]]; then
-      echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> "${GITHUB_ENV}"
-    fi
-  else
-    export PATH="${libdir}:${PATH}"
-    if [[ -n "${GITHUB_PATH:-}" ]]; then
-      echo "${libdir}" >> "${GITHUB_PATH}"
-    fi
-  fi
-}
+done
+if [[ -z "${python_minor}" ]]; then
+  err "Need Python 3.12 or 3.14 to run the release CLI."
+  exit 1
+fi
 
 try_download() {
   local archive="$1"
@@ -178,24 +140,6 @@ try_download() {
   fi
 }
 
-flavor="$(detect_flavor || true)"
-if [[ -z "${flavor}" ]]; then
-  err "Need Python 3.12 to run the release CLI (system, uv, or Homebrew python@3.12 on macOS)."
-  exit 1
-fi
-
-if [[ "${flavor}" == "uv" ]]; then
-  export_lib_path "$(uv python find 3.12)"
-elif [[ "${flavor}" == "system" && "${OS_NAME}" == "Linux" ]] && command -v python3.12 >/dev/null 2>&1; then
-  export_lib_path "$(command -v python3.12)"
-elif [[ "${flavor}" == "system" && "${OS_NAME}" == "Windows" ]]; then
-  if py -3.12 -c "import sys" >/dev/null 2>&1; then
-    export_lib_path "$(py -3.12 -c "import sys; print(sys.executable)")"
-  elif command -v python3.12 >/dev/null 2>&1; then
-    export_lib_path "$(command -v python3.12)"
-  fi
-fi
-
 if in_gha; then
   work_dir="${RUNNER_TEMP}/oneil-${ONEIL_VERSION}"
 else
@@ -204,17 +148,17 @@ fi
 mkdir -p "${work_dir}"
 cd "${work_dir}"
 
-flavored="oneil-${ONEIL_VERSION}-${triple}-${flavor}.${ext}"
+versioned="oneil-${ONEIL_VERSION}-${triple}-py${python_minor}.${ext}"
 unflavored="oneil-${ONEIL_VERSION}-${triple}.${ext}"
 archive=""
 
-if try_download "${flavored}"; then
-  archive="${flavored}"
+if try_download "${versioned}"; then
+  archive="${versioned}"
 elif try_download "${unflavored}"; then
-  echo "No ${flavored}; using unflavored archive from an older release"
+  echo "No ${versioned}; using unflavored archive from an older release"
   archive="${unflavored}"
 else
-  err "Could not download ${flavored} or ${unflavored}"
+  err "Could not download ${versioned} or ${unflavored}"
   exit 1
 fi
 
@@ -231,6 +175,8 @@ else
   tar -xzf "${archive}"
 fi
 
+runner_name="${binary_name/oneil/oneil-runner}"
+
 if [[ ! -f "${binary_name}" ]]; then
   err "Expected ${binary_name} in ${archive}"
   ls -la
@@ -238,9 +184,15 @@ if [[ ! -f "${binary_name}" ]]; then
 fi
 
 chmod +x "${binary_name}"
+if [[ -f "${runner_name}" ]]; then
+  chmod +x "${runner_name}"
+fi
 
 if [[ "${OS_NAME}" == "macOS" ]] && command -v xattr >/dev/null 2>&1; then
   xattr -d com.apple.quarantine "${binary_name}" 2>/dev/null || true
+  if [[ -f "${runner_name}" ]]; then
+    xattr -d com.apple.quarantine "${runner_name}" 2>/dev/null || true
+  fi
 fi
 
 if in_gha; then
@@ -251,23 +203,24 @@ else
   dest_dir="${ONEIL_INSTALL_DIR:-${HOME}/.local/bin}"
   mkdir -p "${dest_dir}"
   mv "${binary_name}" "${dest_dir}/${binary_name}"
+  if [[ -f "${runner_name}" ]]; then
+    mv "${runner_name}" "${dest_dir}/${runner_name}"
+  fi
   oneil_path="${dest_dir}/${binary_name}"
   export PATH="${dest_dir}:${PATH}"
 fi
 
 version_err="$(mktemp "${TMPDIR:-/tmp}/oneil-version.XXXXXX")"
 if ! version_line="$("${oneil_path}" --version 2>"${version_err}")"; then
-  err "Installed oneil failed \`--version\` (flavor=${flavor}). Install matching Python 3.12."
+  err "Installed oneil failed \`--version\`. Install Python ${python_minor}."
   cat "${version_err}" >&2 || true
   rm -f "${version_err}"
   exit 1
 fi
 rm -f "${version_err}"
 
-echo "Installed ${version_line} (${flavor}) at ${oneil_path}"
+echo "Installed ${version_line} (Python ${python_minor}) at ${oneil_path}"
 if in_gha; then
   echo "version=${version_line}" >> "${GITHUB_OUTPUT}"
   echo "oneil-path=${oneil_path}" >> "${GITHUB_OUTPUT}"
-elif [[ "${flavor}" == "uv" ]]; then
-  echo "The uv flavor needs the Python 3.12 library on the loader path in this shell (DYLD_LIBRARY_PATH / LD_LIBRARY_PATH / PATH)."
 fi

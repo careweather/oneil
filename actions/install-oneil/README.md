@@ -9,8 +9,8 @@ Prefer this Action when your workflow needs `oneil` directly (custom scripts, ad
 ```yaml
 - uses: actions/checkout@v4
 
-# The release CLI links against an installed Python 3.12. Install that
-# layout before this Action so it can pick the matching archive flavor.
+# The release CLI links against Python 3.12 or 3.14. Install one of them
+# before this Action. The script prefers 3.14 when both are present.
 - uses: actions/setup-python@v5
   with:
     python-version: "3.12"
@@ -48,12 +48,12 @@ That installs into `~/.local/bin` (override with `ONEIL_INSTALL_DIR`). In Action
 
 ## Platforms
 
-The Action detects Homebrew `python@3.12`, then `uv python find 3.12`, then a system 3.12, and downloads that flavor (`…-homebrew`, `…-uv`, or `…-system`). Older unflavored 1.x archives are a fallback. On macOS, `actions/setup-python` is not the `system` layout (that flavor is the python.org framework); use Homebrew or uv there.
+The Action prefers Python 3.14, then 3.12, and downloads `…-py3.14` or `…-py3.12`. That archive runs against Homebrew, python.org, a distro package, or uv. Older unflavored 1.x archives are a fallback.
 
 | Runner | Archives |
 |--------|----------|
-| `ubuntu-*` (x86_64) | `oneil-<tag>-x86_64-unknown-linux-gnu-{system,uv}.tar.gz` |
-| `windows-*` (x86_64) | `oneil-<tag>-x86_64-pc-windows-msvc-{system,uv}.zip` |
-| `macos-*` (Apple Silicon) | `oneil-<tag>-aarch64-apple-darwin-{homebrew,system,uv}.tar.gz` |
+| `ubuntu-*` (x86_64) | `oneil-<tag>-x86_64-unknown-linux-gnu-py3.12.tar.gz`, `…-py3.14.tar.gz` |
+| `windows-*` (x86_64) | `oneil-<tag>-x86_64-pc-windows-msvc-py3.12.zip`, `…-py3.14.zip` |
+| `macos-*` (Apple Silicon) | `oneil-<tag>-aarch64-apple-darwin-py3.12.tar.gz`, `…-py3.14.tar.gz` |
 
 These archives are produced by the Oneil [Release](https://github.com/careweather/oneil/blob/main/.github/workflows/release.yml) workflow when a `v*` tag is pushed.

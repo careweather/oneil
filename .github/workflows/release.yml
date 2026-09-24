@@ -1,7 +1,7 @@
 # Build and publish release artifacts when a version tag is pushed (e.g. `v1.0.0`).
 #
 # Artifacts: the Rust `oneil` compiler for Linux, Windows, and macOS (one archive
-# per Python 3.12 layout), plus wheels for the Python library (`import oneil`).
+# per Python 3.12 and 3.14), plus wheels for the Python library (`import oneil`).
 
 name: Release
 
@@ -15,7 +15,7 @@ env:
 
 jobs:
   build:
-    name: BUILD (${{ matrix.triple }} / ${{ matrix.flavor }})
+    name: BUILD (${{ matrix.triple }} / py${{ matrix.python }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -23,36 +23,32 @@ jobs:
         include:
           - runner: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
-            flavor: system
+            python: "3.12"
             archive: tar.gz
           - runner: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
-            flavor: uv
+            python: "3.14"
             archive: tar.gz
           - runner: windows-latest
             triple: x86_64-pc-windows-msvc
-            flavor: system
+            python: "3.12"
             archive: zip
           - runner: windows-latest
             triple: x86_64-pc-windows-msvc
-            flavor: uv
+            python: "3.14"
             archive: zip
           - runner: macos-latest
             triple: aarch64-apple-darwin
-            flavor: homebrew
+            python: "3.12"
             archive: tar.gz
           - runner: macos-latest
             triple: aarch64-apple-darwin
-            flavor: uv
-            archive: tar.gz
-          - runner: macos-latest
-            triple: aarch64-apple-darwin
-            flavor: system
+            python: "3.14"
             archive: tar.gz
           # Intel macOS runners are scarce / often cancelled in queue; ship
           # Apple Silicon only for now. Re-add x86_64-apple-darwin when stable.
     env:
-      ASSET_NAME: oneil-${{ github.ref_name }}-${{ matrix.triple }}-${{ matrix.flavor }}
+      ASSET_NAME: oneil-${{ github.ref_name }}-${{ matrix.triple }}-py${{ matrix.python }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -60,53 +56,19 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # Each flavor links against that layout's CPython 3.12. Homebrew and
-      # system bake a stable absolute path. uv's prefix is per-user and
-      # patch-versioned, so that flavor is rewritten to a relocatable load
-      # command after the build; the extension sets the library search path
-      # when it spawns the binary.
-      - name: Install Python 3.12 (Homebrew)
-        if: matrix.flavor == 'homebrew'
-        run: |
-          brew install python@3.12
-          echo "PYO3_PYTHON=$(brew --prefix python@3.12)/bin/python3.12" >> "$GITHUB_ENV"
-
-      - name: Install Python 3.12 (uv)
-        if: matrix.flavor == 'uv'
+      # Link against this minor version. The `oneil` loader finds whichever
+      # install of that version is present (Homebrew, python.org, distro, uv)
+      # and execs `oneil-runner` with PYTHONHOME set. macOS rewrites the load
+      # command to `@executable_path/libpython3.x.dylib` so dyld does not need
+      # DYLD_LIBRARY_PATH.
+      - name: Install Python
         uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
 
-      - name: Export PYO3_PYTHON (uv)
-        if: matrix.flavor == 'uv'
+      - name: Export PYO3_PYTHON
         shell: bash
-        run: echo "PYO3_PYTHON=$(uv python find 3.12)" >> "$GITHUB_ENV"
-
-      - name: Install Python 3.12 (system, Linux)
-        if: matrix.flavor == 'system' && runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3.12-dev
-          echo "PYO3_PYTHON=python3.12" >> "$GITHUB_ENV"
-
-      - name: Install Python 3.12 (system, Windows)
-        if: matrix.flavor == 'system' && runner.os == 'Windows'
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: Export PYO3_PYTHON (system, Windows)
-        if: matrix.flavor == 'system' && runner.os == 'Windows'
-        shell: bash
-        run: echo "PYO3_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
-
-      - name: Install Python 3.12 (system, macOS)
-        if: matrix.flavor == 'system' && runner.os == 'macOS'
-        run: |
-          curl -fsSL -o "${RUNNER_TEMP}/python3.12.pkg" \
-            "https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg"
-          sudo installer -pkg "${RUNNER_TEMP}/python3.12.pkg" -target /
-          echo "PYO3_PYTHON=/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12" >> "$GITHUB_ENV"
+        run: echo "PYO3_PYTHON=$(uv python find ${{ matrix.python }})" >> "$GITHUB_ENV"
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -115,17 +77,17 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-release-${{ matrix.triple }}-${{ matrix.flavor }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-release-${{ matrix.triple }}-py${{ matrix.python }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release
-        run: cargo build --release -p oneil
+        run: cargo build --release -p oneil -p oneil_loader
 
-      - name: Make uv binary relocatable
-        if: matrix.flavor == 'uv' && runner.os != 'Windows'
+      - name: Make the runner relocatable
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          bin="target/release/oneil"
+          bin="target/release/oneil-runner"
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             old="$(otool -L "$bin" | awk '/libpython|Python\.framework/{print $1; exit}')"
             if [[ -z "$old" ]]; then
@@ -133,7 +95,7 @@ jobs:
               otool -L "$bin"
               exit 1
             fi
-            install_name_tool -change "$old" "@rpath/libpython3.12.dylib" "$bin"
+            install_name_tool -change "$old" "@executable_path/libpython${{ matrix.python }}.dylib" "$bin"
             otool -L "$bin"
           else
             sudo apt-get update
@@ -146,9 +108,9 @@ jobs:
         if: matrix.archive == 'tar.gz'
         run: |
           mkdir -p release
-          cp target/release/oneil release/oneil
-          chmod +x release/oneil
-          tar -czvf "${ASSET_NAME}.tar.gz" -C release oneil
+          cp target/release/oneil target/release/oneil-runner release/
+          chmod +x release/oneil release/oneil-runner
+          tar -czvf "${ASSET_NAME}.tar.gz" -C release oneil oneil-runner
 
       - name: Create archive (Windows)
         if: matrix.archive == 'zip'
@@ -156,12 +118,13 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release
           Copy-Item target/release/oneil.exe release/oneil.exe
-          Compress-Archive -Path "release/oneil.exe" -DestinationPath "$env:ASSET_NAME.zip"
+          Copy-Item target/release/oneil-runner.exe release/oneil-runner.exe
+          Compress-Archive -Path "release/oneil.exe","release/oneil-runner.exe" -DestinationPath "$env:ASSET_NAME.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.triple }}-${{ matrix.flavor }}
+          name: ${{ matrix.triple }}-py${{ matrix.python }}
           path: ${{ env.ASSET_NAME }}.${{ matrix.archive }}
 
   build-python-wheels:
@@ -258,13 +221,13 @@ jobs:
           notes = f"""{changelog}
           ## Binaries
 
-          Each archive is linked against a specific Python 3.12 layout. The CLI does not ship Python. Download the flavor that matches how 3.12 is installed, or let the VS Code / Cursor extension pick it:
+          Supported Python versions for the CLI are **CPython 3.12** and **CPython 3.14**. The CLI does not ship Python. Download the archive that matches the version you have (`py3.14` if you have both, or if you are installing Python for Oneil). Homebrew, python.org, a distro package, and uv all work.
 
-          - Linux: `oneil-v{version}-x86_64-unknown-linux-gnu-system.tar.gz`, `…-uv.tar.gz`
-          - Windows: `oneil-v{version}-x86_64-pc-windows-msvc-system.zip`, `…-uv.zip`
-          - Apple Silicon macOS: `oneil-v{version}-aarch64-apple-darwin-homebrew.tar.gz`, `…-system.tar.gz`, `…-uv.tar.gz`
+          - Linux: `oneil-v{version}-x86_64-unknown-linux-gnu-py3.12.tar.gz`, `…-py3.14.tar.gz`
+          - Windows: `oneil-v{version}-x86_64-pc-windows-msvc-py3.12.zip`, `…-py3.14.zip`
+          - Apple Silicon macOS: `oneil-v{version}-aarch64-apple-darwin-py3.12.tar.gz`, `…-py3.14.tar.gz`
 
-          Or run the attached installer (detects the Python layout and downloads that archive):
+          Or run the attached installer. It uses Python 3.14 when that is installed, otherwise 3.12, and downloads that archive:
 
           ```sh
           curl -fsSL https://github.com/careweather/oneil/releases/download/v{version}/install-oneil.sh | bash
