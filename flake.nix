@@ -53,10 +53,13 @@
           pname = "oneil";
           version = "1.0.0";
           src = ./.;
-          nativeBuildInputs = [ python ];
+          nativeBuildInputs = [ python pkgs.makeWrapper ];
           buildInputs = [ python ];
           cargoLock.lockFile = ./Cargo.lock;
           env.PYO3_PYTHON = python.interpreter;
+          postInstall = ''
+            wrapProgram $out/bin/oneil --set ONEIL_USE_LINKED_PYTHON 1
+          '';
 
           meta = {
             description = "Design specification language for rapid, comprehensive system modeling";

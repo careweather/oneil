@@ -6,6 +6,10 @@
     Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 -->
 
+## Unreleased
+
+- The managed CLI downloads the Python 3.14 or 3.12 archive (`oneil-…-py3.14` / `oneil-…-py3.12`). `oneil` finds that install itself. Older 3.12 layout archives (homebrew / system / uv) are still accepted when the archive has no `oneil-runner`.
+
 ## v1.0.1 - 2026-08-26
 
 - Bump ESLint 10, vscode-languageclient 10, Vite 8, and @vitejs/plugin-react 6 so patched transitives (minimatch, brace-expansion, postcss, picomatch) come in from parent ranges. The extension now requires VS Code 1.91+.
