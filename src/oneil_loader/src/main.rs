@@ -56,6 +56,8 @@ fn launch() -> io::Result<ExitCode> {
     if let Some(layout) = &layout {
         apply_python_env(&mut command, layout);
     }
+    // Forward the user's command. argv[0] is not used to decide which program to trust.
+    // nosemgrep: rust.lang.security.args-os.args-os
     command.args(env::args_os().skip(1));
     handoff(command)
 }
@@ -67,6 +69,8 @@ fn launch() -> io::Result<ExitCode> {
 /// Returns an error when the current executable path has no parent directory or
 /// the runner file is not there.
 fn runner_path() -> io::Result<PathBuf> {
+    // The runner is installed beside this binary. The path locates that file.
+    // nosemgrep: rust.lang.security.current-exe.current-exe
     let current = env::current_exe()?;
     let parent = current.parent().ok_or_else(|| {
         io::Error::other(format!(

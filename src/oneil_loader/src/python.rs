@@ -301,7 +301,8 @@ mod tests {
 
     #[test]
     fn first_existing_skips_missing_paths() {
-        let dir = std::env::temp_dir().join(format!("oneil-loader-{}", std::process::id()));
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("target/oneil-loader-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("temp dir");
         let present = dir.join("libpython.so");
