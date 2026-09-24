@@ -40,8 +40,8 @@ fn main() -> ExitCode {
 ///
 /// # Errors
 ///
-/// Returns an error when the runner binary is missing, `ONEIL_PYTHON` does not
-/// match the linked minor version, or the staged macOS launch directory cannot be written.
+/// Returns an error when the runner binary is missing, Python cannot be found or
+/// `ONEIL_PYTHON` cannot be used, or the staged macOS launch directory cannot be written.
 fn launch() -> io::Result<ExitCode> {
     let runner = runner_path()?;
     let layout = find_python()?;

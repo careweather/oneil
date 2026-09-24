@@ -2,7 +2,7 @@
 
 use std::env;
 use std::ffi::{OsStr, OsString};
-use std::io::{self, Write};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -90,35 +90,93 @@ impl PythonInvoke {
     }
 }
 
+/// Why probing an interpreter did not produce a [`PythonLayout`].
+enum ProbeFailure {
+    /// The program could not be started.
+    Spawn(io::Error),
+    /// The program ran and exited with a failure.
+    Exited { status: String, stderr: String },
+    /// stdout was not the probe JSON.
+    BadOutput(String),
+    /// The interpreter is a different minor version.
+    WrongMinor(String),
+    /// The interpreter matches, but none of its library paths exist.
+    NoLibrary,
+}
+
 /// Locate the interpreter for [`PYTHON_MINOR`].
 ///
 /// `ONEIL_PYTHON` must be that version. Other candidates are skipped when they
-/// are a different version. Returns `Ok(None)` when nothing matching is installed
-/// so the runner can still start from an rpath baked in by the linker (Nix).
+/// are a different version or cannot be run. When nothing matches, this returns
+/// an error that names the required version and how to install it.
+/// `ONEIL_USE_LINKED_PYTHON=1` returns `Ok(None)` instead, so a Nix build can
+/// start `oneil-runner` from the rpath baked into that binary.
 ///
 /// # Errors
 ///
-/// Returns an error when `ONEIL_PYTHON` is set and is missing or a different minor version.
+/// Returns an error when `ONEIL_PYTHON` cannot be run or is a different minor
+/// version, or when no matching interpreter is installed and the linked-Python
+/// opt-out is unset.
 pub fn find_python() -> io::Result<Option<PythonLayout>> {
     if let Some(explicit) = env::var_os("ONEIL_PYTHON") {
         let invoke = PythonInvoke::new(explicit);
-        return probe(&invoke).map_or_else(
-            || {
-                Err(io::Error::other(format!(
-                    "ONEIL_PYTHON ({}) is not Python {PYTHON_MINOR}",
-                    invoke.program.to_string_lossy(),
-                )))
-            },
-            |layout| Ok(Some(layout)),
-        );
+        return match probe(&invoke) {
+            Ok(layout) => Ok(Some(layout)),
+            Err(failure) => Err(io::Error::other(explain_explicit(&invoke, &failure))),
+        };
     }
 
     for invoke in candidates() {
-        if let Some(layout) = probe(&invoke) {
+        if let Ok(layout) = probe(&invoke) {
             return Ok(Some(layout));
         }
     }
-    Ok(None)
+    if use_linked_python() {
+        return Ok(None);
+    }
+    Err(io::Error::other(missing_python_message()))
+}
+
+/// True when the caller asked to run the runner against its baked library path.
+fn use_linked_python() -> bool {
+    matches!(
+        env::var("ONEIL_USE_LINKED_PYTHON").ok().as_deref(),
+        Some("1" | "true")
+    )
+}
+
+/// Install guidance when discovery finds no interpreter of [`PYTHON_MINOR`].
+fn missing_python_message() -> String {
+    format!(
+        "Python {PYTHON_MINOR} was not found. Install CPython {PYTHON_MINOR}, or set ONEIL_PYTHON to that interpreter.\n  uv python install {PYTHON_MINOR}\n  brew install python@{PYTHON_MINOR}"
+    )
+}
+
+/// Message for a failed `ONEIL_PYTHON` probe. Search misses stay silent.
+fn explain_explicit(invoke: &PythonInvoke, failure: &ProbeFailure) -> String {
+    let program = invoke.program.to_string_lossy();
+    match failure {
+        ProbeFailure::Spawn(error) => {
+            format!("ONEIL_PYTHON ({program}) could not be started: {error}")
+        }
+        ProbeFailure::Exited { status, stderr } => {
+            let detail = if stderr.is_empty() {
+                status.clone()
+            } else {
+                stderr.clone()
+            };
+            format!("ONEIL_PYTHON ({program}) failed ({detail})")
+        }
+        ProbeFailure::BadOutput(error) => {
+            format!("ONEIL_PYTHON ({program}) did not report its version ({error})")
+        }
+        ProbeFailure::WrongMinor(found) => {
+            format!("ONEIL_PYTHON ({program}) is Python {found}, not {PYTHON_MINOR}")
+        }
+        ProbeFailure::NoLibrary => format!(
+            "ONEIL_PYTHON ({program}) is Python {PYTHON_MINOR}, but its shared library was not found"
+        ),
+    }
 }
 
 /// Search order: active venv, `pythonX.Y` and `python3` on `PATH`, uv, then Homebrew and python.org.
@@ -179,31 +237,27 @@ fn uv_python() -> Option<PathBuf> {
     }
 }
 
-fn probe(invoke: &PythonInvoke) -> Option<PythonLayout> {
+fn probe(invoke: &PythonInvoke) -> Result<PythonLayout, ProbeFailure> {
     let output = Command::new(&invoke.program)
         .args(&invoke.prefix_args)
         .args(["-c", PROBE_SCRIPT])
         .output()
-        .ok()?;
+        .map_err(ProbeFailure::Spawn)?;
     if !output.status.success() {
-        return None;
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let status = output
+            .status
+            .code()
+            .map_or_else(|| "signal".to_string(), |code| format!("exit {code}"));
+        return Err(ProbeFailure::Exited { status, stderr });
     }
-    let parsed: ProbeJson = match serde_json::from_slice(&output.stdout) {
-        Ok(parsed) => parsed,
-        Err(error) => {
-            let _ = writeln!(
-                io::stderr(),
-                "oneil: ignoring {}: probe output was not valid ({error})",
-                invoke.program.to_string_lossy(),
-            );
-            return None;
-        }
-    };
+    let parsed: ProbeJson = serde_json::from_slice(&output.stdout)
+        .map_err(|error| ProbeFailure::BadOutput(error.to_string()))?;
     if parsed.minor != PYTHON_MINOR {
-        return None;
+        return Err(ProbeFailure::WrongMinor(parsed.minor));
     }
-    let library = first_existing(&parsed.candidates)?;
-    Some(PythonLayout {
+    let library = first_existing(&parsed.candidates).ok_or(ProbeFailure::NoLibrary)?;
+    Ok(PythonLayout {
         base_prefix: parsed.base_prefix,
         site_packages: parsed.site_packages.filter(|path| path.is_dir()),
         library,
@@ -238,7 +292,10 @@ pub fn prepend_path(dir: &Path, existing: Option<&OsStr>) -> OsString {
 
 #[cfg(test)]
 mod tests {
-    use super::{first_existing, macos_library_link_name, prepend_path};
+    use super::{
+        ProbeFailure, PythonInvoke, explain_explicit, first_existing, macos_library_link_name,
+        missing_python_message, prepend_path,
+    };
     use std::fs;
     use std::path::PathBuf;
 
@@ -267,5 +324,31 @@ mod tests {
         let text = joined.to_string_lossy();
         assert!(text.starts_with("/opt/py/lib"));
         assert!(text.contains("/usr/lib"));
+    }
+
+    #[test]
+    fn explicit_probe_errors_name_the_cause() {
+        let invoke = PythonInvoke::new("/opt/py/bin/python3");
+        let missing = explain_explicit(
+            &invoke,
+            &ProbeFailure::Spawn(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "No such file or directory",
+            )),
+        );
+        assert!(missing.contains("could not be started"));
+        assert!(missing.contains("No such file or directory"));
+        let wrong = explain_explicit(&invoke, &ProbeFailure::WrongMinor("3.14".to_string()));
+        assert!(wrong.contains("is Python 3.14, not"));
+        let library = explain_explicit(&invoke, &ProbeFailure::NoLibrary);
+        assert!(library.contains("shared library was not found"));
+    }
+
+    #[test]
+    fn missing_python_message_names_the_baked_minor() {
+        let message = missing_python_message();
+        assert!(message.contains(super::PYTHON_MINOR));
+        assert!(message.contains("uv python install"));
+        assert!(message.contains("ONEIL_PYTHON"));
     }
 }

@@ -20,7 +20,7 @@ Ship six archives: Linux, Windows, and Apple Silicon, each for Python 3.12 and f
 - Windows: that interpreter's directory is prepended to `PATH` so `python3x.dll` resolves.
 - macOS: the runner's load command is `@executable_path/libpython3.x.dylib`. Before exec, `oneil` copies the runner into `~/Library/Caches/oneil` and symlinks that name at the discovered library. `dyld` resolves `@executable_path` from the staged copy.
 
-`ONEIL_PYTHON` selects the interpreter when several installs of the same minor version exist.
+`ONEIL_PYTHON` selects the interpreter when several installs of the same minor version exist. A missing interpreter is an error that names that version and how to install it. `ONEIL_USE_LINKED_PYTHON=1` skips the error so a Nix build can run `oneil-runner` from the library path baked into that binary.
 
 ## Consequences
 
