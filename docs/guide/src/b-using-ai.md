@@ -25,7 +25,7 @@ complex physical systems. Follow these modeling principles:
 - Maintain one source of truth for each physical property or relationship.
 
 Oneil's language and syntax change frequently. Before writing Oneil code, review
-[Oneil documentation](https://careweather.github.com/oneil),
+[Oneil documentation](https://oneil-lang.org),
 [coding standards](https://raw.githubusercontent.com/careweather/oneil/refs/heads/main/docs/ONEIL_CODING_STANDARDS.md),
 and relevant `.on` and `.one` examples. Do not rely on remembered syntax.
 

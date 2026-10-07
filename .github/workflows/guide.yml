@@ -1,10 +1,12 @@
 name: Deploy mdBook site to GitHub Pages
 
 on:
-    # Runs on pushes targeting the `gh-pages` branch
-    # TODO: once `gh-pages` can be merged into `main`, change this to `main`
+    # Runs on pushes to `main` that change the guide or this workflow
     push:
-        branches: ["gh-pages"]
+        branches: ["main"]
+        paths:
+            - "docs/guide/**"
+            - ".github/workflows/guide.yml"
 
     # Allows you to run this workflow manually from the Actions tab
     workflow_dispatch:

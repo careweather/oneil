@@ -270,7 +270,7 @@ jobs:
           curl -fsSL https://github.com/careweather/oneil/releases/download/v{version}/install-oneil.sh | bash
           ```
 
-          See the [installation guide](https://careweather.github.io/oneil/02-installation.html).
+          See the [installation guide](https://oneil-lang.org/02-installation.html).
 
           ## Python library
 
