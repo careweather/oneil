@@ -215,8 +215,9 @@ normal CI. Also requires the `CURSOR_API_KEY` secret.
 ### User guide (GitHub Pages)
 
 [`.github/workflows/guide.yml`](.github/workflows/guide.yml) builds the mdBook
-user guide under `docs/guide/` and deploys it to GitHub Pages on pushes to the
-`gh-pages` branch (and via manual `workflow_dispatch`).
+user guide under `docs/guide/` and deploys it to
+[oneil-lang.org](https://oneil-lang.org) on pushes to `main` that change the
+guide or the workflow (and via manual `workflow_dispatch`).
 
 ### Releases
 

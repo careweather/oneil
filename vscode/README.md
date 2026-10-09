@@ -8,7 +8,7 @@ This VS Code extension adds language support for the Oneil programming language.
 - **Go to Definition**: Jump to the definition of parameters, models, and imported Python files and functions
 - **Hover Information**: View the labels and notes associated with a parameter, model, function, or Python module by hovering
 - **Inline Errors**: See errors directly in the editor
-- **Rendered View**: Preview models with notes rendered as Markdown (math, `{{param:value|equation}}` interpolation, citations). Prefer a `references.bib` beside the model or at the workspace root — see the [Notes](https://careweather.github.io/oneil/08-notes.html) guide chapter.
+- **Rendered View**: Preview models with notes rendered as Markdown (math, `{{param:value|equation}}` interpolation, citations). Prefer a `references.bib` beside the model or at the workspace root — see the [Notes](https://oneil-lang.org/08-notes.html) guide chapter.
 - **CLI install / update**: Download the Oneil CLI from GitHub Releases via Command Palette commands when it is not already on PATH
 
 ## Planned Features
