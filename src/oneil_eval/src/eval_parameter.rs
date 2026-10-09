@@ -93,6 +93,9 @@ pub fn eval_parameter_from_resolved_value<E: ExternalEvaluationContext>(
             let number = MeasuredNumber::from_number_and_unit(number, unit);
             Value::MeasuredNumber(number)
         }
+        (Value::MeasuredNumber(number), None) if is_parameter_reference(value_source) => {
+            Value::MeasuredNumber(number)
+        }
         (Value::MeasuredNumber(number), None) if number.is_dimensionless() => {
             Value::MeasuredNumber(number.with_unit(Unit::one()))
         }
@@ -129,6 +132,25 @@ pub fn eval_parameter_from_resolved_value<E: ExternalEvaluationContext>(
         expr_span: expr_span.clone(),
         warnings,
     })
+}
+
+/// Returns whether a parameter value is a plain reference to another
+/// parameter, such as `P_l = P_t.r`, with no unit annotation.
+///
+/// A plain reference inherits the unit of the parameter it references, which
+/// already declares that unit, so it does not need its own annotation.
+fn is_parameter_reference(value_source: &ir::ParameterValue) -> bool {
+    let ir::ParameterValue::Simple(expr, None) = value_source else {
+        return false;
+    };
+
+    matches!(
+        expr.as_ref(),
+        ir::Expr::Variable {
+            variable: ir::Variable::Parameter { .. } | ir::Variable::External { .. },
+            ..
+        }
+    )
 }
 
 fn get_piecewise_result<'a, E: ExternalEvaluationContext>(
@@ -1665,8 +1687,40 @@ mod tests {
     }
 
     #[test]
-    fn eval_measured_value_missing_unit_annotation() {
-        // Seed a measured parameter, then reference it without a unit annotation.
+    fn eval_parameter_reference_inherits_unit() {
+        // Seed a measured parameter in km, then reference it without a unit annotation.
+        let mut external = TestExternalContext::new();
+        let mut context = EvalContext::new(&mut external);
+        context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
+        setup_context_with_parameters(
+            &mut context,
+            [(
+                "src",
+                2.0,
+                vec![UnitSpec::new(Some("k"), Some("m"), false, 1.0)],
+            )],
+        );
+
+        let parameter =
+            build_parameter_from_expr("dst", param_var("src"), None, ir::Limits::default());
+
+        let parameter_value =
+            eval_parameter(&parameter, &mut context).expect("eval should succeed");
+
+        // The reference keeps the km magnitude instead of falling back to base meters.
+        check_param_measured_scalar(
+            &parameter_value,
+            2000.0,
+            &[(Dimension::Distance, 1.0)],
+            1000.0,
+            false,
+        )
+        .assert();
+    }
+
+    #[test]
+    fn eval_calculation_missing_unit_annotation() {
+        // A calculation, unlike a plain reference, must declare its unit.
         let mut external = TestExternalContext::new();
         let mut context = EvalContext::new(&mut external);
         context.push_active_model(EvalInstanceKey::root(test_model_path("test")));
@@ -1675,8 +1729,7 @@ mod tests {
             [("src", 1.0, vec![UnitSpec::new(None, Some("m"), false, 1.0)])],
         );
 
-        let parameter =
-            build_parameter_from_expr("dst", param_var("src"), None, ir::Limits::default());
+        let parameter = build_binary_parameter("dst", ir::BinaryOp::Add, "src", "src", []);
 
         let errors = eval_parameter(&parameter, &mut context).expect_err("eval should fail");
         assert_eq!(errors.len(), 1);

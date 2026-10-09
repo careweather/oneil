@@ -82,6 +82,13 @@ fn basic_failing_test() {
 }
 
 #[test]
+fn basic_reference_inherits_unit() {
+    // A parameter whose value is only a reference, local or `p.r`, inherits
+    // the referenced parameter's unit and display unit without an annotation.
+    insta::assert_snapshot!(run_fixture("reference_units/parent.on"));
+}
+
+#[test]
 fn basic_undefined_reference_parameter() {
     // A cross-file reference whose parameter access names a parameter that
     // does not exist on the referenced model.  This exercises the

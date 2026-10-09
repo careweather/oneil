@@ -1,0 +1,13 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/parent.on\")"
+---
+Model: fixtures/reference_units/parent.on
+Tests: 0/0
+Parameters:
+  L = 2 :km
+  P_c = 16 :dBW
+  R_c = 3 | 4 :km
+  G_c = 18 :dB
+  eta_c = 90 :%
+  L_r = 2 :km

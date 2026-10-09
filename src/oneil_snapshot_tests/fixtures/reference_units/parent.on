@@ -1,0 +1,11 @@
+# Plain parameter references inherit the referenced unit, so they need no annotation
+
+submodel child as c
+
+Local length: L = 2 :km
+
+Referenced power: P_c = P.c
+Referenced range: R_c = R.c
+Referenced gain: G_c = G.c
+Referenced efficiency: eta_c = eta.c
+Local reference: L_r = L
