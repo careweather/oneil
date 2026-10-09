@@ -1,10 +1,14 @@
 //! Units that plain parameter references inherit.
 //!
 //! A parameter whose value is only a reference to another parameter, such as
-//! `P_l = P_t.r`, and that has no unit annotation takes the unit declared by
-//! the parameter it references. The instance graph build writes that unit into
-//! the reference's IR value, so design overlay checks, evaluation, and every
-//! other consumer of the IR treat it like an explicit annotation.
+//! `P_l = P_t.r`, and that has no unit annotation takes the unit of the
+//! parameter it references. Composition writes that unit into the reference's
+//! IR value after every design is applied, so validation, evaluation, and the
+//! rendered view read it like an explicit annotation, and a design that
+//! changes the referenced parameter's unit changes the inherited unit too. The
+//! design overlay unit check runs while designs are still being applied, so it
+//! reads inherited units through [`parameter_unit`] and [`value_unit`] without
+//! writing them.
 //!
 //! Only units with physical dimensions are inherited. A reference to a
 //! dimensionless unit, such as `dB` or `%`, stays unannotated and evaluates to
@@ -22,43 +26,82 @@ use super::InstancedModel;
 
 type ReferencePool = IndexMap<ModelPath, Box<InstancedModel>>;
 
-/// Writes the inherited unit into every unannotated plain reference in
-/// `root`'s subtree and in `pool`.
-///
-/// A scoped design overlay resolves its names from an ancestor of its host,
-/// which this pass cannot reach, so its unit is written when the overlay is
-/// applied, through [`fill_inherited_unit`].
-pub(super) fn fill_inherited_units(root: &mut InstancedModel, pool: &mut ReferencePool) {
-    let mut root_fills = Vec::new();
-    collect_fills(root, &mut Vec::new(), pool, &mut root_fills);
+/// The names that a parameter value resolves against: an instance, plus the
+/// parameters that a design being applied to it adds.
+#[derive(Clone, Copy)]
+pub(super) struct Scope<'a> {
+    pub instance: &'a InstancedModel,
+    pub additions: Option<&'a IndexMap<ParameterName, ir::Parameter>>,
+}
 
-    let pool_fills: Vec<(ModelPath, Vec<UnitFill>)> = pool
-        .iter()
-        .map(|(path, instance)| {
-            let mut fills = Vec::new();
-            collect_fills(instance, &mut Vec::new(), pool, &mut fills);
-            (path.clone(), fills)
-        })
-        .collect();
+impl<'a> Scope<'a> {
+    /// The scope of `instance` with no pending design additions.
+    pub(super) const fn of(instance: &'a InstancedModel) -> Self {
+        Self {
+            instance,
+            additions: None,
+        }
+    }
 
-    apply_fills(root, root_fills);
-    for (path, fills) in pool_fills {
-        let instance = pool
-            .get_mut(&path)
-            .expect("fills are collected from existing pool entries");
-        apply_fills(instance, fills);
+    fn parameter(self, name: &ParameterName) -> Option<(&'a ParameterName, &'a ir::Parameter)> {
+        self.additions
+            .and_then(|additions| additions.get_key_value(name))
+            .or_else(|| self.instance.parameters().get_key_value(name))
     }
 }
 
-/// Writes the unit that `value` inherits into it when `value` is an
-/// unannotated plain reference, resolving the reference against `scope`.
-pub(super) fn fill_inherited_unit(
-    value: &mut ir::ParameterValue,
-    scope: &InstancedModel,
-    pool: &ReferencePool,
-) {
-    if let Some(unit) = inherited_unit(value, scope, pool) {
-        set_missing_unit(value, unit);
+/// Returns the unit of `parameter`, which lives on the instance of `scope`:
+/// its annotation, or else the unit it inherits as a plain reference.
+///
+/// A scoped design overlay resolves its names from an anchor above its host,
+/// so only its annotation counts.
+pub(super) fn parameter_unit<'a>(
+    parameter: &'a ir::Parameter,
+    scope: Scope<'a>,
+    pool: &'a ReferencePool,
+) -> Option<&'a ir::CompositeUnit> {
+    if has_scoped_anchor(parameter) {
+        return annotated_unit(parameter.value());
+    }
+    value_unit(parameter.value(), scope, pool)
+}
+
+/// Returns the unit of `value`: its annotation, or else the unit it inherits
+/// as a plain reference resolved in `scope`.
+pub(super) fn value_unit<'a>(
+    value: &'a ir::ParameterValue,
+    scope: Scope<'a>,
+    pool: &'a ReferencePool,
+) -> Option<&'a ir::CompositeUnit> {
+    annotated_unit(value).or_else(|| inherited_unit(value, scope, pool))
+}
+
+/// Writes the inherited unit into every unannotated plain reference in
+/// `root`'s subtree and in `pool`.
+///
+/// A chain of references stops at a scoped design overlay that has no unit
+/// yet, because its anchor is only known from its host. The pass repeats until
+/// it writes nothing, so a reference to such an overlay gets its unit in the
+/// round after the overlay does.
+pub(super) fn fill_inherited_units(root: &mut InstancedModel, pool: &mut ReferencePool) {
+    loop {
+        let root_fills = subtree_fills(root, pool);
+        let pool_fills: Vec<(ModelPath, Vec<UnitFill>)> = pool
+            .iter()
+            .map(|(path, instance)| (path.clone(), subtree_fills(instance, pool)))
+            .filter(|(_, fills)| !fills.is_empty())
+            .collect();
+        if root_fills.is_empty() && pool_fills.is_empty() {
+            return;
+        }
+
+        apply_fills(root, root_fills);
+        for (path, fills) in pool_fills {
+            let instance = pool
+                .get_mut(&path)
+                .expect("fills are collected from existing pool entries");
+            apply_fills(instance, fills);
+        }
     }
 }
 
@@ -70,30 +113,42 @@ struct UnitFill {
     unit: ir::CompositeUnit,
 }
 
-fn collect_fills(
-    node: &InstancedModel,
+fn subtree_fills(root: &InstancedModel, pool: &ReferencePool) -> Vec<UnitFill> {
+    let mut fills = Vec::new();
+    collect_fills(root, &mut Vec::new(), &mut Vec::new(), pool, &mut fills);
+    fills
+}
+
+/// Collects the fills for `node` and its submodels. `ancestors` runs from the
+/// root of the walk down to `node`'s parent, and `path` holds the submodel
+/// aliases from the root of the walk to `node`.
+fn collect_fills<'a>(
+    node: &'a InstancedModel,
+    ancestors: &mut Vec<&'a InstancedModel>,
     path: &mut Vec<ReferenceName>,
     pool: &ReferencePool,
     fills: &mut Vec<UnitFill>,
 ) {
     for (name, parameter) in node.parameters() {
-        if has_scoped_anchor(parameter) {
+        let Some(scope) = value_scope(parameter, node, ancestors) else {
             continue;
-        }
-        if let Some(unit) = inherited_unit(parameter.value(), node, pool) {
+        };
+        if let Some(unit) = inherited_unit(parameter.value(), Scope::of(scope), pool) {
             fills.push(UnitFill {
                 path: path.clone(),
                 parameter: name.clone(),
-                unit,
+                unit: unit.clone(),
             });
         }
     }
 
+    ancestors.push(node);
     for (alias, submodel) in node.submodels() {
         path.push(alias.clone());
-        collect_fills(&submodel.instance, path, pool, fills);
+        collect_fills(&submodel.instance, ancestors, path, pool, fills);
         path.pop();
     }
+    ancestors.pop();
 }
 
 fn apply_fills(root: &mut InstancedModel, fills: Vec<UnitFill>) {
@@ -108,47 +163,73 @@ fn apply_fills(root: &mut InstancedModel, fills: Vec<UnitFill>) {
             .parameters_mut()
             .get_mut(&fill.parameter)
             .expect("fills are collected from existing parameters");
-        set_missing_unit(parameter.value_mut(), fill.unit);
+        if let ir::ParameterValue::Simple(_, unit_slot) = parameter.value_mut() {
+            *unit_slot = Some(fill.unit);
+        }
     }
 }
 
-fn set_missing_unit(value: &mut ir::ParameterValue, unit: ir::CompositeUnit) {
-    if let ir::ParameterValue::Simple(_, unit_slot) = value
-        && unit_slot.is_none()
-    {
-        *unit_slot = Some(unit);
+/// Returns the instance that `parameter`'s value resolves its names in: the
+/// design anchor for a scoped design overlay, or else `host`.
+///
+/// `ancestors` runs from the root of the walk down to `host`'s parent, so an
+/// anchor above the root of the walk cannot be resolved.
+fn value_scope<'a>(
+    parameter: &ir::Parameter,
+    host: &'a InstancedModel,
+    ancestors: &[&'a InstancedModel],
+) -> Option<&'a InstancedModel> {
+    let Some(provenance) = parameter.design_provenance() else {
+        return Some(host);
+    };
+    let anchor_path = &provenance.anchor_path;
+    let base = match anchor_path.up {
+        0 => host,
+        up => *ancestors.get(ancestors.len().checked_sub(up)?)?,
+    };
+    anchor_path.down.iter().try_fold(base, |node, segment| {
+        node.submodels()
+            .get(segment)
+            .map(|submodel| submodel.instance.as_ref())
+    })
+}
+
+const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::CompositeUnit> {
+    match value {
+        ir::ParameterValue::Simple(_, unit) | ir::ParameterValue::Piecewise(_, unit) => {
+            unit.as_ref()
+        }
     }
 }
 
 /// Returns the unit that `value` inherits when it is an unannotated plain
-/// reference whose target, possibly through further plain references, declares
-/// a unit with physical dimensions.
-fn inherited_unit(
-    value: &ir::ParameterValue,
-    scope: &InstancedModel,
-    pool: &ReferencePool,
-) -> Option<ir::CompositeUnit> {
+/// reference whose target, possibly through further plain references, has a
+/// unit with physical dimensions.
+fn inherited_unit<'a>(
+    value: &'a ir::ParameterValue,
+    scope: Scope<'a>,
+    pool: &'a ReferencePool,
+) -> Option<&'a ir::CompositeUnit> {
     let mut value = value;
     let mut scope = scope;
+    // A parameter is identified by its instance and its name, because every
+    // instance of a model has parameters with the same names.
     let mut visited: Vec<(&InstancedModel, &ParameterName)> = Vec::new();
 
     loop {
-        let (target_scope, target_name) = reference_target(value, scope, pool)?;
+        let (target_scope, target_name, target) = reference_target(value, scope, pool)?;
 
         // References that form a cycle have no unit to inherit.
-        let is_revisit = visited
-            .iter()
-            .any(|(model, name)| std::ptr::eq(*model, target_scope) && *name == target_name);
+        let is_revisit = visited.iter().any(|(instance, name)| {
+            std::ptr::eq(*instance, target_scope.instance) && *name == target_name
+        });
         if is_revisit {
             return None;
         }
-        visited.push((target_scope, target_name));
+        visited.push((target_scope.instance, target_name));
 
-        let target = target_scope.parameters().get(target_name)?;
-        if let ir::ParameterValue::Simple(_, Some(unit))
-        | ir::ParameterValue::Piecewise(_, Some(unit)) = target.value()
-        {
-            return (!unit.dimension().is_dimensionless()).then(|| unit.clone());
+        if let Some(unit) = annotated_unit(target.value()) {
+            return (!unit.dimension().is_dimensionless()).then_some(unit);
         }
         if has_scoped_anchor(target) {
             return None;
@@ -159,13 +240,13 @@ fn inherited_unit(
     }
 }
 
-/// Returns the instance and parameter name that `value` refers to when it is
-/// an unannotated plain reference resolved against `scope`.
+/// Returns the scope, name, and parameter that `value` refers to when it is
+/// an unannotated plain reference resolved in `scope`.
 fn reference_target<'a>(
     value: &'a ir::ParameterValue,
-    scope: &'a InstancedModel,
+    scope: Scope<'a>,
     pool: &'a ReferencePool,
-) -> Option<(&'a InstancedModel, &'a ParameterName)> {
+) -> Option<(Scope<'a>, &'a ParameterName, &'a ir::Parameter)> {
     let ir::ParameterValue::Simple(expr, None) = value else {
         return None;
     };
@@ -174,16 +255,25 @@ fn reference_target<'a>(
     };
 
     match variable {
-        ir::Variable::Parameter { parameter_name, .. } => Some((scope, parameter_name)),
+        ir::Variable::Parameter { parameter_name, .. } => {
+            let (name, parameter) = scope.parameter(parameter_name)?;
+            Some((scope, name, parameter))
+        }
+        // A parameter that a design adds shadows the builtin with its name,
+        // and variable classification turns the builtin into a reference to it.
+        ir::Variable::Builtin { ident, .. } => {
+            let (name, parameter) = scope.parameter(&ParameterName::from(ident.as_str()))?;
+            Some((scope, name, parameter))
+        }
         ir::Variable::External {
             reference_name,
             parameter_name,
             ..
-        } => Some((
-            referenced_instance(scope, reference_name, pool)?,
-            parameter_name,
-        )),
-        ir::Variable::Builtin { .. } => None,
+        } => {
+            let instance = referenced_instance(scope.instance, reference_name, pool)?;
+            let (name, parameter) = instance.parameters().get_key_value(parameter_name)?;
+            Some((Scope::of(instance), name, parameter))
+        }
     }
 }
 
@@ -232,17 +322,18 @@ mod tests {
     use oneil_ir::{
         self as ir,
         test_helpers::{
-            expr::{binary, external_var, lit_number, param_var},
+            expr::{binary, builtin_var, external_var, lit_number, param_var},
             parameter::build_parameter_from_expr,
         },
     };
     use oneil_output::{Dimension, DimensionMap};
     use oneil_shared::{
+        RelativePath,
         span::Span,
         symbols::{ParameterName, ReferenceName, SubmodelName},
     };
 
-    use super::{ReferencePool, fill_inherited_units};
+    use super::{ReferencePool, Scope, fill_inherited_units, value_unit};
     use crate::{
         instance::{InstancedModel, ReferenceImport, SubmodelImport},
         test::test_model_path,
@@ -275,6 +366,19 @@ mod tests {
             model.add_parameter(parameter.name().clone(), parameter);
         }
         model
+    }
+
+    fn add_child(parent: &mut InstancedModel, alias: &str, child: InstancedModel) {
+        parent.add_submodel(
+            ReferenceName::from(alias),
+            SubmodelImport {
+                name: SubmodelName::new(alias.to_string()),
+                name_span: Span::synthetic(),
+                alias: Some(ReferenceName::from(alias)),
+                alias_span: None,
+                instance: Box::new(child),
+            },
+        );
     }
 
     fn unit_of<'a>(model: &'a InstancedModel, name: &str) -> Option<&'a ir::CompositeUnit> {
@@ -313,16 +417,7 @@ mod tests {
             [parameter("R", lit_number(3.0), Some(kilometers()))],
         );
         let mut root = model("root", [parameter("R_c", external_var("R", "c"), None)]);
-        root.add_submodel(
-            ReferenceName::from("c"),
-            SubmodelImport {
-                name: SubmodelName::new("child".to_string()),
-                name_span: Span::synthetic(),
-                alias: Some(ReferenceName::from("c")),
-                alias_span: None,
-                instance: Box::new(child),
-            },
-        );
+        add_child(&mut root, "c", child);
 
         let root = fill(root);
 
@@ -373,6 +468,68 @@ mod tests {
 
         assert_eq!(unit_of(&root, "a"), Some(&kilometers()));
         assert_eq!(unit_of(&root, "b"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn scoped_overlay_and_reference_to_it_inherit_units() {
+        let provenance = ir::DesignProvenance {
+            design_path: test_model_path("design"),
+            is_addition: false,
+            assignment_span: Span::synthetic(),
+            anchor_path: RelativePath {
+                up: 1,
+                down: Vec::new(),
+            },
+            applied_via: None,
+        };
+        let overlay = parameter("R", param_var("L"), None).with_design_provenance(provenance);
+        let mut root = model(
+            "root",
+            [
+                parameter("L", lit_number(2.0), Some(kilometers())),
+                parameter("R_c", external_var("R", "c"), None),
+            ],
+        );
+        add_child(&mut root, "c", model("child", [overlay]));
+
+        let root = fill(root);
+
+        let child = &root.submodels()[&ReferenceName::from("c")].instance;
+        assert_eq!(unit_of(child, "R"), Some(&kilometers()));
+        assert_eq!(unit_of(&root, "R_c"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn reference_to_shadowed_builtin_inherits_unit() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("pi", lit_number(3.0), Some(kilometers())),
+                parameter("t", builtin_var("pi"), None),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "t"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn reference_to_design_addition_has_unit() {
+        let host = model("root", []);
+        let additions: IndexMap<ParameterName, ir::Parameter> = std::iter::once((
+            ParameterName::from("d"),
+            parameter("d", lit_number(5.0), Some(kilometers())),
+        ))
+        .collect();
+        let override_value = ir::ParameterValue::Simple(Box::new(param_var("d")), None);
+        let scope = Scope {
+            instance: &host,
+            additions: Some(&additions),
+        };
+        let pool = ReferencePool::new();
+
+        let unit = value_unit(&override_value, scope, &pool);
+
+        assert_eq!(unit, Some(&kilometers()));
     }
 
     #[test]

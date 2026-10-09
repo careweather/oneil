@@ -14,13 +14,13 @@ It runs in two passes:
 2. **Per-unit build (cached)** — `oneil_frontend::instance::graph`
    walks the resolved IR for a compilation unit (`.on` model or `.one`
    design) and produces a self-rooted `InstanceGraph`. All own-file
-   `apply` statements land on their target instances during this pass,
-   and each unannotated plain parameter reference gets the unit of the
-   parameter it references. Results are cached by `CompilationUnit`.
+   `apply` statements land on their target instances during this pass.
+   Results are cached by `CompilationUnit`.
 
 A subsequent **composition** step (also in `instance::graph`) clones a
 cached unit graph and overlays any runtime designs to produce the graph
-that evaluation runs against. Existence checks for variables and
+that evaluation runs against. It ends by giving each unannotated plain
+parameter reference the unit of the parameter it references. Existence checks for variables and
 parameter cycle detection happen *after* composition in
 `oneil_analysis::validate_instance_graph`, when every contribution that
 could introduce a name is in scope.

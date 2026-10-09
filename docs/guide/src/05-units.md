@@ -214,7 +214,8 @@ d_t = 100 :m  # Trip distance
 This also applies to a parameter from another model, such as `P_l = P_t.r`, and
 to a design override that is only a reference. A design override has to keep
 the dimensions of the parameter it replaces, including a unit that the
-parameter inherits.
+parameter inherits. When a design changes the unit of the referenced parameter,
+such as `d = 0.1 :km`, the reference inherits the new unit.
 
 A reference to a dimensionless parameter, such as a gain in `dB` or an
 efficiency in `%`, becomes a plain number, like any other dimensionless value

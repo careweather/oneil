@@ -32,11 +32,13 @@
 //!    the root unit's cached graph and overlays runtime-supplied
 //!    designs at the root anchor.
 //!
-//! Both passes end by writing the unit that each unannotated plain
+//! Composition ends by writing the unit that each unannotated plain
 //! parameter reference, such as `P_l = P_t.r`, inherits from the
-//! parameter it references. Design overlays get their inherited unit
-//! before the overlay unit check, so the check compares the units of
-//! plain references on either side.
+//! parameter it references, once every design is applied. Cached unit
+//! graphs leave plain references unannotated, so a design that changes
+//! a referenced parameter's unit also changes the inherited unit. The
+//! overlay unit check computes the inherited units of both sides when a
+//! design is applied, with the design's additions in scope.
 //!
 //! Per-instance variable classification ([`classify_variables`]) is a
 //! pre-validation step that the post-build validation pass invokes as
@@ -80,7 +82,7 @@ use crate::instance::cycle_error::CompilationCycleError;
 use super::{
     CompilationUnit, ContributionDiagnostic, InstancedModel,
     design::{ApplyDesign, Design, OverlayParameterValue},
-    reference_units::{fill_inherited_unit, fill_inherited_units},
+    reference_units::{Scope, fill_inherited_units, parameter_unit, value_unit},
     validation_error::InstanceValidationError,
 };
 
@@ -334,14 +336,12 @@ fn build_unit_graph_uncached(
     stack: &mut Vec<CycleStackFrame>,
     ctx: &GraphCtx<'_>,
 ) -> InstanceGraph {
-    let mut graph = match unit {
+    match unit {
         CompilationUnit::Model(model_path) => build_model_unit_graph(model_path, cache, stack, ctx),
         CompilationUnit::Design(design_path) => {
             build_design_unit_graph(design_path, cache, stack, ctx)
         }
-    };
-    fill_inherited_units(&mut graph.root, &mut graph.reference_pool);
-    graph
+    }
 }
 
 fn build_model_unit_graph(
@@ -710,21 +710,23 @@ fn apply_design_at_host(
     applied_via: Option<&ir::DesignApplication>,
     ctx: &GraphCtx<'_>,
 ) {
-    let (overrides, additions) = {
+    let unit_errors = {
         let host =
             host_at_in_view(root, pool, &host_loc.absolute_path).expect("host_loc just resolved");
-        (
-            overrides_with_inherited_units(&design.parameter_overrides, host, pool),
-            additions_with_inherited_units(&design.parameter_additions, host, pool),
-        )
+        let scope = Scope {
+            instance: host,
+            additions: Some(&design.parameter_additions),
+        };
+        unit_mismatches(&design.parameter_overrides, scope, scope, pool)
     };
 
     {
         let host = host_at_mut(root, pool, host_loc).expect("host_loc just resolved");
         apply_overlay_at_host(
             host,
-            &overrides,
-            &additions,
+            &design.parameter_overrides,
+            &design.parameter_additions,
+            &unit_errors,
             &design.parameter_section_placements,
             &host_loc.absolute_path.host_path(),
             &RelativePath::self_path(),
@@ -815,20 +817,20 @@ fn apply_scoped_overlay(
     };
 
     // A scoped overlay resolves its names from the anchor, not from its host.
-    let (overrides, additions) = {
+    let unit_errors = {
         let anchor = host_at_in_view(root, pool, &anchor_loc.absolute_path)
             .expect("the caller resolved anchor_loc");
-        (
-            overrides_with_inherited_units(overrides, anchor, pool),
-            additions_with_inherited_units(additions, anchor, pool),
-        )
+        let host = host_at_in_view(root, pool, &host_loc.absolute_path)
+            .expect("scoped host just resolved");
+        unit_mismatches(overrides, Scope::of(host), Scope::of(anchor), pool)
     };
 
     let host = host_at_mut(root, pool, &host_loc).expect("scoped host must exist");
     apply_overlay_at_host(
         host,
-        &overrides,
-        &additions,
+        overrides,
+        additions,
+        &unit_errors,
         &IndexMap::new(),
         &host_loc.absolute_path.host_path(),
         &anchor_relative,
@@ -839,47 +841,40 @@ fn apply_scoped_overlay(
     );
 }
 
-/// Returns `overrides` with the unit that each unannotated plain reference
-/// inherits written in, resolving names against `scope`.
-fn overrides_with_inherited_units(
+/// Returns the unit mismatch error of each override in `overrides` whose
+/// value has other dimensions than the parameter it replaces, keyed by the
+/// parameter name.
+///
+/// The overridden parameters live on the instance of `host`, and the override
+/// values resolve their names in `overlay_scope`. Both sides count the unit
+/// that a plain reference inherits at this point in the build.
+fn unit_mismatches(
     overrides: &IndexMap<ParameterName, OverlayParameterValue>,
-    scope: &InstancedModel,
+    host: Scope<'_>,
+    overlay_scope: Scope<'_>,
     pool: &IndexMap<ModelPath, Box<InstancedModel>>,
-) -> IndexMap<ParameterName, OverlayParameterValue> {
+) -> IndexMap<ParameterName, DesignResolutionError> {
     overrides
         .iter()
-        .map(|(name, overlay)| {
-            let mut overlay = overlay.clone();
-            fill_inherited_unit(&mut overlay.value, scope, pool);
-            (name.clone(), overlay)
-        })
-        .collect()
-}
-
-/// Returns `additions` with the unit that each unannotated plain reference
-/// inherits written in, resolving names against `scope`.
-fn additions_with_inherited_units(
-    additions: &IndexMap<ParameterName, ir::Parameter>,
-    scope: &InstancedModel,
-    pool: &IndexMap<ModelPath, Box<InstancedModel>>,
-) -> IndexMap<ParameterName, ir::Parameter> {
-    additions
-        .iter()
-        .map(|(name, parameter)| {
-            let mut parameter = parameter.clone();
-            fill_inherited_unit(parameter.value_mut(), scope, pool);
-            (name.clone(), parameter)
+        .filter_map(|(name, overlay)| {
+            let target = host.instance.parameters().get(name)?;
+            let target_unit = parameter_unit(target, host, pool)?;
+            let overlay_unit = value_unit(&overlay.value, overlay_scope, pool)?;
+            let error = check_unit_compatibility(name, target_unit, overlay, overlay_unit)?;
+            Some((name.clone(), error))
         })
         .collect()
 }
 
 /// Applies one host's worth of design contributions in place,
-/// recording errors for missing / unit-mismatched overlay targets.
+/// recording errors for missing overlay targets and the unit mismatches
+/// in `unit_errors`.
 #[expect(clippy::too_many_arguments, reason = "single internal helper")]
 fn apply_overlay_at_host(
     host: &mut InstancedModel,
     overrides: &IndexMap<ParameterName, OverlayParameterValue>,
     additions: &IndexMap<ParameterName, ir::Parameter>,
+    unit_errors: &IndexMap<ParameterName, DesignResolutionError>,
     addition_placements: &IndexMap<ParameterName, (SectionLabel, Option<ir::Note>)>,
     host_path: &InstancePath,
     anchor_path: &RelativePath,
@@ -927,10 +922,10 @@ fn apply_overlay_at_host(
             ));
             continue;
         };
-        if let Some(err) = check_unit_compatibility(parameter, name, overlay) {
+        if let Some(err) = unit_errors.get(name) {
             contribution_errors.push(ContributionDiagnostic::new(
                 host_path.clone(),
-                err,
+                err.clone(),
                 design_file.clone(),
                 applied_via.cloned(),
             ));
@@ -1176,18 +1171,14 @@ fn render_path(p: &InstancePath) -> String {
 
 // ── Apply-time helpers ───────────────────────────────────────────────────────
 
+/// Returns an error when the override `overlay` of `parameter_name` has a unit
+/// with other dimensions than the parameter it replaces.
 fn check_unit_compatibility(
-    target_param: &ir::Parameter,
     parameter_name: &ParameterName,
+    target_unit: &ir::CompositeUnit,
     overlay: &OverlayParameterValue,
+    overlay_unit: &ir::CompositeUnit,
 ) -> Option<DesignResolutionError> {
-    let target_unit = match target_param.value() {
-        ir::ParameterValue::Simple(_, u) | ir::ParameterValue::Piecewise(_, u) => u.as_ref()?,
-    };
-    let overlay_unit = match &overlay.value {
-        ir::ParameterValue::Simple(_, u) | ir::ParameterValue::Piecewise(_, u) => u.as_ref()?,
-    };
-
     if target_unit.dimension() == overlay_unit.dimension() {
         return None;
     }

@@ -1,0 +1,3 @@
+# A plain reference to the builtin `pi`, which a design can shadow with a parameter.
+
+Half turn: t = pi

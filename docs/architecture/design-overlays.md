@@ -170,18 +170,6 @@ entry. Two overlay passes run after the target's unit graph is merged in: the
 design's own resolved contributions (overrides and additions), then the design
 file's own `apply X to ref` declarations.
 
-### Inherited units
-
-A parameter whose value is only a reference to another parameter, such as
-`P_l = P_t.r`, and that has no unit annotation inherits the referenced
-parameter's unit when that unit has physical dimensions. Every per-unit build
-and every composition ends with `fill_inherited_units`
-(`oneil_frontend::instance::reference_units`), which writes the inherited unit
-into the reference's `ParameterValue`. Overlay values get their inherited unit
-from the design's anchor scope before the overlay unit check, so the check
-compares inherited units on either side. Validation, evaluation, and the
-rendered view then read the unit as if the source had annotated it.
-
 ### Cycle detection
 
 A per-build stack of `(CompilationUnit, imported_at: Span)` values tracks
@@ -196,9 +184,9 @@ every cycle observed anywhere in the dependency tree.
 
 `apply_designs(root_unit, runtime_designs)` clones the cached root-unit graph
 into a fresh `InstanceGraph` and applies `runtime_designs` as contributions via
-the same `merge_child_graph` + `apply_contribution_here` pair. No-op when
-`runtime_designs` is empty, in which case the cached root unit graph *is* the
-composed graph (modulo a cheap clone).
+the same `merge_child_graph` + `apply_contribution_here` pair. When
+`runtime_designs` is empty, the composed graph is a clone of the cached root
+unit graph with [inherited units](#inherited-units) written in.
 
 The composed graph is **not cached**. Composition runs in time linear in
 instance count. If profiling later shows pain, add a memo keyed by
@@ -208,6 +196,29 @@ of truth.
 The CLI's `--design path.one` injects a single synthetic contribution into
 `apply_designs`'s `runtime_designs` slot. There is no separate code path for
 "with design" vs. "without design" — both flow through the same primitive.
+
+### Inherited units
+
+A parameter whose value is only a reference to another parameter, such as
+`P_l = P_t.r`, and that has no unit annotation inherits the referenced
+parameter's unit when that unit has physical dimensions. Composition ends with
+`fill_inherited_units` (`oneil_frontend::instance::reference_units`), which
+writes the inherited unit into the reference's `ParameterValue` once every
+design is applied. Validation, evaluation, and the rendered view then read the
+unit as if the source had annotated it.
+
+Cached unit graphs and overlay values keep plain references unannotated, so a
+reference follows a design that changes the referenced parameter's unit. A
+scoped overlay's unit resolves from its anchor, found through the overlay's
+ancestors the same way validation finds it. A name that a design parameter
+shadows, such as `pi`, resolves to that parameter, as classification later
+does.
+
+The overlay unit check runs while designs are still being applied, so it
+computes the units that both sides inherit at that point without writing
+them. An override value resolves in the design's anchor scope together with
+the design's additions, so an override can't take other dimensions by
+referencing a parameter that the same design adds.
 
 ## Error partitioning
 
