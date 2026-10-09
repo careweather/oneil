@@ -1162,7 +1162,7 @@ mod helper {
     pub fn extract_homogeneous_numbers_list(
         values: &[(Value, Span)],
     ) -> Result<HomogeneousNumberList<'_>, Vec<EvalError>> {
-        assert!(!values.is_empty());
+        assert_ne!(values, []);
 
         // iterate over the values and collect them into a homogeneous list
         let mut list_result: Option<ListResult<'_>> = None;
