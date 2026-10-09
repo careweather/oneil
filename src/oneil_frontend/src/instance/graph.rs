@@ -713,9 +713,11 @@ fn apply_design_at_host(
     let (overrides, additions) = {
         let host =
             host_at_in_view(root, pool, &host_loc.absolute_path).expect("host_loc just resolved");
-        (
-            overrides_with_inherited_units(&design.parameter_overrides, host, pool),
-            additions_with_inherited_units(&design.parameter_additions, host, pool),
+        design_contributions_with_inherited_units(
+            &design.parameter_overrides,
+            &design.parameter_additions,
+            host,
+            pool,
         )
     };
 
@@ -837,6 +839,29 @@ fn apply_scoped_overlay(
         contribution_errors,
         ctx,
     );
+}
+
+/// Returns design contributions with inherited units filled in.
+///
+/// Additions are installed in an effective scope before override units are
+/// inferred, because an override can reference a parameter from the same
+/// design.
+fn design_contributions_with_inherited_units(
+    overrides: &IndexMap<ParameterName, OverlayParameterValue>,
+    additions: &IndexMap<ParameterName, ir::Parameter>,
+    scope: &InstancedModel,
+    pool: &IndexMap<ModelPath, Box<InstancedModel>>,
+) -> (
+    IndexMap<ParameterName, OverlayParameterValue>,
+    IndexMap<ParameterName, ir::Parameter>,
+) {
+    let additions = additions_with_inherited_units(additions, scope, pool);
+    let mut effective_scope = scope.clone();
+    for (name, parameter) in &additions {
+        effective_scope.add_parameter(name.clone(), parameter.clone());
+    }
+    let overrides = overrides_with_inherited_units(overrides, &effective_scope, pool);
+    (overrides, additions)
 }
 
 /// Returns `overrides` with the unit that each unannotated plain reference
@@ -1349,11 +1374,19 @@ mod tests {
     use indexmap::IndexSet;
     use oneil_ir::{
         self as ir,
-        test_helpers::expr::{builtin_variable, external_variable, parameter_variable},
+        test_helpers::{
+            expr::{
+                builtin_variable, external_variable, lit_number, param_var, parameter_variable,
+            },
+            parameter::build_parameter_from_expr,
+        },
     };
-    use oneil_shared::symbols::ParameterName;
+    use oneil_shared::{span::Span, symbols::ParameterName};
 
-    use super::{BuiltinLookup, ClassifyScope, classify_variable};
+    use super::{
+        BuiltinLookup, ClassifyScope, InstancedModel, OverlayParameterValue,
+        check_unit_compatibility, classify_variable, design_contributions_with_inherited_units,
+    };
 
     struct StubBuiltins {
         names: Vec<String>,
@@ -1371,6 +1404,75 @@ mod tests {
         fn has_builtin_value(&self, name: &str) -> bool {
             self.names.iter().any(|n| n == name)
         }
+    }
+
+    fn unit(name: &str, dimension: oneil_output::Dimension) -> ir::CompositeUnit {
+        ir::CompositeUnit::new(
+            Vec::new(),
+            ir::DisplayCompositeUnit::BaseUnit(ir::DisplayUnit::new(name.to_string(), 1.0)),
+            Span::synthetic(),
+            std::iter::once((dimension, 1.0)).collect(),
+        )
+    }
+
+    fn parameter(
+        name: &str,
+        expr: ir::Expr,
+        unit: Option<ir::CompositeUnit>,
+    ) -> ir::Parameter {
+        build_parameter_from_expr(name, expr, unit, ir::Limits::default())
+    }
+
+    #[test]
+    fn override_inherits_incompatible_unit_from_design_addition() {
+        let name = ParameterName::from("x");
+        let mut host = InstancedModel::empty_for(crate::test::test_model_path("root"));
+        host.add_parameter(
+            name.clone(),
+            parameter(
+                "x",
+                lit_number(1.0),
+                Some(unit("s", oneil_output::Dimension::Time)),
+            ),
+        );
+
+        let mut additions = indexmap::IndexMap::new();
+        additions.insert(
+            ParameterName::from("y"),
+            parameter(
+                "y",
+                lit_number(1.0),
+                Some(unit("m", oneil_output::Dimension::Distance)),
+            ),
+        );
+
+        let mut overrides = indexmap::IndexMap::new();
+        overrides.insert(
+            name.clone(),
+            OverlayParameterValue {
+                value: ir::ParameterValue::simple(param_var("y"), None),
+                design_span: Span::synthetic(),
+                instance_path_span: None,
+                original_model_span: Span::synthetic(),
+                note: None,
+                label: None,
+                render_name: None,
+                limits_override: None,
+                section: None,
+            },
+        );
+
+        let (overrides, _) = design_contributions_with_inherited_units(
+            &overrides,
+            &additions,
+            &host,
+            &indexmap::IndexMap::new(),
+        );
+        let target = host
+            .get_parameter(&name)
+            .expect("target parameter should exist");
+
+        assert!(check_unit_compatibility(target, &name, &overrides[&name]).is_some());
     }
 
     #[test]

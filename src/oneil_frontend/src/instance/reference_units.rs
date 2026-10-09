@@ -183,7 +183,10 @@ fn reference_target<'a>(
             referenced_instance(scope, reference_name, pool)?,
             parameter_name,
         )),
-        ir::Variable::Builtin { .. } => None,
+        ir::Variable::Builtin { ident, .. } => scope
+            .parameters()
+            .get_key_value(&ParameterName::from(ident.as_str()))
+            .map(|(name, _)| (scope, name)),
     }
 }
 
@@ -232,7 +235,7 @@ mod tests {
     use oneil_ir::{
         self as ir,
         test_helpers::{
-            expr::{binary, external_var, lit_number, param_var},
+            expr::{binary, builtin_var, external_var, lit_number, param_var},
             parameter::build_parameter_from_expr,
         },
     };
@@ -404,6 +407,19 @@ mod tests {
         ));
 
         assert_eq!(unit_of(&root, "L_2"), None);
+    }
+
+    #[test]
+    fn builtin_shadowed_by_parameter_inherits_unit() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("pi", lit_number(3.0), Some(kilometers())),
+                parameter("L", builtin_var("pi"), None),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "L"), Some(&kilometers()));
     }
 
     #[test]
