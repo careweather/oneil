@@ -32,6 +32,12 @@
 //!    the root unit's cached graph and overlays runtime-supplied
 //!    designs at the root anchor.
 //!
+//! Both passes end by writing the unit that each unannotated plain
+//! parameter reference, such as `P_l = P_t.r`, inherits from the
+//! parameter it references. Design overlays get their inherited unit
+//! before the overlay unit check, so the check compares the units of
+//! plain references on either side.
+//!
 //! Per-instance variable classification ([`classify_variables`]) is a
 //! pre-validation step that the post-build validation pass invokes as
 //! its first action. It walks the composed graph and rewrites raw
@@ -74,6 +80,7 @@ use crate::instance::cycle_error::CompilationCycleError;
 use super::{
     CompilationUnit, ContributionDiagnostic, InstancedModel,
     design::{ApplyDesign, Design, OverlayParameterValue},
+    reference_units::{fill_inherited_unit, fill_inherited_units},
     validation_error::InstanceValidationError,
 };
 
@@ -270,6 +277,8 @@ pub fn apply_designs(
         *composed.root = root;
     }
 
+    fill_inherited_units(&mut composed.root, &mut composed.reference_pool);
+
     composed
 }
 
@@ -325,12 +334,14 @@ fn build_unit_graph_uncached(
     stack: &mut Vec<CycleStackFrame>,
     ctx: &GraphCtx<'_>,
 ) -> InstanceGraph {
-    match unit {
+    let mut graph = match unit {
         CompilationUnit::Model(model_path) => build_model_unit_graph(model_path, cache, stack, ctx),
         CompilationUnit::Design(design_path) => {
             build_design_unit_graph(design_path, cache, stack, ctx)
         }
-    }
+    };
+    fill_inherited_units(&mut graph.root, &mut graph.reference_pool);
+    graph
 }
 
 fn build_model_unit_graph(
@@ -699,12 +710,21 @@ fn apply_design_at_host(
     applied_via: Option<&ir::DesignApplication>,
     ctx: &GraphCtx<'_>,
 ) {
+    let (overrides, additions) = {
+        let host =
+            host_at_in_view(root, pool, &host_loc.absolute_path).expect("host_loc just resolved");
+        (
+            overrides_with_inherited_units(&design.parameter_overrides, host, pool),
+            additions_with_inherited_units(&design.parameter_additions, host, pool),
+        )
+    };
+
     {
         let host = host_at_mut(root, pool, host_loc).expect("host_loc just resolved");
         apply_overlay_at_host(
             host,
-            &design.parameter_overrides,
-            &design.parameter_additions,
+            &overrides,
+            &additions,
             &design.parameter_section_placements,
             &host_loc.absolute_path.host_path(),
             &RelativePath::self_path(),
@@ -794,11 +814,21 @@ fn apply_scoped_overlay(
         return;
     };
 
+    // A scoped overlay resolves its names from the anchor, not from its host.
+    let (overrides, additions) = {
+        let anchor = host_at_in_view(root, pool, &anchor_loc.absolute_path)
+            .expect("the caller resolved anchor_loc");
+        (
+            overrides_with_inherited_units(overrides, anchor, pool),
+            additions_with_inherited_units(additions, anchor, pool),
+        )
+    };
+
     let host = host_at_mut(root, pool, &host_loc).expect("scoped host must exist");
     apply_overlay_at_host(
         host,
-        overrides,
-        additions,
+        &overrides,
+        &additions,
         &IndexMap::new(),
         &host_loc.absolute_path.host_path(),
         &anchor_relative,
@@ -807,6 +837,40 @@ fn apply_scoped_overlay(
         contribution_errors,
         ctx,
     );
+}
+
+/// Returns `overrides` with the unit that each unannotated plain reference
+/// inherits written in, resolving names against `scope`.
+fn overrides_with_inherited_units(
+    overrides: &IndexMap<ParameterName, OverlayParameterValue>,
+    scope: &InstancedModel,
+    pool: &IndexMap<ModelPath, Box<InstancedModel>>,
+) -> IndexMap<ParameterName, OverlayParameterValue> {
+    overrides
+        .iter()
+        .map(|(name, overlay)| {
+            let mut overlay = overlay.clone();
+            fill_inherited_unit(&mut overlay.value, scope, pool);
+            (name.clone(), overlay)
+        })
+        .collect()
+}
+
+/// Returns `additions` with the unit that each unannotated plain reference
+/// inherits written in, resolving names against `scope`.
+fn additions_with_inherited_units(
+    additions: &IndexMap<ParameterName, ir::Parameter>,
+    scope: &InstancedModel,
+    pool: &IndexMap<ModelPath, Box<InstancedModel>>,
+) -> IndexMap<ParameterName, ir::Parameter> {
+    additions
+        .iter()
+        .map(|(name, parameter)| {
+            let mut parameter = parameter.clone();
+            fill_inherited_unit(parameter.value_mut(), scope, pool);
+            (name.clone(), parameter)
+        })
+        .collect()
 }
 
 /// Applies one host's worth of design contributions in place,
@@ -1130,7 +1194,7 @@ fn check_unit_compatibility(
 
     Some(DesignResolutionError::new(
         format!(
-            "unit mismatch: parameter `{}` declared as `{}` but design applies value with unit `{}`",
+            "unit mismatch: parameter `{}` has unit `{}` but design applies value with unit `{}`",
             parameter_name.as_str(),
             target_unit.display_unit().to_resolved_display(),
             overlay_unit.display_unit().to_resolved_display(),

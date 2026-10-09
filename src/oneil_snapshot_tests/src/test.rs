@@ -90,6 +90,21 @@ fn basic_reference_inherits_unit() {
 }
 
 #[test]
+fn overlay_reference_inherits_unit() {
+    // A design override that is a plain reference inherits the referenced unit
+    // in the design's anchor scope, and the overlay check compares it with the
+    // unit that the overridden plain reference inherits.
+    insta::assert_snapshot!(run_fixture("reference_units/overlay.one"));
+}
+
+#[test]
+fn overlay_reference_unit_mismatch() {
+    // A plain reference to a power cannot override a plain reference to a
+    // length, because both carry their inherited units into the overlay check.
+    insta::assert_snapshot!(run_fixture("reference_units/mismatch.one"));
+}
+
+#[test]
 fn basic_undefined_reference_parameter() {
     // A cross-file reference whose parameter access names a parameter that
     // does not exist on the referenced model.  This exercises the

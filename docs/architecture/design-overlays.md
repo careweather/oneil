@@ -170,6 +170,18 @@ entry. Two overlay passes run after the target's unit graph is merged in: the
 design's own resolved contributions (overrides and additions), then the design
 file's own `apply X to ref` declarations.
 
+### Inherited units
+
+A parameter whose value is only a reference to another parameter, such as
+`P_l = P_t.r`, and that has no unit annotation inherits the referenced
+parameter's unit when that unit has physical dimensions. Every per-unit build
+and every composition ends with `fill_inherited_units`
+(`oneil_frontend::instance::reference_units`), which writes the inherited unit
+into the reference's `ParameterValue`. Overlay values get their inherited unit
+from the design's anchor scope before the overlay unit check, so the check
+compares inherited units on either side. Validation, evaluation, and the
+rendered view then read the unit as if the source had annotated it.
+
 ### Cycle detection
 
 A per-build stack of `(CompilationUnit, imported_at: Span)` values tracks
