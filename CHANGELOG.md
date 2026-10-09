@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- A parameter whose value is only a reference to another parameter, such as `P_l = P_t.r`, inherits that parameter's unit and display unit, so it no longer needs a unit annotation. Unannotated references to dimensionless parameters, such as dB gains and percentages, now display in the referenced unit instead of as a plain number.
+- A parameter whose value is only a reference to another parameter with physical dimensions, such as `P_l = P_t.r`, inherits that parameter's unit and display unit, so it no longer needs a unit annotation. A reference to a dimensionless parameter, such as a dB gain or a percentage, still becomes a plain number.
 
 ## [1.0.0-beta.6] - 2026-08-17
 

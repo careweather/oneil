@@ -213,6 +213,11 @@ d_t = 100 :m  # Trip distance
 
 This also applies to a parameter from another model, such as `P_l = P_t.r`.
 
+A reference to a dimensionless parameter, such as a gain in `dB` or an
+efficiency in `%`, becomes a plain number, like any other dimensionless value
+without a unit annotation. To keep the referenced unit, add the annotation, such
+as `G_r = G :dB`.
+
 ## Composing units in a unit expression
 
 A **unit expression** is built from one or more units separated by `*` or `/`.

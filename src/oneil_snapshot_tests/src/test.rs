@@ -85,6 +85,7 @@ fn basic_failing_test() {
 fn basic_reference_inherits_unit() {
     // A parameter whose value is only a reference, local or `p.r`, inherits
     // the referenced parameter's unit and display unit without an annotation.
+    // A reference to a dimensionless parameter becomes a plain number.
     insta::assert_snapshot!(run_fixture("reference_units/parent.on"));
 }
 
