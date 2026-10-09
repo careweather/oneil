@@ -16,7 +16,7 @@ Unannotated references to dimensionless parameters were already accepted, but we
 
 A parameter whose value is a single reference to another parameter, either in the same model (`x = y`) or in another model (`x = y.r`), and that has no unit annotation, takes the referenced value with its unit and display unit unchanged. This applies to dimensionless units as well, so a reference to `18 :dB` displays as `18 :dB`.
 
-Every other expression with a unit, including a reference combined with any operator or function, still requires an annotation. An annotation on a reference is still allowed and is checked as before.
+Every other expression with physical dimensions, including a reference combined with any operator or function, still requires an annotation. Dimensionless calculations keep their existing behavior: without an annotation, they become plain dimensionless values. An annotation on a reference is still allowed and is checked as before.
 
 ## Consequences
 
