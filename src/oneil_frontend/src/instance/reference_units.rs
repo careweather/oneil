@@ -7,8 +7,7 @@
 //! rendered view read it like an explicit annotation, and a design that
 //! changes the referenced parameter's unit changes the inherited unit too. The
 //! design overlay unit check runs while designs are still being applied, so it
-//! reads inherited units through [`parameter_unit`] and [`value_unit`] without
-//! writing them.
+//! reads inherited units through [`value_unit`] without writing them.
 //!
 //! Only units with physical dimensions are inherited. A reference to a
 //! dimensionless unit, such as `dB` or `%`, stays unannotated and evaluates to
@@ -48,22 +47,6 @@ impl<'a> Scope<'a> {
             .and_then(|additions| additions.get_key_value(name))
             .or_else(|| self.instance.parameters().get_key_value(name))
     }
-}
-
-/// Returns the unit of `parameter`, which lives on the instance of `scope`:
-/// its annotation, or else the unit it inherits as a plain reference.
-///
-/// A scoped design overlay resolves its names from an anchor above its host,
-/// so only its annotation counts.
-pub(super) fn parameter_unit<'a>(
-    parameter: &'a ir::Parameter,
-    scope: Scope<'a>,
-    pool: &'a ReferencePool,
-) -> Option<&'a ir::CompositeUnit> {
-    if has_scoped_anchor(parameter) {
-        return annotated_unit(parameter.value());
-    }
-    value_unit(parameter.value(), scope, pool)
 }
 
 /// Returns the unit of `value`: its annotation, or else the unit it inherits
@@ -194,7 +177,8 @@ fn value_scope<'a>(
     })
 }
 
-const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::CompositeUnit> {
+/// Returns the unit written on `value`, if any.
+pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::CompositeUnit> {
     match value {
         ir::ParameterValue::Simple(_, unit) | ir::ParameterValue::Piecewise(_, unit) => {
             unit.as_ref()

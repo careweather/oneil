@@ -112,6 +112,21 @@ fn overlay_reference_to_addition_unit_mismatch() {
 }
 
 #[test]
+fn nested_override_of_scoped_reference_unit_mismatch() {
+    // A parameter that a scoped override set to a plain reference keeps the
+    // unit it inherits from the override's anchor when a later design
+    // overrides it again.
+    insta::assert_snapshot!(run_fixture("reference_units/nested_mismatch.one"));
+}
+
+#[test]
+fn second_scoped_override_of_reference_unit_mismatch() {
+    // A second scoped override of the same parameter is checked against the
+    // unit that the first one's reference inherits.
+    insta::assert_snapshot!(run_fixture("reference_units/two_scoped_mismatch.on"));
+}
+
+#[test]
 fn reference_follows_design_display_unit() {
     // A plain reference inherits the unit that its target has after every
     // design applies, not the unit the target had in the base model.

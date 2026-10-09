@@ -218,7 +218,9 @@ The overlay unit check runs while designs are still being applied, so it
 computes the units that both sides inherit at that point without writing
 them. An override value resolves in the design's anchor scope together with
 the design's additions, so an override can't take other dimensions by
-referencing a parameter that the same design adds.
+referencing a parameter that the same design adds. An overridden parameter
+that an earlier scoped overlay set resolves in the anchor that overlay
+recorded, so a later design can't change its dimensions either.
 
 ## Error partitioning
 
