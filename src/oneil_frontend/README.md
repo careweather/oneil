@@ -19,7 +19,8 @@ It runs in two passes:
 
 A subsequent **composition** step (also in `instance::graph`) clones a
 cached unit graph and overlays any runtime designs to produce the graph
-that evaluation runs against. Existence checks for variables and
+that evaluation runs against. It ends by giving each unannotated plain
+parameter reference the unit of the parameter it references. Existence checks for variables and
 parameter cycle detection happen *after* composition in
 `oneil_analysis::validate_instance_graph`, when every contribution that
 could introduce a name is in scope.

@@ -1,0 +1,6 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/mismatch.one\")"
+---
+error: unit mismatch: parameter `L_r` has unit `km` but design applies value with unit `dBW`
+  at fixtures/reference_units/mismatch.one:6:1

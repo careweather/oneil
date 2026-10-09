@@ -82,6 +82,50 @@ fn basic_failing_test() {
 }
 
 #[test]
+fn basic_reference_inherits_unit() {
+    // A parameter whose value is only a reference, local or `p.r`, inherits
+    // the referenced parameter's unit and display unit without an annotation.
+    // A reference to a dimensionless parameter becomes a plain number.
+    insta::assert_snapshot!(run_fixture("reference_units/parent.on"));
+}
+
+#[test]
+fn overlay_reference_inherits_unit() {
+    // A design override that is a plain reference inherits the referenced unit
+    // in the design's anchor scope, and the overlay check compares it with the
+    // unit that the overridden plain reference inherits.
+    insta::assert_snapshot!(run_fixture("reference_units/overlay.one"));
+}
+
+#[test]
+fn overlay_reference_unit_mismatch() {
+    // A plain reference to a power cannot override a plain reference to a
+    // length, because both carry their inherited units into the overlay check.
+    insta::assert_snapshot!(run_fixture("reference_units/mismatch.one"));
+}
+
+#[test]
+fn overlay_reference_to_addition_unit_mismatch() {
+    // An override that is a plain reference to a parameter that the same
+    // design adds inherits the addition's unit in the overlay check.
+    insta::assert_snapshot!(run_fixture("reference_units/addition_mismatch.one"));
+}
+
+#[test]
+fn reference_follows_design_display_unit() {
+    // A plain reference inherits the unit that its target has after every
+    // design applies, not the unit the target had in the base model.
+    insta::assert_snapshot!(run_fixture("reference_units/display_unit.one"));
+}
+
+#[test]
+fn reference_to_shadowed_builtin_inherits_unit() {
+    // A design parameter that shadows a builtin turns a plain reference to the
+    // builtin into a reference to the parameter, which then has a unit.
+    insta::assert_snapshot!(run_fixture("reference_units/shadow.one"));
+}
+
+#[test]
 fn basic_undefined_reference_parameter() {
     // A cross-file reference whose parameter access names a parameter that
     // does not exist on the referenced model.  This exercises the

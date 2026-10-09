@@ -515,10 +515,6 @@ fn parenthesized_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError>
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::float_cmp,
-    reason = "it will be obvious when floating point equality fails and we need to use a tolerance"
-)]
 mod tests {
     use super::*;
     use crate::Config;
@@ -528,11 +524,7 @@ mod tests {
             panic!("expected literal in {expr:?}");
         };
 
-        let Literal::Number(value) = lit.clone().take_value() else {
-            panic!("expected number in {lit:?}");
-        };
-
-        assert_eq!(value, expected);
+        assert_eq!(lit.take_value(), Literal::Number(expected));
     }
 
     fn assert_literal_string(expr: &super::Node<Expr>, expected: &str) {

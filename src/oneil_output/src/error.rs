@@ -381,6 +381,8 @@ pub enum EvalError {
     ///
     /// This occurs when a parameter's value expression evaluates to a value with
     /// a unit, but the parameter definition does not include a unit annotation.
+    /// A value that is only a reference to another parameter inherits that
+    /// parameter's unit instead.
     ParameterMissingUnitAnnotation {
         /// The source span of the parameter expression.
         param_expr_span: Span,

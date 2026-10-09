@@ -32,6 +32,14 @@
 //!    the root unit's cached graph and overlays runtime-supplied
 //!    designs at the root anchor.
 //!
+//! Composition ends by writing the unit that each unannotated plain
+//! parameter reference, such as `P_l = P_t.r`, inherits from the
+//! parameter it references, once every design is applied. Cached unit
+//! graphs leave plain references unannotated, so a design that changes
+//! a referenced parameter's unit also changes the inherited unit. The
+//! overlay unit check computes the inherited units of both sides when a
+//! design is applied, with the design's additions in scope.
+//!
 //! Per-instance variable classification ([`classify_variables`]) is a
 //! pre-validation step that the post-build validation pass invokes as
 //! its first action. It walks the composed graph and rewrites raw
@@ -74,6 +82,7 @@ use crate::instance::cycle_error::CompilationCycleError;
 use super::{
     CompilationUnit, ContributionDiagnostic, InstancedModel,
     design::{ApplyDesign, Design, OverlayParameterValue},
+    reference_units::{Scope, fill_inherited_units, parameter_unit, value_unit},
     validation_error::InstanceValidationError,
 };
 
@@ -269,6 +278,8 @@ pub fn apply_designs(
 
         *composed.root = root;
     }
+
+    fill_inherited_units(&mut composed.root, &mut composed.reference_pool);
 
     composed
 }
@@ -699,12 +710,23 @@ fn apply_design_at_host(
     applied_via: Option<&ir::DesignApplication>,
     ctx: &GraphCtx<'_>,
 ) {
+    let unit_errors = {
+        let host =
+            host_at_in_view(root, pool, &host_loc.absolute_path).expect("host_loc just resolved");
+        let scope = Scope {
+            instance: host,
+            additions: Some(&design.parameter_additions),
+        };
+        unit_mismatches(&design.parameter_overrides, scope, scope, pool)
+    };
+
     {
         let host = host_at_mut(root, pool, host_loc).expect("host_loc just resolved");
         apply_overlay_at_host(
             host,
             &design.parameter_overrides,
             &design.parameter_additions,
+            &unit_errors,
             &design.parameter_section_placements,
             &host_loc.absolute_path.host_path(),
             &RelativePath::self_path(),
@@ -794,11 +816,21 @@ fn apply_scoped_overlay(
         return;
     };
 
+    // A scoped overlay resolves its names from the anchor, not from its host.
+    let unit_errors = {
+        let anchor = host_at_in_view(root, pool, &anchor_loc.absolute_path)
+            .expect("the caller resolved anchor_loc");
+        let host = host_at_in_view(root, pool, &host_loc.absolute_path)
+            .expect("scoped host just resolved");
+        unit_mismatches(overrides, Scope::of(host), Scope::of(anchor), pool)
+    };
+
     let host = host_at_mut(root, pool, &host_loc).expect("scoped host must exist");
     apply_overlay_at_host(
         host,
         overrides,
         additions,
+        &unit_errors,
         &IndexMap::new(),
         &host_loc.absolute_path.host_path(),
         &anchor_relative,
@@ -809,13 +841,40 @@ fn apply_scoped_overlay(
     );
 }
 
+/// Returns the unit mismatch error of each override in `overrides` whose
+/// value has other dimensions than the parameter it replaces, keyed by the
+/// parameter name.
+///
+/// The overridden parameters live on the instance of `host`, and the override
+/// values resolve their names in `overlay_scope`. Both sides count the unit
+/// that a plain reference inherits at this point in the build.
+fn unit_mismatches(
+    overrides: &IndexMap<ParameterName, OverlayParameterValue>,
+    host: Scope<'_>,
+    overlay_scope: Scope<'_>,
+    pool: &IndexMap<ModelPath, Box<InstancedModel>>,
+) -> IndexMap<ParameterName, DesignResolutionError> {
+    overrides
+        .iter()
+        .filter_map(|(name, overlay)| {
+            let target = host.instance.parameters().get(name)?;
+            let target_unit = parameter_unit(target, host, pool)?;
+            let overlay_unit = value_unit(&overlay.value, overlay_scope, pool)?;
+            let error = check_unit_compatibility(name, target_unit, overlay, overlay_unit)?;
+            Some((name.clone(), error))
+        })
+        .collect()
+}
+
 /// Applies one host's worth of design contributions in place,
-/// recording errors for missing / unit-mismatched overlay targets.
+/// recording errors for missing overlay targets and the unit mismatches
+/// in `unit_errors`.
 #[expect(clippy::too_many_arguments, reason = "single internal helper")]
 fn apply_overlay_at_host(
     host: &mut InstancedModel,
     overrides: &IndexMap<ParameterName, OverlayParameterValue>,
     additions: &IndexMap<ParameterName, ir::Parameter>,
+    unit_errors: &IndexMap<ParameterName, DesignResolutionError>,
     addition_placements: &IndexMap<ParameterName, (SectionLabel, Option<ir::Note>)>,
     host_path: &InstancePath,
     anchor_path: &RelativePath,
@@ -863,10 +922,10 @@ fn apply_overlay_at_host(
             ));
             continue;
         };
-        if let Some(err) = check_unit_compatibility(parameter, name, overlay) {
+        if let Some(err) = unit_errors.get(name) {
             contribution_errors.push(ContributionDiagnostic::new(
                 host_path.clone(),
-                err,
+                err.clone(),
                 design_file.clone(),
                 applied_via.cloned(),
             ));
@@ -1112,25 +1171,21 @@ fn render_path(p: &InstancePath) -> String {
 
 // ── Apply-time helpers ───────────────────────────────────────────────────────
 
+/// Returns an error when the override `overlay` of `parameter_name` has a unit
+/// with other dimensions than the parameter it replaces.
 fn check_unit_compatibility(
-    target_param: &ir::Parameter,
     parameter_name: &ParameterName,
+    target_unit: &ir::CompositeUnit,
     overlay: &OverlayParameterValue,
+    overlay_unit: &ir::CompositeUnit,
 ) -> Option<DesignResolutionError> {
-    let target_unit = match target_param.value() {
-        ir::ParameterValue::Simple(_, u) | ir::ParameterValue::Piecewise(_, u) => u.as_ref()?,
-    };
-    let overlay_unit = match &overlay.value {
-        ir::ParameterValue::Simple(_, u) | ir::ParameterValue::Piecewise(_, u) => u.as_ref()?,
-    };
-
     if target_unit.dimension() == overlay_unit.dimension() {
         return None;
     }
 
     Some(DesignResolutionError::new(
         format!(
-            "unit mismatch: parameter `{}` declared as `{}` but design applies value with unit `{}`",
+            "unit mismatch: parameter `{}` has unit `{}` but design applies value with unit `{}`",
             parameter_name.as_str(),
             target_unit.display_unit().to_resolved_display(),
             overlay_unit.display_unit().to_resolved_display(),

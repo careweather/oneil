@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A parameter whose value is only a reference to another parameter with physical dimensions, such as `P_l = P_t.r`, inherits that parameter's unit and display unit, so it no longer needs a unit annotation. Design overlay unit checks and the rendered view use the inherited unit. A reference to a dimensionless parameter, such as a dB gain or a percentage, still becomes a plain number.
+- The design overlay unit mismatch error says that a parameter "has unit" instead of "declared as", because the unit can be inherited.
+
 ## [1.0.0-beta.6] - 2026-08-17
 
 ### Added

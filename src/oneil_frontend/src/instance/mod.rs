@@ -13,8 +13,8 @@
 //!    templates into an [`InstanceGraph`] via the per-unit build
 //!    pipeline ([`build_unit_graph`] + [`apply_designs`]). The build
 //!    inlines each referenced unit's cached subtree, overlays design
-//!    contributions, and detects cross-file cycles
-//!    ([`CompilationCycleError`]).
+//!    contributions, writes the units that plain parameter references
+//!    inherit, and detects cross-file cycles ([`CompilationCycleError`]).
 //!
 //! The core types here are:
 //! - [`CompilationUnit`]: cache-key + cycle-stack identity for the
@@ -30,6 +30,7 @@ pub mod design;
 pub mod graph;
 pub mod imports;
 pub mod model;
+mod reference_units;
 pub mod validation_error;
 
 pub use compilation_unit::CompilationUnit;

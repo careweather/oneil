@@ -1394,7 +1394,7 @@ mod tests {
         );
         let result = eval_parameter_simple(&parameter).expect("eval should succeed");
         assert_eq!(result.value, Value::Boolean(true));
-        assert!(result.warnings.is_empty());
+        assert_eq!(result.warnings, []);
     }
 
     #[test]

@@ -1326,7 +1326,7 @@ mod tests {
             assert_eq!(apply_node.design_file().as_str(), "uhf");
             assert_eq!(apply_node.target().len(), 1);
             assert_eq!(apply_node.target()[0].as_str(), "U");
-            assert!(apply_node.nested_applies().is_empty());
+            assert_eq!(apply_node.nested_applies(), []);
             assert_eq!(rest.fragment(), &"");
         }
 

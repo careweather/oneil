@@ -199,6 +199,29 @@ error: parameter is missing a unit
   = help: add a unit annotation `:meters/seconds` to the parameter
 ```
 
+A parameter whose value is only a reference to another parameter is the
+exception. The referenced parameter already declares its unit, so the reference
+inherits that unit and how it is displayed.
+
+```oneil
+Trip distance: d_t = d
+```
+
+```oneil-eval-output
+d_t = 100 :m  # Trip distance
+```
+
+This also applies to a parameter from another model, such as `P_l = P_t.r`, and
+to a design override that is only a reference. A design override has to keep
+the dimensions of the parameter it replaces, including a unit that the
+parameter inherits. When a design changes the unit of the referenced parameter,
+such as `d = 0.1 :km`, the reference inherits the new unit.
+
+A reference to a dimensionless parameter, such as a gain in `dB` or an
+efficiency in `%`, becomes a plain number, like any other dimensionless value
+without a unit annotation. To keep the referenced unit, add the annotation, such
+as `G_r = G :dB`.
+
 ## Composing units in a unit expression
 
 A **unit expression** is built from one or more units separated by `*` or `/`.
