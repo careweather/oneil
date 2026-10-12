@@ -9,10 +9,11 @@
 //! design overlay unit check runs while designs are still being applied, so it
 //! reads inherited units through [`value_unit`] without writing them.
 //!
-//! Only units with physical dimensions are inherited. A reference to a
-//! dimensionless unit, such as `dB` or `%`, stays unannotated and evaluates to
-//! a plain number, because `strip` and limits without units read a value in
-//! its display unit.
+//! Only units with physical dimensions are written into the IR. A reference
+//! to a dimensionless unit, such as `dB` or `%`, stays unannotated and
+//! evaluates to a plain number, because `strip` and limits without units read
+//! a value in its display unit. [`value_unit`] still returns the dimensionless
+//! unit so an overlay can check its dimension.
 
 use indexmap::IndexMap;
 use oneil_ir as ir;
@@ -49,14 +50,14 @@ impl<'a> Scope<'a> {
     }
 }
 
-/// Returns the unit of `value`: its annotation, or else the unit it inherits
-/// as a plain reference resolved in `scope`.
+/// Returns the unit of `value`: its annotation, or else the unit reached by a
+/// plain reference resolved in `scope`.
 pub(super) fn value_unit<'a>(
     value: &'a ir::ParameterValue,
     scope: Scope<'a>,
     pool: &'a ReferencePool,
 ) -> Option<&'a ir::CompositeUnit> {
-    annotated_unit(value).or_else(|| inherited_unit(value, scope, pool))
+    annotated_unit(value).or_else(|| referenced_unit(value, scope, pool))
 }
 
 /// Writes the inherited unit into every unannotated plain reference in
@@ -186,10 +187,20 @@ pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::Co
     }
 }
 
-/// Returns the unit that `value` inherits when it is an unannotated plain
-/// reference whose target, possibly through further plain references, has a
-/// unit with physical dimensions.
+/// Returns the physical unit that `value` inherits when it is an unannotated
+/// plain reference.
 fn inherited_unit<'a>(
+    value: &'a ir::ParameterValue,
+    scope: Scope<'a>,
+    pool: &'a ReferencePool,
+) -> Option<&'a ir::CompositeUnit> {
+    let unit = referenced_unit(value, scope, pool)?;
+    (!unit.dimension().is_dimensionless()).then_some(unit)
+}
+
+/// Returns the unit reached by an unannotated plain reference, possibly
+/// through further plain references.
+fn referenced_unit<'a>(
     value: &'a ir::ParameterValue,
     scope: Scope<'a>,
     pool: &'a ReferencePool,
@@ -213,7 +224,7 @@ fn inherited_unit<'a>(
         visited.push((target_scope.instance, target_name));
 
         if let Some(unit) = annotated_unit(target.value()) {
-            return (!unit.dimension().is_dimensionless()).then_some(unit);
+            return Some(unit);
         }
         if has_scoped_anchor(target) {
             return None;
@@ -517,16 +528,26 @@ mod tests {
     }
 
     #[test]
-    fn dimensionless_reference_stays_unannotated() {
+    fn dimensionless_reference_is_known_but_stays_unannotated() {
         let decibels = unit("dB", DimensionMap::dimensionless());
-        let root = fill(model(
+        let root = model(
             "root",
             [
-                parameter("G", lit_number(18.0), Some(decibels)),
+                parameter("G", lit_number(18.0), Some(decibels.clone())),
                 parameter("G_r", param_var("G"), None),
             ],
-        ));
+        );
+        let reference = root
+            .get_parameter(&ParameterName::from("G_r"))
+            .expect("parameter should exist");
+        let pool = ReferencePool::new();
 
+        assert_eq!(
+            value_unit(reference.value(), Scope::of(&root), &pool),
+            Some(&decibels)
+        );
+
+        let root = fill(root);
         assert_eq!(unit_of(&root, "G_r"), None);
     }
 
