@@ -209,18 +209,19 @@ unit as if the source had annotated it.
 
 Cached unit graphs and overlay values keep plain references unannotated, so a
 reference follows a design that changes the referenced parameter's unit. A
-scoped overlay's unit resolves from its anchor, found through the overlay's
-ancestors the same way validation finds it. A name that a design parameter
-shadows, such as `pi`, resolves to that parameter, as classification later
-does.
+scoped overlay's value resolves in the anchor that its `anchor_path` leads to
+from the overlay's host, and a chain of references continues through a scoped
+overlay in that anchor. A name that a design parameter shadows, such as `pi`,
+resolves to that parameter, as classification later does.
 
 The overlay unit check runs while designs are still being applied, so it
 computes the units that both sides inherit at that point without writing
 them. An override value resolves in the design's anchor scope together with
 the design's additions, so an override can't take other dimensions by
-referencing a parameter that the same design adds. An overridden parameter
-that an earlier scoped overlay set resolves in the anchor that overlay
-recorded, so a later design can't change its dimensions either.
+referencing a parameter that the same design adds. The overridden parameter's
+own value resolves like any other reference, including through the anchor of
+an earlier scoped overlay, so a later design can't change its dimensions
+either.
 
 ## Error partitioning
 

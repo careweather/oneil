@@ -17,32 +17,47 @@
 use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_shared::{
+    InstancePath,
     paths::ModelPath,
     symbols::{ParameterName, ReferenceName},
 };
 
-use super::InstancedModel;
+use super::{
+    InstancedModel,
+    graph::{AbsolutePath, host_at_in_view},
+};
 
 type ReferencePool = IndexMap<ModelPath, Box<InstancedModel>>;
 
-/// The names that a parameter value resolves against: an instance, plus the
-/// parameters that a design being applied to it adds.
+/// The instances that references resolve in: the root model's tree and the
+/// reference pool.
 #[derive(Clone, Copy)]
+pub(super) struct GraphView<'a> {
+    pub root: &'a InstancedModel,
+    pub pool: &'a ReferencePool,
+}
+
+/// The names that a parameter value resolves against: an instance and where
+/// it lives, plus the parameters that a design being applied to it adds.
+#[derive(Clone)]
 pub(super) struct Scope<'a> {
     pub instance: &'a InstancedModel,
+    pub path: AbsolutePath,
     pub additions: Option<&'a IndexMap<ParameterName, ir::Parameter>>,
 }
 
 impl<'a> Scope<'a> {
-    /// The scope of `instance` with no pending design additions.
-    pub(super) const fn of(instance: &'a InstancedModel) -> Self {
+    /// The scope of `instance`, which lives at `path`, with no pending design
+    /// additions.
+    pub(super) const fn at(instance: &'a InstancedModel, path: AbsolutePath) -> Self {
         Self {
             instance,
+            path,
             additions: None,
         }
     }
 
-    fn parameter(self, name: &ParameterName) -> Option<(&'a ParameterName, &'a ir::Parameter)> {
+    fn parameter(&self, name: &ParameterName) -> Option<(&'a ParameterName, &'a ir::Parameter)> {
         self.additions
             .and_then(|additions| additions.get_key_value(name))
             .or_else(|| self.instance.parameters().get_key_value(name))
@@ -53,90 +68,114 @@ impl<'a> Scope<'a> {
 /// as a plain reference resolved in `scope`.
 pub(super) fn value_unit<'a>(
     value: &'a ir::ParameterValue,
-    scope: Scope<'a>,
-    pool: &'a ReferencePool,
+    scope: &Scope<'a>,
+    graph: GraphView<'a>,
 ) -> Option<&'a ir::CompositeUnit> {
-    annotated_unit(value).or_else(|| inherited_unit(value, scope, pool))
+    annotated_unit(value).or_else(|| inherited_unit(value, scope.clone(), graph))
+}
+
+/// Returns the scope that `parameter`, which lives in `host`, resolves its
+/// value in: the anchor that a scoped design overlay recorded, or else `host`.
+///
+/// Returns `None` when the anchor lies above the root of `host`'s tree.
+pub(super) fn value_scope<'a>(
+    parameter: &ir::Parameter,
+    host: &Scope<'a>,
+    graph: GraphView<'a>,
+) -> Option<Scope<'a>> {
+    let anchor_path = parameter
+        .design_provenance()
+        .map(|provenance| &provenance.anchor_path)
+        .filter(|anchor_path| !anchor_path.is_self());
+    let Some(anchor_path) = anchor_path else {
+        return Some(host.clone());
+    };
+    let path = host.path.resolve(anchor_path)?;
+    let anchor = host_at_in_view(graph.root, graph.pool, &path)?;
+    Some(Scope::at(anchor, path))
 }
 
 /// Writes the inherited unit into every unannotated plain reference in
 /// `root`'s subtree and in `pool`.
-///
-/// A chain of references stops at a scoped design overlay that has no unit
-/// yet, because its anchor is only known from its host. The pass repeats until
-/// it writes nothing, so a reference to such an overlay gets its unit in the
-/// round after the overlay does.
 pub(super) fn fill_inherited_units(root: &mut InstancedModel, pool: &mut ReferencePool) {
-    loop {
-        let root_fills = subtree_fills(root, pool);
-        let pool_fills: Vec<(ModelPath, Vec<UnitFill>)> = pool
+    let (root_fills, pool_fills) = {
+        let graph = GraphView {
+            root: &*root,
+            pool: &*pool,
+        };
+        let root_fills = tree_fills(graph.root, AbsolutePath::Root(InstancePath::root()), graph);
+        let pool_fills: Vec<(ModelPath, Vec<UnitFill>)> = graph
+            .pool
             .iter()
-            .map(|(path, instance)| (path.clone(), subtree_fills(instance, pool)))
-            .filter(|(_, fills)| !fills.is_empty())
+            .map(|(model_path, instance)| {
+                let path = AbsolutePath::Pool(model_path.clone(), InstancePath::root());
+                (model_path.clone(), tree_fills(instance, path, graph))
+            })
             .collect();
-        if root_fills.is_empty() && pool_fills.is_empty() {
-            return;
-        }
+        (root_fills, pool_fills)
+    };
 
-        apply_fills(root, root_fills);
-        for (path, fills) in pool_fills {
-            let instance = pool
-                .get_mut(&path)
-                .expect("fills are collected from existing pool entries");
-            apply_fills(instance, fills);
-        }
+    apply_fills(root, root_fills);
+    for (model_path, fills) in pool_fills {
+        let instance = pool
+            .get_mut(&model_path)
+            .expect("fills are collected from existing pool entries");
+        apply_fills(instance, fills);
     }
 }
 
-/// A unit to write into the parameter `parameter` of the instance reached by
-/// following the submodel aliases in `path`.
+/// A unit to write into the parameter `parameter` of the instance at `path`
+/// within one tree of the graph.
 struct UnitFill {
-    path: Vec<ReferenceName>,
+    path: InstancePath,
     parameter: ParameterName,
     unit: ir::CompositeUnit,
 }
 
-fn subtree_fills(root: &InstancedModel, pool: &ReferencePool) -> Vec<UnitFill> {
+/// Returns the fills for the tree whose root `root` lives at `path`.
+fn tree_fills<'a>(
+    root: &'a InstancedModel,
+    path: AbsolutePath,
+    graph: GraphView<'a>,
+) -> Vec<UnitFill> {
     let mut fills = Vec::new();
-    collect_fills(root, &mut Vec::new(), &mut Vec::new(), pool, &mut fills);
+    collect_fills(root, path, graph, &mut fills);
     fills
 }
 
-/// Collects the fills for `node` and its submodels. `ancestors` runs from the
-/// root of the walk down to `node`'s parent, and `path` holds the submodel
-/// aliases from the root of the walk to `node`.
+/// Collects the fills for `node`, which lives at `path`, and its submodels.
 fn collect_fills<'a>(
     node: &'a InstancedModel,
-    ancestors: &mut Vec<&'a InstancedModel>,
-    path: &mut Vec<ReferenceName>,
-    pool: &ReferencePool,
+    path: AbsolutePath,
+    graph: GraphView<'a>,
     fills: &mut Vec<UnitFill>,
 ) {
+    let host = Scope::at(node, path);
     for (name, parameter) in node.parameters() {
-        let Some(scope) = value_scope(parameter, node, ancestors) else {
-            continue;
-        };
-        if let Some(unit) = inherited_unit(parameter.value(), Scope::of(scope), pool) {
+        let unit = value_scope(parameter, &host, graph)
+            .and_then(|scope| inherited_unit(parameter.value(), scope, graph));
+        if let Some(unit) = unit {
             fills.push(UnitFill {
-                path: path.clone(),
+                path: host.path.host_path(),
                 parameter: name.clone(),
                 unit: unit.clone(),
             });
         }
     }
 
-    ancestors.push(node);
     for (alias, submodel) in node.submodels() {
-        path.push(alias.clone());
-        collect_fills(&submodel.instance, ancestors, path, pool, fills);
-        path.pop();
+        collect_fills(
+            &submodel.instance,
+            host.path.append(alias.clone()),
+            graph,
+            fills,
+        );
     }
-    ancestors.pop();
 }
 
 fn apply_fills(root: &mut InstancedModel, fills: Vec<UnitFill>) {
     for fill in fills {
-        let node = fill.path.iter().fold(&mut *root, |node, alias| {
+        let node = fill.path.segments().iter().fold(&mut *root, |node, alias| {
             node.submodels_mut()
                 .get_mut(alias)
                 .map(|submodel| submodel.instance.as_mut())
@@ -152,31 +191,6 @@ fn apply_fills(root: &mut InstancedModel, fills: Vec<UnitFill>) {
     }
 }
 
-/// Returns the instance that `parameter`'s value resolves its names in: the
-/// design anchor for a scoped design overlay, or else `host`.
-///
-/// `ancestors` runs from the root of the walk down to `host`'s parent, so an
-/// anchor above the root of the walk cannot be resolved.
-fn value_scope<'a>(
-    parameter: &ir::Parameter,
-    host: &'a InstancedModel,
-    ancestors: &[&'a InstancedModel],
-) -> Option<&'a InstancedModel> {
-    let Some(provenance) = parameter.design_provenance() else {
-        return Some(host);
-    };
-    let anchor_path = &provenance.anchor_path;
-    let base = match anchor_path.up {
-        0 => host,
-        up => *ancestors.get(ancestors.len().checked_sub(up)?)?,
-    };
-    anchor_path.down.iter().try_fold(base, |node, segment| {
-        node.submodels()
-            .get(segment)
-            .map(|submodel| submodel.instance.as_ref())
-    })
-}
-
 /// Returns the unit written on `value`, if any.
 pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::CompositeUnit> {
     match value {
@@ -189,10 +203,13 @@ pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::Co
 /// Returns the unit that `value` inherits when it is an unannotated plain
 /// reference whose target, possibly through further plain references, has a
 /// unit with physical dimensions.
+///
+/// The chain continues through a scoped design overlay in the anchor that the
+/// overlay recorded.
 fn inherited_unit<'a>(
     value: &'a ir::ParameterValue,
     scope: Scope<'a>,
-    pool: &'a ReferencePool,
+    graph: GraphView<'a>,
 ) -> Option<&'a ir::CompositeUnit> {
     let mut value = value;
     let mut scope = scope;
@@ -201,7 +218,7 @@ fn inherited_unit<'a>(
     let mut visited: Vec<(&InstancedModel, &ParameterName)> = Vec::new();
 
     loop {
-        let (target_scope, target_name, target) = reference_target(value, scope, pool)?;
+        let (target_scope, target_name, target) = reference_target(value, &scope, graph.pool)?;
 
         // References that form a cycle have no unit to inherit.
         let is_revisit = visited.iter().any(|(instance, name)| {
@@ -215,12 +232,9 @@ fn inherited_unit<'a>(
         if let Some(unit) = annotated_unit(target.value()) {
             return (!unit.dimension().is_dimensionless()).then_some(unit);
         }
-        if has_scoped_anchor(target) {
-            return None;
-        }
 
         value = target.value();
-        scope = target_scope;
+        scope = value_scope(target, &target_scope, graph)?;
     }
 }
 
@@ -228,7 +242,7 @@ fn inherited_unit<'a>(
 /// an unannotated plain reference resolved in `scope`.
 fn reference_target<'a>(
     value: &'a ir::ParameterValue,
-    scope: Scope<'a>,
+    scope: &Scope<'a>,
     pool: &'a ReferencePool,
 ) -> Option<(Scope<'a>, &'a ParameterName, &'a ir::Parameter)> {
     let ir::ParameterValue::Simple(expr, None) = value else {
@@ -241,63 +255,63 @@ fn reference_target<'a>(
     match variable {
         ir::Variable::Parameter { parameter_name, .. } => {
             let (name, parameter) = scope.parameter(parameter_name)?;
-            Some((scope, name, parameter))
+            Some((scope.clone(), name, parameter))
         }
         // A parameter that a design adds shadows the builtin with its name,
         // and variable classification turns the builtin into a reference to it.
         ir::Variable::Builtin { ident, .. } => {
             let (name, parameter) = scope.parameter(&ParameterName::from(ident.as_str()))?;
-            Some((scope, name, parameter))
+            Some((scope.clone(), name, parameter))
         }
         ir::Variable::External {
             reference_name,
             parameter_name,
             ..
         } => {
-            let instance = referenced_instance(scope.instance, reference_name, pool)?;
-            let (name, parameter) = instance.parameters().get_key_value(parameter_name)?;
-            Some((Scope::of(instance), name, parameter))
+            let target_scope = referenced_scope(scope, reference_name, pool)?;
+            let (name, parameter) = target_scope
+                .instance
+                .parameters()
+                .get_key_value(parameter_name)?;
+            Some((target_scope, name, parameter))
         }
     }
 }
 
-/// Returns the instance that `reference_name` names on `host`, through a
-/// `reference`, a `submodel`, or a `with` alias.
-fn referenced_instance<'a>(
-    host: &'a InstancedModel,
+/// Returns the scope of the instance that `reference_name` names on the
+/// instance of `host`, through a `reference`, a `submodel`, or a `with` alias.
+fn referenced_scope<'a>(
+    host: &Scope<'a>,
     reference_name: &ReferenceName,
     pool: &'a ReferencePool,
-) -> Option<&'a InstancedModel> {
+) -> Option<Scope<'a>> {
+    let submodel_scope = |parent: &Scope<'a>, name: &ReferenceName| {
+        let submodel = parent.instance.submodels().get(name)?;
+        Some(Scope::at(
+            &submodel.instance,
+            parent.path.append(name.clone()),
+        ))
+    };
     let direct = |name: &ReferenceName| {
-        if let Some(reference) = host.references().get(name) {
-            return pool.get(&reference.path).map(AsRef::as_ref);
-        }
-        host.submodels()
-            .get(name)
-            .map(|submodel| submodel.instance.as_ref())
+        let Some(reference) = host.instance.references().get(name) else {
+            return submodel_scope(host, name);
+        };
+        let instance = pool.get(&reference.path)?;
+        let path = AbsolutePath::Pool(reference.path.clone(), InstancePath::root());
+        Some(Scope::at(instance, path))
     };
 
-    if let Some(instance) = direct(reference_name) {
-        return Some(instance);
+    if let Some(scope) = direct(reference_name) {
+        return Some(scope);
     }
 
     // An alias path starts at a submodel or reference of the host and then
     // descends through submodels.
-    let alias = host.aliases().get(reference_name)?;
+    let alias = host.instance.aliases().get(reference_name)?;
     let (first, rest) = alias.alias_path.segments().split_first()?;
-    rest.iter().try_fold(direct(first)?, |node, segment| {
-        node.submodels()
-            .get(segment)
-            .map(|submodel| submodel.instance.as_ref())
+    rest.iter().try_fold(direct(first)?, |scope, segment| {
+        submodel_scope(&scope, segment)
     })
-}
-
-/// Returns whether `parameter` is a design overlay whose names resolve from an
-/// ancestor of its host instead of from the host itself.
-fn has_scoped_anchor(parameter: &ir::Parameter) -> bool {
-    parameter
-        .design_provenance()
-        .is_some_and(|provenance| !provenance.anchor_path.is_self())
 }
 
 #[cfg(test)]
@@ -312,14 +326,14 @@ mod tests {
     };
     use oneil_output::{Dimension, DimensionMap};
     use oneil_shared::{
-        RelativePath,
+        InstancePath, RelativePath,
         span::Span,
         symbols::{ParameterName, ReferenceName, SubmodelName},
     };
 
-    use super::{ReferencePool, Scope, fill_inherited_units, value_unit};
+    use super::{GraphView, ReferencePool, Scope, fill_inherited_units, value_unit};
     use crate::{
-        instance::{InstancedModel, ReferenceImport, SubmodelImport},
+        instance::{InstancedModel, ReferenceImport, SubmodelImport, graph::AbsolutePath},
         test::test_model_path,
     };
 
@@ -454,8 +468,9 @@ mod tests {
         assert_eq!(unit_of(&root, "b"), Some(&kilometers()));
     }
 
-    #[test]
-    fn scoped_overlay_and_reference_to_it_inherit_units() {
+    /// A root with `L = 2 :km` and `R_c = R.c`, where a scoped design overlay
+    /// anchored at the root sets the child's `R` to `L`.
+    fn scoped_overlay_model() -> InstancedModel {
         let provenance = ir::DesignProvenance {
             design_path: test_model_path("design"),
             is_addition: false,
@@ -475,12 +490,34 @@ mod tests {
             ],
         );
         add_child(&mut root, "c", model("child", [overlay]));
+        root
+    }
 
-        let root = fill(root);
+    #[test]
+    fn scoped_overlay_and_reference_to_it_inherit_units() {
+        let root = fill(scoped_overlay_model());
 
         let child = &root.submodels()[&ReferenceName::from("c")].instance;
         assert_eq!(unit_of(child, "R"), Some(&kilometers()));
         assert_eq!(unit_of(&root, "R_c"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn reference_through_unfilled_scoped_overlay_has_unit() {
+        let root = scoped_overlay_model();
+        let pool = ReferencePool::new();
+        let graph = GraphView {
+            root: &root,
+            pool: &pool,
+        };
+        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("R_c"))
+            .expect("parameter should exist");
+
+        let unit = value_unit(reference.value(), &scope, graph);
+
+        assert_eq!(unit, Some(&kilometers()));
     }
 
     #[test]
@@ -507,11 +544,16 @@ mod tests {
         let override_value = ir::ParameterValue::Simple(Box::new(param_var("d")), None);
         let scope = Scope {
             instance: &host,
+            path: AbsolutePath::Root(InstancePath::root()),
             additions: Some(&additions),
         };
         let pool = ReferencePool::new();
+        let graph = GraphView {
+            root: &host,
+            pool: &pool,
+        };
 
-        let unit = value_unit(&override_value, scope, &pool);
+        let unit = value_unit(&override_value, &scope, graph);
 
         assert_eq!(unit, Some(&kilometers()));
     }

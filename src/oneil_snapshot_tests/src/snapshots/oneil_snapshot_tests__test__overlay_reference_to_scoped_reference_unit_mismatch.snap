@@ -1,0 +1,9 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/chained_overlay_mismatch.on\")"
+---
+error: unit mismatch: parameter `P_c` has unit `dBW` but design applies value with unit `km`
+  at fixtures/reference_units/power_to_range.one:5:1
+
+error: applied design `power_to_range.one` produced invalid contributions
+  at fixtures/reference_units/chained_overlay_mismatch.on:8:7

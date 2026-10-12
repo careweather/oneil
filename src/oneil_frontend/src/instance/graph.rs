@@ -82,7 +82,9 @@ use crate::instance::cycle_error::CompilationCycleError;
 use super::{
     CompilationUnit, ContributionDiagnostic, InstancedModel,
     design::{ApplyDesign, Design, OverlayParameterValue},
-    reference_units::{Scope, annotated_unit, fill_inherited_units, value_unit},
+    reference_units::{
+        GraphView, Scope, annotated_unit, fill_inherited_units, value_scope, value_unit,
+    },
     validation_error::InstanceValidationError,
 };
 
@@ -715,15 +717,14 @@ fn apply_design_at_host(
             host_at_in_view(root, pool, &host_loc.absolute_path).expect("host_loc just resolved");
         let scope = Scope {
             instance: host,
+            path: host_loc.absolute_path.clone(),
             additions: Some(&design.parameter_additions),
         };
         unit_mismatches(
             &design.parameter_overrides,
-            scope,
-            &host_loc.absolute_path,
-            scope,
-            root,
-            pool,
+            &scope,
+            &scope,
+            GraphView { root, pool },
         )
     };
 
@@ -831,11 +832,9 @@ fn apply_scoped_overlay(
             .expect("scoped host just resolved");
         unit_mismatches(
             overrides,
-            Scope::of(host),
-            &host_loc.absolute_path,
-            Scope::of(anchor),
-            root,
-            pool,
+            &Scope::at(host, host_loc.absolute_path.clone()),
+            &Scope::at(anchor, anchor_loc.absolute_path.clone()),
+            GraphView { root, pool },
         )
     };
 
@@ -859,52 +858,28 @@ fn apply_scoped_overlay(
 /// value has other dimensions than the parameter it replaces, keyed by the
 /// parameter name.
 ///
-/// The overridden parameters live on the instance of `host`, at `host_path`,
-/// and the override values resolve their names in `overlay_scope`. Both sides
-/// count the unit that a plain reference inherits at this point in the build.
+/// The overridden parameters live on the instance of `host`, and the override
+/// values resolve their names in `overlay_scope`. Both sides count the unit
+/// that a plain reference inherits at this point in the build.
 fn unit_mismatches<'a>(
     overrides: &IndexMap<ParameterName, OverlayParameterValue>,
-    host: Scope<'a>,
-    host_path: &AbsolutePath,
-    overlay_scope: Scope<'a>,
-    root: &'a InstancedModel,
-    pool: &'a IndexMap<ModelPath, Box<InstancedModel>>,
+    host: &Scope<'a>,
+    overlay_scope: &Scope<'a>,
+    graph: GraphView<'a>,
 ) -> IndexMap<ParameterName, DesignResolutionError> {
     overrides
         .iter()
         .filter_map(|(name, overlay)| {
             let target = host.instance.parameters().get(name)?;
-            let target_unit = parameter_scope(target, host, host_path, root, pool).map_or_else(
+            let target_unit = value_scope(target, host, graph).map_or_else(
                 || annotated_unit(target.value()),
-                |scope| value_unit(target.value(), scope, pool),
+                |scope| value_unit(target.value(), &scope, graph),
             )?;
-            let overlay_unit = value_unit(&overlay.value, overlay_scope, pool)?;
+            let overlay_unit = value_unit(&overlay.value, overlay_scope, graph)?;
             let error = check_unit_compatibility(name, target_unit, overlay, overlay_unit)?;
             Some((name.clone(), error))
         })
         .collect()
-}
-
-/// Returns the scope that `parameter`, which lives on the instance of `host`
-/// at `host_path`, resolves its value in: `host` itself, or the anchor that an
-/// earlier scoped design overlay recorded. Returns `None` when that anchor
-/// isn't in the tree of `host_path`.
-fn parameter_scope<'a>(
-    parameter: &ir::Parameter,
-    host: Scope<'a>,
-    host_path: &AbsolutePath,
-    root: &'a InstancedModel,
-    pool: &'a IndexMap<ModelPath, Box<InstancedModel>>,
-) -> Option<Scope<'a>> {
-    let anchor_path = parameter
-        .design_provenance()
-        .map(|provenance| &provenance.anchor_path)
-        .filter(|anchor_path| !anchor_path.is_self());
-    let Some(anchor_path) = anchor_path else {
-        return Some(host);
-    };
-    let anchor = host_at_in_view(root, pool, &host_path.resolve(anchor_path)?)?;
-    Some(Scope::of(anchor))
 }
 
 /// Applies one host's worth of design contributions in place,
@@ -1010,8 +985,10 @@ struct HostLocation {
     absolute_path: AbsolutePath,
 }
 
+/// Where an instance lives: in the root model's tree or in the tree of a
+/// reference-pool entry.
 #[derive(Debug, Clone)]
-enum AbsolutePath {
+pub(super) enum AbsolutePath {
     /// Node at the given path in `graph.root`'s subtree.
     Root(InstancePath),
     /// Node at the given sub-path of pool entry `ModelPath`.
@@ -1019,13 +996,15 @@ enum AbsolutePath {
 }
 
 impl AbsolutePath {
-    fn host_path(&self) -> InstancePath {
+    /// Returns the path within this path's tree.
+    pub(super) fn host_path(&self) -> InstancePath {
         match self {
             Self::Root(p) | Self::Pool(_, p) => p.clone(),
         }
     }
 
-    fn append(&self, seg: ReferenceName) -> Self {
+    /// Returns the path of the submodel `seg` of the instance at this path.
+    pub(super) fn append(&self, seg: ReferenceName) -> Self {
         match self {
             Self::Root(p) => Self::Root(p.child(seg)),
             Self::Pool(pp, p) => Self::Pool(pp.clone(), p.child(seg)),
@@ -1034,7 +1013,7 @@ impl AbsolutePath {
 
     /// Returns the path that `relative` leads to from this path, or `None`
     /// when it walks above the root of this path's tree.
-    fn resolve(&self, relative: &RelativePath) -> Option<Self> {
+    pub(super) fn resolve(&self, relative: &RelativePath) -> Option<Self> {
         let walk = |path: &InstancePath| {
             let ancestor = (0..relative.up).try_fold(path.clone(), |path, _| {
                 path.split_parent_and_self().map(|(parent, _)| parent)
@@ -1090,7 +1069,7 @@ fn resolve_host_location(
     })
 }
 
-fn host_at_in_view<'a>(
+pub(super) fn host_at_in_view<'a>(
     root: &'a InstancedModel,
     pool: &'a IndexMap<ModelPath, Box<InstancedModel>>,
     absolute: &AbsolutePath,

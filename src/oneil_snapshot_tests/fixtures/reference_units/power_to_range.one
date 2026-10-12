@@ -1,0 +1,5 @@
+# Sets `P_c`, the parent's reference to the child's power, to the child's range.
+
+design parent
+
+P_c = R.c
