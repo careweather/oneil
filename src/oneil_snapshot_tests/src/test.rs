@@ -142,6 +142,18 @@ fn overlay_reference_to_scoped_reference_unit_mismatch() {
 }
 
 #[test]
+fn overlay_dimensionless_reference_unit_mismatch() {
+    // A reference to a dimensionless parameter can't override a length.
+    insta::assert_snapshot!(run_fixture("reference_units/length_to_gain.one"));
+}
+
+#[test]
+fn overlay_onto_dimensionless_reference_unit_mismatch() {
+    // A length can't override a reference to a dimensionless parameter.
+    insta::assert_snapshot!(run_fixture("reference_units/gain_to_length.one"));
+}
+
+#[test]
 fn reference_follows_design_display_unit() {
     // A plain reference inherits the unit that its target has after every
     // design applies, not the unit the target had in the base model.

@@ -1,0 +1,5 @@
+# Overrides `G_c`, a reference to the child's gain in dB, with the length `L`.
+
+design parent
+
+G_c = L

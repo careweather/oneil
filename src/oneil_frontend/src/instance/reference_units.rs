@@ -9,10 +9,11 @@
 //! design overlay unit check runs while designs are still being applied, so it
 //! reads inherited units through [`value_unit`] without writing them.
 //!
-//! Only units with physical dimensions are inherited. A reference to a
+//! Only units with physical dimensions are written. A reference to a
 //! dimensionless unit, such as `dB` or `%`, stays unannotated and evaluates to
 //! a plain number, because `strip` and limits without units read a value in
-//! its display unit.
+//! its display unit. [`value_unit`] still returns the dimensionless unit, so
+//! the overlay unit check can compare its dimensions.
 
 use indexmap::IndexMap;
 use oneil_ir as ir;
@@ -64,14 +65,15 @@ impl<'a> Scope<'a> {
     }
 }
 
-/// Returns the unit of `value`: its annotation, or else the unit it inherits
-/// as a plain reference resolved in `scope`.
+/// Returns the unit of `value`: its annotation, or else the unit that it
+/// reaches as a plain reference resolved in `scope`, including a
+/// dimensionless one.
 pub(super) fn value_unit<'a>(
     value: &'a ir::ParameterValue,
     scope: &Scope<'a>,
     graph: GraphView<'a>,
 ) -> Option<&'a ir::CompositeUnit> {
-    annotated_unit(value).or_else(|| inherited_unit(value, scope.clone(), graph))
+    annotated_unit(value).or_else(|| referenced_unit(value, scope.clone(), graph))
 }
 
 /// Returns the scope that `parameter`, which lives in `host`, resolves its
@@ -201,12 +203,22 @@ pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::Co
 }
 
 /// Returns the unit that `value` inherits when it is an unannotated plain
-/// reference whose target, possibly through further plain references, has a
-/// unit with physical dimensions.
+/// reference to a unit with physical dimensions.
+fn inherited_unit<'a>(
+    value: &'a ir::ParameterValue,
+    scope: Scope<'a>,
+    graph: GraphView<'a>,
+) -> Option<&'a ir::CompositeUnit> {
+    referenced_unit(value, scope, graph).filter(|unit| !unit.dimension().is_dimensionless())
+}
+
+/// Returns the unit that `value` reaches when it is an unannotated plain
+/// reference: the annotation of its target, possibly through further plain
+/// references.
 ///
 /// The chain continues through a scoped design overlay in the anchor that the
 /// overlay recorded.
-fn inherited_unit<'a>(
+fn referenced_unit<'a>(
     value: &'a ir::ParameterValue,
     scope: Scope<'a>,
     graph: GraphView<'a>,
@@ -230,7 +242,7 @@ fn inherited_unit<'a>(
         visited.push((target_scope.instance, target_name));
 
         if let Some(unit) = annotated_unit(target.value()) {
-            return (!unit.dimension().is_dimensionless()).then_some(unit);
+            return Some(unit);
         }
 
         value = target.value();
@@ -559,16 +571,31 @@ mod tests {
     }
 
     #[test]
-    fn dimensionless_reference_stays_unannotated() {
+    fn dimensionless_reference_has_unit_but_stays_unannotated() {
         let decibels = unit("dB", DimensionMap::dimensionless());
-        let root = fill(model(
+        let root = model(
             "root",
             [
-                parameter("G", lit_number(18.0), Some(decibels)),
+                parameter("G", lit_number(18.0), Some(decibels.clone())),
                 parameter("G_r", param_var("G"), None),
             ],
-        ));
+        );
+        let pool = ReferencePool::new();
+        let graph = GraphView {
+            root: &root,
+            pool: &pool,
+        };
+        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("G_r"))
+            .expect("parameter should exist");
 
+        assert_eq!(
+            value_unit(reference.value(), &scope, graph),
+            Some(&decibels)
+        );
+
+        let root = fill(root);
         assert_eq!(unit_of(&root, "G_r"), None);
     }
 

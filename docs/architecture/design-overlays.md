@@ -221,7 +221,8 @@ the design's additions, so an override can't take other dimensions by
 referencing a parameter that the same design adds. The overridden parameter's
 own value resolves like any other reference, including through the anchor of
 an earlier scoped overlay, so a later design can't change its dimensions
-either.
+either. The check also counts a dimensionless unit, such as `dB`, that a
+reference reaches, although composition leaves that reference unannotated.
 
 ## Error partitioning
 
