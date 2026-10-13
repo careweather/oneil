@@ -83,7 +83,7 @@ use super::{
     CompilationUnit, ContributionDiagnostic, InstancedModel,
     design::{ApplyDesign, Design, OverlayParameterValue},
     reference_units::{
-        Binding, GraphView, Scope, annotated_unit, fill_inherited_units, value_scope, value_unit,
+        Binding, GraphView, Scope, UnitResolver, annotated_unit, fill_inherited_units, value_scope,
     },
     validation_error::InstanceValidationError,
 };
@@ -867,15 +867,16 @@ fn unit_mismatches<'a>(
     overlay_scope: &Scope<'a>,
     graph: GraphView<'a>,
 ) -> IndexMap<ParameterName, DesignResolutionError> {
+    let mut units = UnitResolver::new(graph);
     overrides
         .iter()
         .filter_map(|(name, overlay)| {
             let target = host.instance.parameters().get(name)?;
             let target_unit = value_scope(target, host, graph).map_or_else(
                 || annotated_unit(target.value()),
-                |scope| value_unit(target.value(), Binding::of(target), &scope, graph),
+                |scope| units.value_unit(target.value(), Binding::of(target), &scope),
             )?;
-            let overlay_unit = value_unit(&overlay.value, Binding::Design, overlay_scope, graph)?;
+            let overlay_unit = units.value_unit(&overlay.value, Binding::Design, overlay_scope)?;
             let error = check_unit_compatibility(name, target_unit, overlay, overlay_unit)?;
             Some((name.clone(), error))
         })

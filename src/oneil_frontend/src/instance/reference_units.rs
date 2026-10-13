@@ -7,13 +7,14 @@
 //! rendered view read it like an explicit annotation, and a design that
 //! changes the referenced parameter's unit changes the inherited unit too. The
 //! design overlay unit check runs while designs are still being applied, so it
-//! reads inherited units through [`value_unit`] without writing them.
+//! reads inherited units through [`UnitResolver::value_unit`] without writing
+//! them.
 //!
 //! Only units with physical dimensions are written. A reference to a
 //! dimensionless unit, such as `dB` or `%`, stays unannotated and evaluates to
 //! a plain number, because `strip` and limits without units read a value in
-//! its display unit. [`value_unit`] still returns the dimensionless unit, so
-//! the overlay unit check can compare its dimensions.
+//! its display unit. [`UnitResolver::value_unit`] still returns the
+//! dimensionless unit, so the overlay unit check can compare its dimensions.
 
 use indexmap::IndexMap;
 use oneil_ir as ir;
@@ -58,10 +59,10 @@ impl<'a> Scope<'a> {
         }
     }
 
-    fn parameter(&self, name: &ParameterName) -> Option<(&'a ParameterName, &'a ir::Parameter)> {
+    fn parameter(&self, name: &ParameterName) -> Option<&'a ir::Parameter> {
         self.additions
-            .and_then(|additions| additions.get_key_value(name))
-            .or_else(|| self.instance.parameters().get_key_value(name))
+            .and_then(|additions| additions.get(name))
+            .or_else(|| self.instance.parameters().get(name))
     }
 }
 
@@ -88,16 +89,98 @@ impl Binding {
     }
 }
 
-/// Returns the unit of `value`: its annotation, or else the unit that it
-/// reaches as a plain reference resolved in `scope`, including a
-/// dimensionless one.
-pub(super) fn value_unit<'a>(
-    value: &'a ir::ParameterValue,
-    binding: Binding,
-    scope: &Scope<'a>,
+/// Finds the units that plain references reach in one view of the graph.
+///
+/// It remembers the unit that each referenced parameter reaches, so every
+/// parameter is resolved once. It's only valid while the graph and the design
+/// additions of the scopes it's given stay the same.
+pub(super) struct UnitResolver<'a> {
     graph: GraphView<'a>,
-) -> Option<&'a ir::CompositeUnit> {
-    annotated_unit(value).or_else(|| referenced_unit(value, binding, scope.clone(), graph))
+    // Keyed by address, because every instance of a model has parameters with
+    // the same names.
+    reached: IndexMap<*const ir::Parameter, Option<&'a ir::CompositeUnit>>,
+}
+
+impl<'a> UnitResolver<'a> {
+    pub(super) fn new(graph: GraphView<'a>) -> Self {
+        Self {
+            graph,
+            reached: IndexMap::new(),
+        }
+    }
+
+    /// Returns the unit of `value`: its annotation, or else the unit that it
+    /// reaches as a plain reference resolved in `scope`, including a
+    /// dimensionless one.
+    pub(super) fn value_unit(
+        &mut self,
+        value: &'a ir::ParameterValue,
+        binding: Binding,
+        scope: &Scope<'a>,
+    ) -> Option<&'a ir::CompositeUnit> {
+        annotated_unit(value).or_else(|| self.referenced_unit(value, binding, scope.clone()))
+    }
+
+    /// Returns the unit that `value` inherits when it is an unannotated plain
+    /// reference to a unit with physical dimensions.
+    fn inherited_unit(
+        &mut self,
+        value: &'a ir::ParameterValue,
+        binding: Binding,
+        scope: Scope<'a>,
+    ) -> Option<&'a ir::CompositeUnit> {
+        self.referenced_unit(value, binding, scope)
+            .filter(|unit| !unit.dimension().is_dimensionless())
+    }
+
+    /// Returns the unit that `value` reaches when it is an unannotated plain
+    /// reference: the annotation of its target, possibly through further
+    /// plain references.
+    ///
+    /// The chain continues through a scoped design overlay in the anchor that
+    /// the overlay recorded.
+    fn referenced_unit(
+        &mut self,
+        value: &'a ir::ParameterValue,
+        binding: Binding,
+        scope: Scope<'a>,
+    ) -> Option<&'a ir::CompositeUnit> {
+        let (mut value, mut binding, mut scope) = (value, binding, scope);
+        let mut chain = Vec::new();
+
+        let unit = loop {
+            let Some((target_scope, target)) =
+                reference_target(value, binding, &scope, self.graph.pool)
+            else {
+                break None;
+            };
+
+            // A parameter that is still on the chain reaches no unit, because
+            // references that form a cycle have no unit to inherit.
+            let key = std::ptr::from_ref(target);
+            if let Some(&unit) = self.reached.get(&key) {
+                break unit;
+            }
+            self.reached.insert(key, None);
+            chain.push(key);
+
+            if let Some(unit) = annotated_unit(target.value()) {
+                break Some(unit);
+            }
+            let Some(target_value_scope) = value_scope(target, &target_scope, self.graph) else {
+                break None;
+            };
+
+            value = target.value();
+            binding = Binding::of(target);
+            scope = target_value_scope;
+        };
+
+        for key in chain {
+            self.reached.insert(key, unit);
+        }
+        unit
+    }
 }
 
 /// Returns the scope that `parameter`, which lives in `host`, resolves its
@@ -129,13 +212,18 @@ pub(super) fn fill_inherited_units(root: &mut InstancedModel, pool: &mut Referen
             root: &*root,
             pool: &*pool,
         };
-        let root_fills = tree_fills(graph.root, AbsolutePath::Root(InstancePath::root()), graph);
+        let mut units = UnitResolver::new(graph);
+        let root_fills = tree_fills(
+            graph.root,
+            AbsolutePath::Root(InstancePath::root()),
+            &mut units,
+        );
         let pool_fills: Vec<(ModelPath, Vec<UnitFill>)> = graph
             .pool
             .iter()
             .map(|(model_path, instance)| {
                 let path = AbsolutePath::Pool(model_path.clone(), InstancePath::root());
-                (model_path.clone(), tree_fills(instance, path, graph))
+                (model_path.clone(), tree_fills(instance, path, &mut units))
             })
             .collect();
         (root_fills, pool_fills)
@@ -162,10 +250,10 @@ struct UnitFill {
 fn tree_fills<'a>(
     root: &'a InstancedModel,
     path: AbsolutePath,
-    graph: GraphView<'a>,
+    units: &mut UnitResolver<'a>,
 ) -> Vec<UnitFill> {
     let mut fills = Vec::new();
-    collect_fills(root, path, graph, &mut fills);
+    collect_fills(root, path, units, &mut fills);
     fills
 }
 
@@ -173,13 +261,13 @@ fn tree_fills<'a>(
 fn collect_fills<'a>(
     node: &'a InstancedModel,
     path: AbsolutePath,
-    graph: GraphView<'a>,
+    units: &mut UnitResolver<'a>,
     fills: &mut Vec<UnitFill>,
 ) {
     let host = Scope::at(node, path);
     for (name, parameter) in node.parameters() {
-        let unit = value_scope(parameter, &host, graph).and_then(|scope| {
-            inherited_unit(parameter.value(), Binding::of(parameter), scope, graph)
+        let unit = value_scope(parameter, &host, units.graph).and_then(|scope| {
+            units.inherited_unit(parameter.value(), Binding::of(parameter), scope)
         });
         if let Some(unit) = unit {
             fills.push(UnitFill {
@@ -194,7 +282,7 @@ fn collect_fills<'a>(
         collect_fills(
             &submodel.instance,
             host.path.append(alias.clone()),
-            graph,
+            units,
             fills,
         );
     }
@@ -227,68 +315,14 @@ pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::Co
     }
 }
 
-/// Returns the unit that `value` inherits when it is an unannotated plain
-/// reference to a unit with physical dimensions.
-fn inherited_unit<'a>(
-    value: &'a ir::ParameterValue,
-    binding: Binding,
-    scope: Scope<'a>,
-    graph: GraphView<'a>,
-) -> Option<&'a ir::CompositeUnit> {
-    referenced_unit(value, binding, scope, graph)
-        .filter(|unit| !unit.dimension().is_dimensionless())
-}
-
-/// Returns the unit that `value` reaches when it is an unannotated plain
-/// reference: the annotation of its target, possibly through further plain
-/// references.
-///
-/// The chain continues through a scoped design overlay in the anchor that the
-/// overlay recorded.
-fn referenced_unit<'a>(
-    value: &'a ir::ParameterValue,
-    binding: Binding,
-    scope: Scope<'a>,
-    graph: GraphView<'a>,
-) -> Option<&'a ir::CompositeUnit> {
-    let mut value = value;
-    let mut binding = binding;
-    let mut scope = scope;
-    // A parameter is identified by its instance and its name, because every
-    // instance of a model has parameters with the same names.
-    let mut visited: Vec<(&InstancedModel, &ParameterName)> = Vec::new();
-
-    loop {
-        let (target_scope, target_name, target) =
-            reference_target(value, binding, &scope, graph.pool)?;
-
-        // References that form a cycle have no unit to inherit.
-        let is_revisit = visited.iter().any(|(instance, name)| {
-            std::ptr::eq(*instance, target_scope.instance) && *name == target_name
-        });
-        if is_revisit {
-            return None;
-        }
-        visited.push((target_scope.instance, target_name));
-
-        if let Some(unit) = annotated_unit(target.value()) {
-            return Some(unit);
-        }
-
-        value = target.value();
-        binding = Binding::of(target);
-        scope = value_scope(target, &target_scope, graph)?;
-    }
-}
-
-/// Returns the scope, name, and parameter that `value` refers to when it is
-/// an unannotated plain reference resolved in `scope`.
+/// Returns the scope and parameter that `value` refers to when it is an
+/// unannotated plain reference resolved in `scope`.
 fn reference_target<'a>(
     value: &'a ir::ParameterValue,
     binding: Binding,
     scope: &Scope<'a>,
     pool: &'a ReferencePool,
-) -> Option<(Scope<'a>, &'a ParameterName, &'a ir::Parameter)> {
+) -> Option<(Scope<'a>, &'a ir::Parameter)> {
     let ir::ParameterValue::Simple(expr, None) = value else {
         return None;
     };
@@ -298,16 +332,16 @@ fn reference_target<'a>(
 
     match variable {
         ir::Variable::Parameter { parameter_name, .. } => {
-            let (name, parameter) = scope.parameter(parameter_name)?;
-            Some((scope.clone(), name, parameter))
+            let parameter = scope.parameter(parameter_name)?;
+            Some((scope.clone(), parameter))
         }
         // A parameter that a design adds shadows the builtin with its name,
         // and variable classification turns the builtin into a reference to
         // it everywhere except in design values.
         ir::Variable::Builtin { ident, .. } => match binding {
             Binding::Scope => {
-                let (name, parameter) = scope.parameter(&ParameterName::from(ident.as_str()))?;
-                Some((scope.clone(), name, parameter))
+                let parameter = scope.parameter(&ParameterName::from(ident.as_str()))?;
+                Some((scope.clone(), parameter))
             }
             Binding::Design => None,
         },
@@ -317,11 +351,8 @@ fn reference_target<'a>(
             ..
         } => {
             let target_scope = referenced_scope(scope, reference_name, pool)?;
-            let (name, parameter) = target_scope
-                .instance
-                .parameters()
-                .get_key_value(parameter_name)?;
-            Some((target_scope, name, parameter))
+            let parameter = target_scope.instance.parameters().get(parameter_name)?;
+            Some((target_scope, parameter))
         }
     }
 }
@@ -379,7 +410,7 @@ mod tests {
         symbols::{ParameterName, ReferenceName, SubmodelName},
     };
 
-    use super::{Binding, GraphView, ReferencePool, Scope, fill_inherited_units, value_unit};
+    use super::{Binding, GraphView, ReferencePool, Scope, UnitResolver, fill_inherited_units};
     use crate::{
         instance::{InstancedModel, ReferenceImport, SubmodelImport, graph::AbsolutePath},
         test::test_model_path,
@@ -563,7 +594,7 @@ mod tests {
             .get_parameter(&ParameterName::from("R_c"))
             .expect("parameter should exist");
 
-        let unit = value_unit(reference.value(), Binding::Scope, &scope, graph);
+        let unit = UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope);
 
         assert_eq!(unit, Some(&kilometers()));
     }
@@ -601,7 +632,7 @@ mod tests {
             pool: &pool,
         };
 
-        let unit = value_unit(&override_value, Binding::Design, &scope, graph);
+        let unit = UnitResolver::new(graph).value_unit(&override_value, Binding::Design, &scope);
 
         assert_eq!(unit, Some(&kilometers()));
     }
@@ -627,7 +658,7 @@ mod tests {
             .expect("parameter should exist");
 
         assert_eq!(
-            value_unit(reference.value(), Binding::Scope, &scope, graph),
+            UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope),
             Some(&decibels)
         );
 
@@ -678,6 +709,21 @@ mod tests {
 
         assert_eq!(unit_of(&root, "a"), None);
         assert_eq!(unit_of(&root, "b"), None);
+    }
+
+    #[test]
+    fn reference_into_cycle_stays_unannotated() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("x", param_var("a"), None),
+                parameter("a", param_var("b"), None),
+                parameter("b", param_var("a"), None),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "x"), None);
+        assert_eq!(unit_of(&root, "a"), None);
     }
 
     #[test]
