@@ -65,15 +65,39 @@ impl<'a> Scope<'a> {
     }
 }
 
+/// How the bare names in a parameter value are bound.
+#[derive(Clone, Copy)]
+pub(super) enum Binding {
+    /// Variable classification binds them after composition, so a builtin
+    /// name refers to a parameter with that name in the value's scope, such
+    /// as one that a design adds.
+    Scope,
+    /// The design resolver bound them when it resolved the design, and
+    /// variable classification keeps them.
+    Design,
+}
+
+impl Binding {
+    /// Returns how the bare names in `parameter`'s value are bound.
+    pub(super) const fn of(parameter: &ir::Parameter) -> Self {
+        if parameter.design_provenance().is_some() {
+            Self::Design
+        } else {
+            Self::Scope
+        }
+    }
+}
+
 /// Returns the unit of `value`: its annotation, or else the unit that it
 /// reaches as a plain reference resolved in `scope`, including a
 /// dimensionless one.
 pub(super) fn value_unit<'a>(
     value: &'a ir::ParameterValue,
+    binding: Binding,
     scope: &Scope<'a>,
     graph: GraphView<'a>,
 ) -> Option<&'a ir::CompositeUnit> {
-    annotated_unit(value).or_else(|| referenced_unit(value, scope.clone(), graph))
+    annotated_unit(value).or_else(|| referenced_unit(value, binding, scope.clone(), graph))
 }
 
 /// Returns the scope that `parameter`, which lives in `host`, resolves its
@@ -154,8 +178,9 @@ fn collect_fills<'a>(
 ) {
     let host = Scope::at(node, path);
     for (name, parameter) in node.parameters() {
-        let unit = value_scope(parameter, &host, graph)
-            .and_then(|scope| inherited_unit(parameter.value(), scope, graph));
+        let unit = value_scope(parameter, &host, graph).and_then(|scope| {
+            inherited_unit(parameter.value(), Binding::of(parameter), scope, graph)
+        });
         if let Some(unit) = unit {
             fills.push(UnitFill {
                 path: host.path.host_path(),
@@ -206,10 +231,12 @@ pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::Co
 /// reference to a unit with physical dimensions.
 fn inherited_unit<'a>(
     value: &'a ir::ParameterValue,
+    binding: Binding,
     scope: Scope<'a>,
     graph: GraphView<'a>,
 ) -> Option<&'a ir::CompositeUnit> {
-    referenced_unit(value, scope, graph).filter(|unit| !unit.dimension().is_dimensionless())
+    referenced_unit(value, binding, scope, graph)
+        .filter(|unit| !unit.dimension().is_dimensionless())
 }
 
 /// Returns the unit that `value` reaches when it is an unannotated plain
@@ -220,17 +247,20 @@ fn inherited_unit<'a>(
 /// overlay recorded.
 fn referenced_unit<'a>(
     value: &'a ir::ParameterValue,
+    binding: Binding,
     scope: Scope<'a>,
     graph: GraphView<'a>,
 ) -> Option<&'a ir::CompositeUnit> {
     let mut value = value;
+    let mut binding = binding;
     let mut scope = scope;
     // A parameter is identified by its instance and its name, because every
     // instance of a model has parameters with the same names.
     let mut visited: Vec<(&InstancedModel, &ParameterName)> = Vec::new();
 
     loop {
-        let (target_scope, target_name, target) = reference_target(value, &scope, graph.pool)?;
+        let (target_scope, target_name, target) =
+            reference_target(value, binding, &scope, graph.pool)?;
 
         // References that form a cycle have no unit to inherit.
         let is_revisit = visited.iter().any(|(instance, name)| {
@@ -246,6 +276,7 @@ fn referenced_unit<'a>(
         }
 
         value = target.value();
+        binding = Binding::of(target);
         scope = value_scope(target, &target_scope, graph)?;
     }
 }
@@ -254,6 +285,7 @@ fn referenced_unit<'a>(
 /// an unannotated plain reference resolved in `scope`.
 fn reference_target<'a>(
     value: &'a ir::ParameterValue,
+    binding: Binding,
     scope: &Scope<'a>,
     pool: &'a ReferencePool,
 ) -> Option<(Scope<'a>, &'a ParameterName, &'a ir::Parameter)> {
@@ -270,11 +302,15 @@ fn reference_target<'a>(
             Some((scope.clone(), name, parameter))
         }
         // A parameter that a design adds shadows the builtin with its name,
-        // and variable classification turns the builtin into a reference to it.
-        ir::Variable::Builtin { ident, .. } => {
-            let (name, parameter) = scope.parameter(&ParameterName::from(ident.as_str()))?;
-            Some((scope.clone(), name, parameter))
-        }
+        // and variable classification turns the builtin into a reference to
+        // it everywhere except in design values.
+        ir::Variable::Builtin { ident, .. } => match binding {
+            Binding::Scope => {
+                let (name, parameter) = scope.parameter(&ParameterName::from(ident.as_str()))?;
+                Some((scope.clone(), name, parameter))
+            }
+            Binding::Design => None,
+        },
         ir::Variable::External {
             reference_name,
             parameter_name,
@@ -343,7 +379,7 @@ mod tests {
         symbols::{ParameterName, ReferenceName, SubmodelName},
     };
 
-    use super::{GraphView, ReferencePool, Scope, fill_inherited_units, value_unit};
+    use super::{Binding, GraphView, ReferencePool, Scope, fill_inherited_units, value_unit};
     use crate::{
         instance::{InstancedModel, ReferenceImport, SubmodelImport, graph::AbsolutePath},
         test::test_model_path,
@@ -527,7 +563,7 @@ mod tests {
             .get_parameter(&ParameterName::from("R_c"))
             .expect("parameter should exist");
 
-        let unit = value_unit(reference.value(), &scope, graph);
+        let unit = value_unit(reference.value(), Binding::Scope, &scope, graph);
 
         assert_eq!(unit, Some(&kilometers()));
     }
@@ -565,7 +601,7 @@ mod tests {
             pool: &pool,
         };
 
-        let unit = value_unit(&override_value, &scope, graph);
+        let unit = value_unit(&override_value, Binding::Design, &scope, graph);
 
         assert_eq!(unit, Some(&kilometers()));
     }
@@ -591,7 +627,7 @@ mod tests {
             .expect("parameter should exist");
 
         assert_eq!(
-            value_unit(reference.value(), &scope, graph),
+            value_unit(reference.value(), Binding::Scope, &scope, graph),
             Some(&decibels)
         );
 
@@ -642,5 +678,25 @@ mod tests {
 
         assert_eq!(unit_of(&root, "a"), None);
         assert_eq!(unit_of(&root, "b"), None);
+    }
+
+    #[test]
+    fn design_builtin_stays_unannotated() {
+        let provenance = ir::DesignProvenance {
+            design_path: test_model_path("design"),
+            is_addition: false,
+            assignment_span: Span::synthetic(),
+            anchor_path: RelativePath::self_path(),
+            applied_via: None,
+        };
+        let root = fill(model(
+            "root",
+            [
+                parameter("pi", lit_number(3.0), Some(kilometers())),
+                parameter("t", builtin_var("pi"), None).with_design_provenance(provenance),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "t"), None);
     }
 }

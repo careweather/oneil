@@ -211,8 +211,10 @@ Cached unit graphs and overlay values keep plain references unannotated, so a
 reference follows a design that changes the referenced parameter's unit. A
 scoped overlay's value resolves in the anchor that its `anchor_path` leads to
 from the overlay's host, and a chain of references continues through a scoped
-overlay in that anchor. A name that a design parameter shadows, such as `pi`,
-resolves to that parameter, as classification later does.
+overlay in that anchor. A builtin name that a design parameter shadows, such as
+`pi`, resolves to that parameter, as classification later does. A design value
+keeps the builtin, because the design resolver bound its names and
+classification skips it.
 
 The overlay unit check runs while designs are still being applied, so it
 computes the units that both sides inherit at that point without writing

@@ -83,7 +83,7 @@ use super::{
     CompilationUnit, ContributionDiagnostic, InstancedModel,
     design::{ApplyDesign, Design, OverlayParameterValue},
     reference_units::{
-        GraphView, Scope, annotated_unit, fill_inherited_units, value_scope, value_unit,
+        Binding, GraphView, Scope, annotated_unit, fill_inherited_units, value_scope, value_unit,
     },
     validation_error::InstanceValidationError,
 };
@@ -873,9 +873,9 @@ fn unit_mismatches<'a>(
             let target = host.instance.parameters().get(name)?;
             let target_unit = value_scope(target, host, graph).map_or_else(
                 || annotated_unit(target.value()),
-                |scope| value_unit(target.value(), &scope, graph),
+                |scope| value_unit(target.value(), Binding::of(target), &scope, graph),
             )?;
-            let overlay_unit = value_unit(&overlay.value, overlay_scope, graph)?;
+            let overlay_unit = value_unit(&overlay.value, Binding::Design, overlay_scope, graph)?;
             let error = check_unit_compatibility(name, target_unit, overlay, overlay_unit)?;
             Some((name.clone(), error))
         })

@@ -154,6 +154,13 @@ fn overlay_onto_dimensionless_reference_unit_mismatch() {
 }
 
 #[test]
+fn design_builtin_ignores_later_design_parameter_with_its_name() {
+    // A design value that names a builtin keeps the builtin when a later
+    // design adds a parameter with that name.
+    insta::assert_snapshot!(run_fixture("reference_units/shadow_after_builtin.on"));
+}
+
+#[test]
 fn reference_follows_design_display_unit() {
     // A plain reference inherits the unit that its target has after every
     // design applies, not the unit the target had in the base model.
