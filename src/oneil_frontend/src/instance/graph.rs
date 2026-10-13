@@ -32,13 +32,14 @@
 //!    the root unit's cached graph and overlays runtime-supplied
 //!    designs at the root anchor.
 //!
-//! Composition ends by writing the unit that each unannotated plain
-//! parameter reference, such as `P_l = P_t.r`, inherits from the
-//! parameter it references, once every design is applied. Cached unit
-//! graphs leave plain references unannotated, so a design that changes
-//! a referenced parameter's unit also changes the inherited unit. The
-//! overlay unit check computes the inherited units of both sides when a
-//! design is applied, with the design's additions in scope.
+//! Once every design is applied, composition ends by giving each
+//! unannotated plain parameter reference, such as `P_l = P_t.r`, the
+//! unit of the parameter it references when that unit has physical
+//! dimensions. Cached unit graphs leave plain references unannotated, so
+//! a design that changes a referenced parameter's unit also changes the
+//! inherited unit. The overlay unit check computes the units that both
+//! sides reach when a design is applied, with the design's additions in
+//! scope.
 //!
 //! Per-instance variable classification ([`classify_variables`]) is a
 //! pre-validation step that the post-build validation pass invokes as
@@ -716,17 +717,22 @@ fn apply_design_at_host(
     let unit_errors = {
         let host =
             host_at_in_view(root, pool, &host_loc.absolute_path).expect("host_loc just resolved");
-        let scope = Scope {
-            instance: host,
-            path: host_loc.absolute_path.clone(),
-            additions: Some(&design.parameter_additions),
-        };
-        unit_mismatches(
-            &design.parameter_overrides,
+        let graph = GraphView::new(root, pool).with_additions(host, &design.parameter_additions);
+        let scope = graph.scope(host, host_loc.absolute_path.clone());
+        // An addition replaces a parameter only when an earlier design added
+        // it, because a name that the target model defines is an override.
+        let additions = design
+            .parameter_additions
+            .iter()
+            .map(|(name, parameter)| (name, parameter.value(), parameter.span()));
+        let mut errors = unit_mismatches(
+            override_values(&design.parameter_overrides),
             &scope,
             &scope,
-            GraphView { root, pool },
-        )
+            graph,
+        );
+        errors.extend(unit_mismatches(additions, &scope, &scope, graph));
+        errors
     };
 
     {
@@ -831,11 +837,12 @@ fn apply_scoped_overlay(
             .expect("the caller resolved anchor_loc");
         let host = host_at_in_view(root, pool, &host_loc.absolute_path)
             .expect("scoped host just resolved");
+        let graph = GraphView::new(root, pool);
         unit_mismatches(
-            overrides,
-            &Scope::at(host, host_loc.absolute_path.clone()),
-            &Scope::at(anchor, anchor_loc.absolute_path.clone()),
-            GraphView { root, pool },
+            override_values(overrides),
+            &graph.scope(host, host_loc.absolute_path.clone()),
+            &graph.scope(anchor, anchor_loc.absolute_path.clone()),
+            graph,
         )
     };
 
@@ -855,30 +862,39 @@ fn apply_scoped_overlay(
     );
 }
 
-/// Returns the unit mismatch error of each override in `overrides` whose
-/// value has other dimensions than the parameter it replaces, keyed by the
-/// parameter name.
-///
-/// The overridden parameters live on the instance of `host`, and the override
-/// values resolve their names in `overlay_scope`. Both sides count the unit
-/// that a plain reference inherits at this point in the build.
-fn unit_mismatches<'a>(
+/// Returns the overrides of a design as the parameter values it applies.
+fn override_values(
     overrides: &IndexMap<ParameterName, OverlayParameterValue>,
+) -> impl Iterator<Item = (&ParameterName, &ir::ParameterValue, &Span)> {
+    overrides
+        .iter()
+        .map(|(name, overlay)| (name, &overlay.value, &overlay.design_span))
+}
+
+/// Returns the unit mismatch error of each value in `values` that has other
+/// dimensions than the parameter with its name that it replaces on the
+/// instance of `host`, keyed by the parameter name.
+///
+/// The values resolve their names in `overlay_scope`. Both sides count the
+/// unit that a plain reference reaches at this point in the build, including a
+/// dimensionless one.
+fn unit_mismatches<'a, 'v>(
+    values: impl IntoIterator<Item = (&'v ParameterName, &'a ir::ParameterValue, &'v Span)>,
     host: &Scope<'a>,
     overlay_scope: &Scope<'a>,
     graph: GraphView<'a>,
 ) -> IndexMap<ParameterName, DesignResolutionError> {
     let mut units = UnitResolver::new(graph);
-    overrides
-        .iter()
-        .filter_map(|(name, overlay)| {
-            let target = host.instance.parameters().get(name)?;
+    values
+        .into_iter()
+        .filter_map(|(name, value, span)| {
+            let target = host.instance().parameters().get(name)?;
             let target_unit = value_scope(target, host, graph).map_or_else(
                 || annotated_unit(target.value()).map(ValueUnit::Annotated),
                 |scope| units.value_unit(target.value(), Binding::of(target), &scope),
             )?;
-            let overlay_unit = units.value_unit(&overlay.value, Binding::Design, overlay_scope)?;
-            let error = check_unit_compatibility(name, target_unit, overlay, overlay_unit)?;
+            let value_unit = units.value_unit(value, Binding::Design, overlay_scope)?;
+            let error = check_unit_compatibility(name, target_unit, value_unit, span)?;
             Some((name.clone(), error))
         })
         .collect()
@@ -886,7 +902,7 @@ fn unit_mismatches<'a>(
 
 /// Applies one host's worth of design contributions in place,
 /// recording errors for missing overlay targets and the unit mismatches
-/// in `unit_errors`.
+/// in `unit_errors`, which skip the override or addition with their name.
 #[expect(clippy::too_many_arguments, reason = "single internal helper")]
 fn apply_overlay_at_host(
     host: &mut InstancedModel,
@@ -901,9 +917,24 @@ fn apply_overlay_at_host(
     contribution_errors: &mut Vec<ContributionDiagnostic>,
     _ctx: &GraphCtx<'_>,
 ) {
+    let unit_error = |name: &ParameterName| {
+        unit_errors.get(name).map(|error| {
+            ContributionDiagnostic::new(
+                host_path.clone(),
+                error.clone(),
+                design_file.clone(),
+                applied_via.cloned(),
+            )
+        })
+    };
+
     // Insert additions first so subsequent override RHS expressions can
     // reference them.
     for (name, parameter) in additions {
+        if let Some(diagnostic) = unit_error(name) {
+            contribution_errors.push(diagnostic);
+            continue;
+        }
         let provenance = ir::DesignProvenance {
             design_path: design_file.clone(),
             is_addition: true,
@@ -940,13 +971,8 @@ fn apply_overlay_at_host(
             ));
             continue;
         };
-        if let Some(err) = unit_errors.get(name) {
-            contribution_errors.push(ContributionDiagnostic::new(
-                host_path.clone(),
-                err.clone(),
-                design_file.clone(),
-                applied_via.cloned(),
-            ));
+        if let Some(diagnostic) = unit_error(name) {
+            contribution_errors.push(diagnostic);
             continue;
         }
         let provenance = ir::DesignProvenance {
@@ -1213,13 +1239,14 @@ fn render_path(p: &InstancePath) -> String {
 
 // ── Apply-time helpers ───────────────────────────────────────────────────────
 
-/// Returns an error when the override `overlay` of `parameter_name` has a unit
-/// with other dimensions than the parameter it replaces.
+/// Returns an error, at the design assignment `design_span`, when the value
+/// that a design applies to `parameter_name` has a unit with other dimensions
+/// than the parameter it replaces.
 fn check_unit_compatibility(
     parameter_name: &ParameterName,
     target_unit: ValueUnit<'_>,
-    overlay: &OverlayParameterValue,
     overlay_unit: ValueUnit<'_>,
+    design_span: &Span,
 ) -> Option<DesignResolutionError> {
     if target_unit.has_same_dimensions(overlay_unit) {
         return None;
@@ -1243,7 +1270,7 @@ fn check_unit_compatibility(
             "unit mismatch: parameter `{}` {target} but design applies {value}",
             parameter_name.as_str(),
         ),
-        overlay.design_span.clone(),
+        design_span.clone(),
     ))
 }
 

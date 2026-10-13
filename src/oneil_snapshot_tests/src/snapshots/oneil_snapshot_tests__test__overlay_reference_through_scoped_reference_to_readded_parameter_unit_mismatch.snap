@@ -1,0 +1,15 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/readded_mismatch.on\")"
+---
+error: unit mismatch: parameter `x` has unit `m` but design applies value with unit `s`
+  at fixtures/reference_units/length_to_range_after_readd.one:8:17
+
+error: unit mismatch: parameter `L` has unit `km` but design applies value with unit `s`
+  at fixtures/reference_units/length_to_range_after_readd.one:6:1
+
+error: applied design `length_to_range_after_readd.one` produced invalid contributions
+  at fixtures/reference_units/readded_mismatch.on:9:7
+
+error: applied design `length_to_range_after_readd.one` produced invalid contributions
+  at fixtures/reference_units/readded_mismatch.on:9:7

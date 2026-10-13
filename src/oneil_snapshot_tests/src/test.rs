@@ -142,6 +142,28 @@ fn overlay_reference_to_scoped_reference_unit_mismatch() {
 }
 
 #[test]
+fn overlay_reference_through_scoped_reference_to_readded_parameter_unit_mismatch() {
+    // An override value that reaches the design's target through an earlier
+    // scoped override sees a parameter that the design adds there, including
+    // one that replaces a parameter an earlier design added.
+    insta::assert_snapshot!(run_fixture("reference_units/readded_mismatch.on"));
+}
+
+#[test]
+fn readded_parameter_unit_mismatch() {
+    // A design can't replace a parameter that an earlier design added with one
+    // of other dimensions, because references to it would follow.
+    insta::assert_snapshot!(run_fixture("reference_units/readded_duration_mismatch.on"));
+}
+
+#[test]
+fn readded_parameter_keeps_dimensions() {
+    // A design can replace a parameter that an earlier design added with one in
+    // another unit of the same dimensions.
+    insta::assert_snapshot!(run_fixture("reference_units/readded_length.on"));
+}
+
+#[test]
 fn overlay_dimensionless_reference_unit_mismatch() {
     // A reference to a dimensionless parameter can't override a length.
     insta::assert_snapshot!(run_fixture("reference_units/length_to_gain.one"));

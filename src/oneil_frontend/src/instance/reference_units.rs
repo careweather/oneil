@@ -8,7 +8,8 @@
 //! changes the referenced parameter's unit changes the inherited unit too. The
 //! design overlay unit check runs while designs are still being applied, so it
 //! reads inherited units through [`UnitResolver::value_unit`] without writing
-//! them.
+//! them. A [`GraphView`] carries the parameters that the design being applied
+//! adds, so every reference that reaches the design's target sees them.
 //!
 //! Only units with physical dimensions are written. A reference to a
 //! dimensionless unit, such as `dB` or `%`, stays unannotated and evaluates to
@@ -32,33 +33,68 @@ use super::{
 };
 
 type ReferencePool = IndexMap<ModelPath, Box<InstancedModel>>;
+type Additions = IndexMap<ParameterName, ir::Parameter>;
 
 /// The instances that references resolve in: the root model's tree and the
-/// reference pool.
+/// reference pool, plus the parameters that a design being applied adds.
 #[derive(Clone, Copy)]
 pub(super) struct GraphView<'a> {
-    pub root: &'a InstancedModel,
-    pub pool: &'a ReferencePool,
+    root: &'a InstancedModel,
+    pool: &'a ReferencePool,
+    // The instance that a design is being applied to and the parameters that
+    // the design adds to it, which aren't in the graph yet.
+    additions: Option<(&'a InstancedModel, &'a Additions)>,
+}
+
+impl<'a> GraphView<'a> {
+    pub(super) const fn new(root: &'a InstancedModel, pool: &'a ReferencePool) -> Self {
+        Self {
+            root,
+            pool,
+            additions: None,
+        }
+    }
+
+    /// Returns this view with `additions` pending on `host`, the instance that
+    /// a design is being applied to.
+    pub(super) const fn with_additions(
+        self,
+        host: &'a InstancedModel,
+        additions: &'a Additions,
+    ) -> Self {
+        Self {
+            additions: Some((host, additions)),
+            ..self
+        }
+    }
+
+    /// Returns the scope of `instance`, which lives at `path`, including the
+    /// pending additions when `instance` is their host.
+    pub(super) fn scope(self, instance: &'a InstancedModel, path: AbsolutePath) -> Scope<'a> {
+        let additions = self
+            .additions
+            .filter(|(host, _)| std::ptr::eq(*host, instance))
+            .map(|(_, additions)| additions);
+        Scope {
+            instance,
+            path,
+            additions,
+        }
+    }
 }
 
 /// The names that a parameter value resolves against: an instance and where
 /// it lives, plus the parameters that a design being applied to it adds.
 #[derive(Clone)]
 pub(super) struct Scope<'a> {
-    pub instance: &'a InstancedModel,
-    pub path: AbsolutePath,
-    pub additions: Option<&'a IndexMap<ParameterName, ir::Parameter>>,
+    instance: &'a InstancedModel,
+    path: AbsolutePath,
+    additions: Option<&'a Additions>,
 }
 
 impl<'a> Scope<'a> {
-    /// The scope of `instance`, which lives at `path`, with no pending design
-    /// additions.
-    pub(super) const fn at(instance: &'a InstancedModel, path: AbsolutePath) -> Self {
-        Self {
-            instance,
-            path,
-            additions: None,
-        }
+    pub(super) const fn instance(&self) -> &'a InstancedModel {
+        self.instance
     }
 
     fn parameter(&self, name: &ParameterName) -> Option<&'a ir::Parameter> {
@@ -129,8 +165,8 @@ impl<'a> ValueUnit<'a> {
 /// Finds the units that plain references reach in one view of the graph.
 ///
 /// It remembers the unit that each referenced parameter reaches, so every
-/// parameter is resolved once. It's only valid while the graph and the design
-/// additions of the scopes it's given stay the same.
+/// parameter is resolved once. It's only valid while the graph view stays the
+/// same.
 pub(super) struct UnitResolver<'a> {
     graph: GraphView<'a>,
     // Keyed by address, because every instance of a model has parameters with
@@ -190,8 +226,7 @@ impl<'a> UnitResolver<'a> {
         let mut chain = Vec::new();
 
         let unit = loop {
-            let Some((target_scope, target)) =
-                reference_target(value, binding, &scope, self.graph.pool)
+            let Some((target_scope, target)) = reference_target(value, binding, &scope, self.graph)
             else {
                 break None;
             };
@@ -245,29 +280,30 @@ pub(super) fn value_scope<'a>(
     };
     let path = host.path.resolve(anchor_path)?;
     let anchor = host_at_in_view(graph.root, graph.pool, &path)?;
-    Some(Scope::at(anchor, path))
+    Some(graph.scope(anchor, path))
 }
 
-/// Writes the inherited unit into every unannotated plain reference in
-/// `root`'s subtree and in `pool`.
+/// Writes the unit that each unannotated plain reference in `root`'s subtree
+/// and in `pool` inherits, for references that reach a unit with physical
+/// dimensions.
 pub(super) fn fill_inherited_units(root: &mut InstancedModel, pool: &mut ReferencePool) {
     let (root_fills, pool_fills) = {
-        let graph = GraphView {
-            root: &*root,
-            pool: &*pool,
-        };
+        let graph = GraphView::new(&*root, &*pool);
         let mut units = UnitResolver::new(graph);
-        let root_fills = tree_fills(
+        let root_fills = collect_fills(
             graph.root,
             AbsolutePath::Root(InstancePath::root()),
             &mut units,
         );
-        let pool_fills: Vec<(ModelPath, Vec<UnitFill>)> = graph
+        let pool_fills: Vec<(ModelPath, UnitFills)> = graph
             .pool
             .iter()
             .map(|(model_path, instance)| {
                 let path = AbsolutePath::Pool(model_path.clone(), InstancePath::root());
-                (model_path.clone(), tree_fills(instance, path, &mut units))
+                (
+                    model_path.clone(),
+                    collect_fills(instance, path, &mut units),
+                )
             })
             .collect();
         (root_fills, pool_fills)
@@ -282,71 +318,70 @@ pub(super) fn fill_inherited_units(root: &mut InstancedModel, pool: &mut Referen
     }
 }
 
-/// A unit to write into the parameter `parameter` of the instance at `path`
-/// within one tree of the graph.
-struct UnitFill {
-    path: InstancePath,
-    parameter: ParameterName,
-    unit: ir::CompositeUnit,
+/// The units to write into the parameters of one instance and of its
+/// submodels, shaped like the instance tree so that writing them visits each
+/// submodel once.
+struct UnitFills {
+    parameters: Vec<(ParameterName, ir::CompositeUnit)>,
+    submodels: Vec<(ReferenceName, Self)>,
 }
 
-/// Returns the fills for the tree whose root `root` lives at `path`.
-fn tree_fills<'a>(
-    root: &'a InstancedModel,
-    path: AbsolutePath,
-    units: &mut UnitResolver<'a>,
-) -> Vec<UnitFill> {
-    let mut fills = Vec::new();
-    collect_fills(root, path, units, &mut fills);
-    fills
+impl UnitFills {
+    const fn is_empty(&self) -> bool {
+        self.parameters.is_empty() && self.submodels.is_empty()
+    }
 }
 
-/// Collects the fills for `node`, which lives at `path`, and its submodels.
+/// Returns the fills for `node`, which lives at `path`, and its submodels.
 fn collect_fills<'a>(
     node: &'a InstancedModel,
     path: AbsolutePath,
     units: &mut UnitResolver<'a>,
-    fills: &mut Vec<UnitFill>,
-) {
-    let host = Scope::at(node, path);
-    for (name, parameter) in node.parameters() {
-        let unit = value_scope(parameter, &host, units.graph).and_then(|scope| {
-            units.inherited_unit(parameter.value(), Binding::of(parameter), scope)
-        });
-        if let Some(unit) = unit {
-            fills.push(UnitFill {
-                path: host.path.host_path(),
-                parameter: name.clone(),
-                unit: unit.clone(),
-            });
-        }
-    }
-
-    for (alias, submodel) in node.submodels() {
-        collect_fills(
-            &submodel.instance,
-            host.path.append(alias.clone()),
-            units,
-            fills,
-        );
+) -> UnitFills {
+    let host = units.graph.scope(node, path);
+    let parameters = node
+        .parameters()
+        .iter()
+        .filter_map(|(name, parameter)| {
+            let scope = value_scope(parameter, &host, units.graph)?;
+            let unit = units.inherited_unit(parameter.value(), Binding::of(parameter), scope)?;
+            Some((name.clone(), unit.clone()))
+        })
+        .collect();
+    let submodels = node
+        .submodels()
+        .iter()
+        .map(|(alias, submodel)| {
+            let path = host.path.append(alias.clone());
+            (
+                alias.clone(),
+                collect_fills(&submodel.instance, path, units),
+            )
+        })
+        .filter(|(_, fills)| !fills.is_empty())
+        .collect();
+    UnitFills {
+        parameters,
+        submodels,
     }
 }
 
-fn apply_fills(root: &mut InstancedModel, fills: Vec<UnitFill>) {
-    for fill in fills {
-        let node = fill.path.segments().iter().fold(&mut *root, |node, alias| {
-            node.submodels_mut()
-                .get_mut(alias)
-                .map(|submodel| submodel.instance.as_mut())
-                .expect("fills are collected from existing submodels")
-        });
+fn apply_fills(node: &mut InstancedModel, fills: UnitFills) {
+    for (name, unit) in fills.parameters {
         let parameter = node
             .parameters_mut()
-            .get_mut(&fill.parameter)
+            .get_mut(&name)
             .expect("fills are collected from existing parameters");
         if let ir::ParameterValue::Simple(_, unit_slot) = parameter.value_mut() {
-            *unit_slot = Some(fill.unit);
+            *unit_slot = Some(unit);
         }
+    }
+    for (alias, submodel_fills) in fills.submodels {
+        let submodel = node
+            .submodels_mut()
+            .get_mut(&alias)
+            .expect("fills are collected from existing submodels");
+        apply_fills(&mut submodel.instance, submodel_fills);
     }
 }
 
@@ -373,7 +408,7 @@ fn reference_target<'a>(
     value: &'a ir::ParameterValue,
     binding: Binding,
     scope: &Scope<'a>,
-    pool: &'a ReferencePool,
+    graph: GraphView<'a>,
 ) -> Option<(Scope<'a>, &'a ir::Parameter)> {
     let ir::ParameterValue::Simple(expr, None) = value else {
         return None;
@@ -402,8 +437,8 @@ fn reference_target<'a>(
             parameter_name,
             ..
         } => {
-            let target_scope = referenced_scope(scope, reference_name, pool)?;
-            let parameter = target_scope.instance.parameters().get(parameter_name)?;
+            let target_scope = referenced_scope(scope, reference_name, graph)?;
+            let parameter = target_scope.parameter(parameter_name)?;
             Some((target_scope, parameter))
         }
     }
@@ -414,22 +449,19 @@ fn reference_target<'a>(
 fn referenced_scope<'a>(
     host: &Scope<'a>,
     reference_name: &ReferenceName,
-    pool: &'a ReferencePool,
+    graph: GraphView<'a>,
 ) -> Option<Scope<'a>> {
     let submodel_scope = |parent: &Scope<'a>, name: &ReferenceName| {
         let submodel = parent.instance.submodels().get(name)?;
-        Some(Scope::at(
-            &submodel.instance,
-            parent.path.append(name.clone()),
-        ))
+        Some(graph.scope(&submodel.instance, parent.path.append(name.clone())))
     };
     let direct = |name: &ReferenceName| {
         let Some(reference) = host.instance.references().get(name) else {
             return submodel_scope(host, name);
         };
-        let instance = pool.get(&reference.path)?;
+        let instance = graph.pool.get(&reference.path)?;
         let path = AbsolutePath::Pool(reference.path.clone(), InstancePath::root());
-        Some(Scope::at(instance, path))
+        Some(graph.scope(instance, path))
     };
 
     if let Some(scope) = direct(reference_name) {
@@ -462,9 +494,7 @@ mod tests {
         symbols::{ParameterName, ReferenceName, SubmodelName},
     };
 
-    use super::{
-        Binding, GraphView, ReferencePool, Scope, UnitResolver, ValueUnit, fill_inherited_units,
-    };
+    use super::{Binding, GraphView, ReferencePool, UnitResolver, ValueUnit, fill_inherited_units};
     use crate::{
         instance::{InstancedModel, ReferenceImport, SubmodelImport, graph::AbsolutePath},
         test::test_model_path,
@@ -639,11 +669,8 @@ mod tests {
     fn reference_through_unfilled_scoped_overlay_has_unit() {
         let root = scoped_overlay_model();
         let pool = ReferencePool::new();
-        let graph = GraphView {
-            root: &root,
-            pool: &pool,
-        };
-        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let graph = GraphView::new(&root, &pool);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
         let reference = root
             .get_parameter(&ParameterName::from("R_c"))
             .expect("parameter should exist");
@@ -651,6 +678,53 @@ mod tests {
         let unit = UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope);
 
         assert_eq!(unit, Some(ValueUnit::Annotated(&kilometers())));
+    }
+
+    #[test]
+    fn reference_through_scoped_overlay_sees_pending_additions() {
+        let root = scoped_overlay_model();
+        let seconds = unit("s", std::iter::once((Dimension::Time, 1.0)).collect());
+        let additions: IndexMap<ParameterName, ir::Parameter> = std::iter::once((
+            ParameterName::from("L"),
+            parameter("L", lit_number(5.0), Some(seconds.clone())),
+        ))
+        .collect();
+        let pool = ReferencePool::new();
+        let graph = GraphView::new(&root, &pool).with_additions(&root, &additions);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("R_c"))
+            .expect("parameter should exist");
+
+        let unit = UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope);
+
+        assert_eq!(unit, Some(ValueUnit::Annotated(&seconds)));
+    }
+
+    #[test]
+    fn deeply_nested_references_inherit_units() {
+        const DEPTH: usize = 200;
+        let leaf = model(
+            "leaf",
+            [parameter("x", lit_number(1.0), Some(kilometers()))],
+        );
+        let root = (0..DEPTH).fold(leaf, |child, level| {
+            let mut parent = model(
+                &format!("level_{level}"),
+                [parameter("x", external_var("x", "s"), None)],
+            );
+            add_child(&mut parent, "s", child);
+            parent
+        });
+
+        let root = fill(root);
+
+        let alias = ReferenceName::from("s");
+        let mut node = &root;
+        for _ in 0..DEPTH {
+            assert_eq!(unit_of(node, "x"), Some(&kilometers()));
+            node = &node.submodels()[&alias].instance;
+        }
     }
 
     #[test]
@@ -675,16 +749,9 @@ mod tests {
         ))
         .collect();
         let override_value = ir::ParameterValue::Simple(Box::new(param_var("d")), None);
-        let scope = Scope {
-            instance: &host,
-            path: AbsolutePath::Root(InstancePath::root()),
-            additions: Some(&additions),
-        };
         let pool = ReferencePool::new();
-        let graph = GraphView {
-            root: &host,
-            pool: &pool,
-        };
+        let graph = GraphView::new(&host, &pool).with_additions(&host, &additions);
+        let scope = graph.scope(&host, AbsolutePath::Root(InstancePath::root()));
 
         let unit = UnitResolver::new(graph).value_unit(&override_value, Binding::Design, &scope);
 
@@ -702,11 +769,8 @@ mod tests {
             ],
         );
         let pool = ReferencePool::new();
-        let graph = GraphView {
-            root: &root,
-            pool: &pool,
-        };
-        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let graph = GraphView::new(&root, &pool);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
         let reference = root
             .get_parameter(&ParameterName::from("G_r"))
             .expect("parameter should exist");
@@ -730,11 +794,8 @@ mod tests {
             ],
         );
         let pool = ReferencePool::new();
-        let graph = GraphView {
-            root: &root,
-            pool: &pool,
-        };
-        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let graph = GraphView::new(&root, &pool);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
         let reference = root
             .get_parameter(&ParameterName::from("n_r"))
             .expect("parameter should exist");
@@ -752,11 +813,8 @@ mod tests {
     fn undefined_reference_has_unknown_unit() {
         let root = model("root", [parameter("x", param_var("missing"), None)]);
         let pool = ReferencePool::new();
-        let graph = GraphView {
-            root: &root,
-            pool: &pool,
-        };
-        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let graph = GraphView::new(&root, &pool);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
         let reference = root
             .get_parameter(&ParameterName::from("x"))
             .expect("parameter should exist");

@@ -220,7 +220,11 @@ The overlay unit check runs while designs are still being applied, so it
 computes the units that both sides inherit at that point without writing
 them. An override value resolves in the design's anchor scope together with
 the design's additions, so an override can't take other dimensions by
-referencing a parameter that the same design adds. The overridden parameter's
+referencing a parameter that the same design adds. A reference that reaches the
+design's target again, such as through the anchor of an earlier scoped overlay,
+sees those additions too. An addition that replaces a parameter that an earlier
+design added is checked like an override, because references to that parameter
+follow it. The overridden parameter's
 own value resolves like any other reference, including through the anchor of
 an earlier scoped overlay, so a later design can't change its dimensions
 either. The check also counts a dimensionless unit, such as `dB`, that a
