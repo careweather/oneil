@@ -19,10 +19,12 @@
 //! It returns [`ValueUnit::Unitless`] for a reference to a parameter without a
 //! unit, which the check also counts as dimensionless.
 
+use std::rc::Rc;
+
 use indexmap::IndexMap;
 use oneil_ir as ir;
 use oneil_shared::{
-    InstancePath,
+    InstancePath, RelativePath,
     paths::ModelPath,
     symbols::{ParameterName, ReferenceName},
 };
@@ -71,13 +73,17 @@ impl<'a> GraphView<'a> {
     /// Returns the scope of `instance`, which lives at `path`, including the
     /// pending additions when `instance` is their host.
     pub(super) fn scope(self, instance: &'a InstancedModel, path: AbsolutePath) -> Scope<'a> {
+        self.scope_in(instance, Location::At(path))
+    }
+
+    fn scope_in(self, instance: &'a InstancedModel, location: Location<'a>) -> Scope<'a> {
         let additions = self
             .additions
             .filter(|(host, _)| std::ptr::eq(*host, instance))
             .map(|(_, additions)| additions);
         Scope {
             instance,
-            path,
+            location: Rc::new(location),
             additions,
         }
     }
@@ -88,8 +94,20 @@ impl<'a> GraphView<'a> {
 #[derive(Clone)]
 pub(super) struct Scope<'a> {
     instance: &'a InstancedModel,
-    path: AbsolutePath,
+    location: Rc<Location<'a>>,
     additions: Option<&'a Additions>,
+}
+
+/// Where the instance of a scope lives.
+///
+/// A submodel's scope keeps its parent's scope instead of a copy of its path,
+/// so reaching a submodel takes constant time and an anchor above it is found
+/// by walking up.
+enum Location<'a> {
+    /// The instance at this path.
+    At(AbsolutePath),
+    /// A submodel of the instance of this parent scope.
+    Submodel(Scope<'a>),
 }
 
 impl<'a> Scope<'a> {
@@ -101,6 +119,53 @@ impl<'a> Scope<'a> {
         self.additions
             .and_then(|additions| additions.get(name))
             .or_else(|| self.instance.parameters().get(name))
+    }
+
+    /// Returns the scope of the submodel `alias` on this scope's instance.
+    fn submodel(&self, alias: &ReferenceName, graph: GraphView<'a>) -> Option<Self> {
+        let submodel = self.instance.submodels().get(alias)?;
+        Some(graph.scope_in(&submodel.instance, Location::Submodel(self.clone())))
+    }
+
+    /// Returns the scope that `segment` names below this scope's instance: a
+    /// submodel, or a `with` alias that leads through submodels.
+    fn descend(&self, segment: &ReferenceName, graph: GraphView<'a>) -> Option<Self> {
+        if let Some(scope) = self.submodel(segment, graph) {
+            return Some(scope);
+        }
+        let alias = self.instance.aliases().get(segment)?;
+        alias
+            .alias_path
+            .segments()
+            .iter()
+            .try_fold(self.clone(), |scope, segment| {
+                scope.submodel(segment, graph)
+            })
+    }
+
+    /// Returns the scope that `relative` leads to from this scope, or `None`
+    /// when it walks above the root of this scope's tree.
+    fn resolve(&self, relative: &RelativePath, graph: GraphView<'a>) -> Option<Self> {
+        let mut ancestor = self.clone();
+        for walked in 0..relative.up {
+            let parent = match ancestor.location.as_ref() {
+                Location::Submodel(parent) => parent.clone(),
+                Location::At(path) => {
+                    let rest = RelativePath {
+                        up: relative.up - walked,
+                        down: relative.down.clone(),
+                    };
+                    let path = path.resolve(&rest)?;
+                    let instance = host_at_in_view(graph.root, graph.pool, &path)?;
+                    return Some(graph.scope(instance, path));
+                }
+            };
+            ancestor = parent;
+        }
+        relative
+            .down
+            .iter()
+            .try_fold(ancestor, |scope, segment| scope.descend(segment, graph))
     }
 }
 
@@ -278,9 +343,7 @@ pub(super) fn value_scope<'a>(
     let Some(anchor_path) = anchor_path else {
         return Some(host.clone());
     };
-    let path = host.path.resolve(anchor_path)?;
-    let anchor = host_at_in_view(graph.root, graph.pool, &path)?;
-    Some(graph.scope(anchor, path))
+    host.resolve(anchor_path, graph)
 }
 
 /// Writes the unit that each unannotated plain reference in `root`'s subtree
@@ -290,20 +353,15 @@ pub(super) fn fill_inherited_units(root: &mut InstancedModel, pool: &mut Referen
     let (root_fills, pool_fills) = {
         let graph = GraphView::new(&*root, &*pool);
         let mut units = UnitResolver::new(graph);
-        let root_fills = collect_fills(
-            graph.root,
-            AbsolutePath::Root(InstancePath::root()),
-            &mut units,
-        );
+        let root_scope = graph.scope(graph.root, AbsolutePath::Root(InstancePath::root()));
+        let root_fills = collect_fills(&root_scope, &mut units);
         let pool_fills: Vec<(ModelPath, UnitFills)> = graph
             .pool
             .iter()
             .map(|(model_path, instance)| {
                 let path = AbsolutePath::Pool(model_path.clone(), InstancePath::root());
-                (
-                    model_path.clone(),
-                    collect_fills(instance, path, &mut units),
-                )
+                let scope = graph.scope(instance, path);
+                (model_path.clone(), collect_fills(&scope, &mut units))
             })
             .collect();
         (root_fills, pool_fills)
@@ -332,31 +390,26 @@ impl UnitFills {
     }
 }
 
-/// Returns the fills for `node`, which lives at `path`, and its submodels.
-fn collect_fills<'a>(
-    node: &'a InstancedModel,
-    path: AbsolutePath,
-    units: &mut UnitResolver<'a>,
-) -> UnitFills {
-    let host = units.graph.scope(node, path);
-    let parameters = node
+/// Returns the fills for the instance of `host` and its submodels.
+fn collect_fills<'a>(host: &Scope<'a>, units: &mut UnitResolver<'a>) -> UnitFills {
+    let parameters = host
+        .instance
         .parameters()
         .iter()
         .filter_map(|(name, parameter)| {
-            let scope = value_scope(parameter, &host, units.graph)?;
+            let scope = value_scope(parameter, host, units.graph)?;
             let unit = units.inherited_unit(parameter.value(), Binding::of(parameter), scope)?;
             Some((name.clone(), unit.clone()))
         })
         .collect();
-    let submodels = node
+    let submodels = host
+        .instance
         .submodels()
         .iter()
         .map(|(alias, submodel)| {
-            let path = host.path.append(alias.clone());
-            (
-                alias.clone(),
-                collect_fills(&submodel.instance, path, units),
-            )
+            let location = Location::Submodel(host.clone());
+            let scope = units.graph.scope_in(&submodel.instance, location);
+            (alias.clone(), collect_fills(&scope, units))
         })
         .filter(|(_, fills)| !fills.is_empty())
         .collect();
@@ -451,13 +504,9 @@ fn referenced_scope<'a>(
     reference_name: &ReferenceName,
     graph: GraphView<'a>,
 ) -> Option<Scope<'a>> {
-    let submodel_scope = |parent: &Scope<'a>, name: &ReferenceName| {
-        let submodel = parent.instance.submodels().get(name)?;
-        Some(graph.scope(&submodel.instance, parent.path.append(name.clone())))
-    };
     let direct = |name: &ReferenceName| {
         let Some(reference) = host.instance.references().get(name) else {
-            return submodel_scope(host, name);
+            return host.submodel(name, graph);
         };
         let instance = graph.pool.get(&reference.path)?;
         let path = AbsolutePath::Pool(reference.path.clone(), InstancePath::root());
@@ -473,7 +522,7 @@ fn referenced_scope<'a>(
     let alias = host.instance.aliases().get(reference_name)?;
     let (first, rest) = alias.alias_path.segments().split_first()?;
     rest.iter().try_fold(direct(first)?, |scope, segment| {
-        submodel_scope(&scope, segment)
+        scope.submodel(segment, graph)
     })
 }
 
