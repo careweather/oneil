@@ -224,7 +224,10 @@ referencing a parameter that the same design adds. The overridden parameter's
 own value resolves like any other reference, including through the anchor of
 an earlier scoped overlay, so a later design can't change its dimensions
 either. The check also counts a dimensionless unit, such as `dB`, that a
-reference reaches, although composition leaves that reference unannotated.
+reference reaches, although composition leaves that reference unannotated. A
+reference that reaches a parameter with no unit and no reference of its own
+counts as dimensionless too. An override value without a unit that isn't a
+plain reference, such as `L = 5`, skips the check.
 
 ## Error partitioning
 

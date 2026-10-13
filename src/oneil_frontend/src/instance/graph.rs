@@ -83,7 +83,8 @@ use super::{
     CompilationUnit, ContributionDiagnostic, InstancedModel,
     design::{ApplyDesign, Design, OverlayParameterValue},
     reference_units::{
-        Binding, GraphView, Scope, UnitResolver, annotated_unit, fill_inherited_units, value_scope,
+        Binding, GraphView, Scope, UnitResolver, ValueUnit, annotated_unit, fill_inherited_units,
+        value_scope,
     },
     validation_error::InstanceValidationError,
 };
@@ -873,7 +874,7 @@ fn unit_mismatches<'a>(
         .filter_map(|(name, overlay)| {
             let target = host.instance.parameters().get(name)?;
             let target_unit = value_scope(target, host, graph).map_or_else(
-                || annotated_unit(target.value()),
+                || annotated_unit(target.value()).map(ValueUnit::Annotated),
                 |scope| units.value_unit(target.value(), Binding::of(target), &scope),
             )?;
             let overlay_unit = units.value_unit(&overlay.value, Binding::Design, overlay_scope)?;
@@ -1216,20 +1217,31 @@ fn render_path(p: &InstancePath) -> String {
 /// with other dimensions than the parameter it replaces.
 fn check_unit_compatibility(
     parameter_name: &ParameterName,
-    target_unit: &ir::CompositeUnit,
+    target_unit: ValueUnit<'_>,
     overlay: &OverlayParameterValue,
-    overlay_unit: &ir::CompositeUnit,
+    overlay_unit: ValueUnit<'_>,
 ) -> Option<DesignResolutionError> {
-    if target_unit.dimension() == overlay_unit.dimension() {
+    if target_unit.has_same_dimensions(overlay_unit) {
         return None;
     }
 
+    let target = match target_unit {
+        ValueUnit::Annotated(unit) => {
+            format!("has unit `{}`", unit.display_unit().to_resolved_display())
+        }
+        ValueUnit::Unitless => "has no unit".to_string(),
+    };
+    let value = match overlay_unit {
+        ValueUnit::Annotated(unit) => format!(
+            "value with unit `{}`",
+            unit.display_unit().to_resolved_display()
+        ),
+        ValueUnit::Unitless => "value without a unit".to_string(),
+    };
     Some(DesignResolutionError::new(
         format!(
-            "unit mismatch: parameter `{}` has unit `{}` but design applies value with unit `{}`",
+            "unit mismatch: parameter `{}` {target} but design applies {value}",
             parameter_name.as_str(),
-            target_unit.display_unit().to_resolved_display(),
-            overlay_unit.display_unit().to_resolved_display(),
         ),
         overlay.design_span.clone(),
     ))

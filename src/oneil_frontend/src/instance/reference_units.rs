@@ -15,6 +15,8 @@
 //! a plain number, because `strip` and limits without units read a value in
 //! its display unit. [`UnitResolver::value_unit`] still returns the
 //! dimensionless unit, so the overlay unit check can compare its dimensions.
+//! It returns [`ValueUnit::Unitless`] for a reference to a parameter without a
+//! unit, which the check also counts as dimensionless.
 
 use indexmap::IndexMap;
 use oneil_ir as ir;
@@ -89,6 +91,41 @@ impl Binding {
     }
 }
 
+/// The unit of a parameter value, as the design overlay unit check sees it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum ValueUnit<'a> {
+    /// A unit annotation, on the value or on the parameter that its plain
+    /// reference reaches.
+    Annotated(&'a ir::CompositeUnit),
+    /// No unit, because the plain reference reaches a parameter that has no
+    /// annotation and isn't a reference. That parameter evaluates to a plain
+    /// number, or fails because it's missing a unit.
+    Unitless,
+}
+
+impl<'a> ValueUnit<'a> {
+    /// Returns whether `self` and `other` have the same dimensions, counting a
+    /// value without a unit as dimensionless.
+    pub(super) fn has_same_dimensions(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::Annotated(unit), Self::Annotated(other)) => {
+                unit.dimension() == other.dimension()
+            }
+            (Self::Annotated(unit), Self::Unitless) | (Self::Unitless, Self::Annotated(unit)) => {
+                unit.dimension().is_dimensionless()
+            }
+            (Self::Unitless, Self::Unitless) => true,
+        }
+    }
+
+    const fn annotation(self) -> Option<&'a ir::CompositeUnit> {
+        match self {
+            Self::Annotated(unit) => Some(unit),
+            Self::Unitless => None,
+        }
+    }
+}
+
 /// Finds the units that plain references reach in one view of the graph.
 ///
 /// It remembers the unit that each referenced parameter reaches, so every
@@ -98,7 +135,7 @@ pub(super) struct UnitResolver<'a> {
     graph: GraphView<'a>,
     // Keyed by address, because every instance of a model has parameters with
     // the same names.
-    reached: IndexMap<*const ir::Parameter, Option<&'a ir::CompositeUnit>>,
+    reached: IndexMap<*const ir::Parameter, Option<ValueUnit<'a>>>,
 }
 
 impl<'a> UnitResolver<'a> {
@@ -117,8 +154,10 @@ impl<'a> UnitResolver<'a> {
         value: &'a ir::ParameterValue,
         binding: Binding,
         scope: &Scope<'a>,
-    ) -> Option<&'a ir::CompositeUnit> {
-        annotated_unit(value).or_else(|| self.referenced_unit(value, binding, scope.clone()))
+    ) -> Option<ValueUnit<'a>> {
+        annotated_unit(value)
+            .map(ValueUnit::Annotated)
+            .or_else(|| self.referenced_unit(value, binding, scope.clone()))
     }
 
     /// Returns the unit that `value` inherits when it is an unannotated plain
@@ -130,12 +169,14 @@ impl<'a> UnitResolver<'a> {
         scope: Scope<'a>,
     ) -> Option<&'a ir::CompositeUnit> {
         self.referenced_unit(value, binding, scope)
+            .and_then(ValueUnit::annotation)
             .filter(|unit| !unit.dimension().is_dimensionless())
     }
 
     /// Returns the unit that `value` reaches when it is an unannotated plain
     /// reference: the annotation of its target, possibly through further
-    /// plain references.
+    /// plain references, or no unit when the chain ends at an unannotated
+    /// parameter that isn't a reference.
     ///
     /// The chain continues through a scoped design overlay in the anchor that
     /// the overlay recorded.
@@ -144,7 +185,7 @@ impl<'a> UnitResolver<'a> {
         value: &'a ir::ParameterValue,
         binding: Binding,
         scope: Scope<'a>,
-    ) -> Option<&'a ir::CompositeUnit> {
+    ) -> Option<ValueUnit<'a>> {
         let (mut value, mut binding, mut scope) = (value, binding, scope);
         let mut chain = Vec::new();
 
@@ -165,7 +206,10 @@ impl<'a> UnitResolver<'a> {
             chain.push(key);
 
             if let Some(unit) = annotated_unit(target.value()) {
-                break Some(unit);
+                break Some(ValueUnit::Annotated(unit));
+            }
+            if !is_plain_reference(target.value()) {
+                break Some(ValueUnit::Unitless);
             }
             let Some(target_value_scope) = value_scope(target, &target_scope, self.graph) else {
                 break None;
@@ -315,6 +359,14 @@ pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::Co
     }
 }
 
+/// Returns whether `value` is a single variable without a unit annotation.
+fn is_plain_reference(value: &ir::ParameterValue) -> bool {
+    matches!(
+        value,
+        ir::ParameterValue::Simple(expr, None) if matches!(**expr, ir::Expr::Variable { .. })
+    )
+}
+
 /// Returns the scope and parameter that `value` refers to when it is an
 /// unannotated plain reference resolved in `scope`.
 fn reference_target<'a>(
@@ -410,7 +462,9 @@ mod tests {
         symbols::{ParameterName, ReferenceName, SubmodelName},
     };
 
-    use super::{Binding, GraphView, ReferencePool, Scope, UnitResolver, fill_inherited_units};
+    use super::{
+        Binding, GraphView, ReferencePool, Scope, UnitResolver, ValueUnit, fill_inherited_units,
+    };
     use crate::{
         instance::{InstancedModel, ReferenceImport, SubmodelImport, graph::AbsolutePath},
         test::test_model_path,
@@ -596,7 +650,7 @@ mod tests {
 
         let unit = UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope);
 
-        assert_eq!(unit, Some(&kilometers()));
+        assert_eq!(unit, Some(ValueUnit::Annotated(&kilometers())));
     }
 
     #[test]
@@ -634,7 +688,7 @@ mod tests {
 
         let unit = UnitResolver::new(graph).value_unit(&override_value, Binding::Design, &scope);
 
-        assert_eq!(unit, Some(&kilometers()));
+        assert_eq!(unit, Some(ValueUnit::Annotated(&kilometers())));
     }
 
     #[test]
@@ -659,11 +713,58 @@ mod tests {
 
         assert_eq!(
             UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope),
-            Some(&decibels)
+            Some(ValueUnit::Annotated(&decibels))
         );
 
         let root = fill(root);
         assert_eq!(unit_of(&root, "G_r"), None);
+    }
+
+    #[test]
+    fn reference_to_unitless_parameter_is_unitless_and_stays_unannotated() {
+        let root = model(
+            "root",
+            [
+                parameter("n", lit_number(1.0), None),
+                parameter("n_r", param_var("n"), None),
+            ],
+        );
+        let pool = ReferencePool::new();
+        let graph = GraphView {
+            root: &root,
+            pool: &pool,
+        };
+        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("n_r"))
+            .expect("parameter should exist");
+
+        assert_eq!(
+            UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope),
+            Some(ValueUnit::Unitless)
+        );
+
+        let root = fill(root);
+        assert_eq!(unit_of(&root, "n_r"), None);
+    }
+
+    #[test]
+    fn undefined_reference_has_unknown_unit() {
+        let root = model("root", [parameter("x", param_var("missing"), None)]);
+        let pool = ReferencePool::new();
+        let graph = GraphView {
+            root: &root,
+            pool: &pool,
+        };
+        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("x"))
+            .expect("parameter should exist");
+
+        assert_eq!(
+            UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope),
+            None
+        );
     }
 
     #[test]

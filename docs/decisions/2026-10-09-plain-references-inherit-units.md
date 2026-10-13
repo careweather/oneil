@@ -25,7 +25,7 @@ Every other expression with physical dimensions, including a reference combined 
 - References to parameters in other models no longer duplicate the source's unit.
 - The rendered view shows a reference's inherited unit.
 - A plain reference that failed with "parameter is missing a unit" now evaluates.
-- A design override that changes a parameter's dimensions now fails the overlay unit check when the parameter or the override is a plain reference. The check used to skip both cases, so a model that evaluated with such an override now reports an error. This includes replacing a parameter with physical dimensions with a reference to a dimensionless one, such as one in `dB`, or the reverse.
+- A design override that changes a parameter's dimensions now fails the overlay unit check when the parameter or the override is a plain reference. The check used to skip both cases, so a model that evaluated with such an override now reports an error. This includes replacing a parameter with physical dimensions with a reference to a dimensionless parameter, such as one in `dB` or one without a unit, or the reverse.
 - Every other model that evaluated before gives the same values, display units, and test results.
 - A reference to a dimensionless parameter displays as a plain number. To keep the referenced unit, such as `dB`, the reference needs an annotation.
 - Wrapping a reference in a calculation, such as `x = 1*y`, still requires an annotation, so the rule depends on the form of the expression.

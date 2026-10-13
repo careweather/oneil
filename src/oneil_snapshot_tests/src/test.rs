@@ -154,6 +154,18 @@ fn overlay_onto_dimensionless_reference_unit_mismatch() {
 }
 
 #[test]
+fn overlay_unitless_reference_unit_mismatch() {
+    // A reference to a parameter without a unit can't override a length.
+    insta::assert_snapshot!(run_fixture("reference_units/length_to_unitless.one"));
+}
+
+#[test]
+fn overlay_onto_unitless_reference_unit_mismatch() {
+    // A length can't override a reference to a parameter without a unit.
+    insta::assert_snapshot!(run_fixture("reference_units/unitless_to_length.one"));
+}
+
+#[test]
 fn design_builtin_ignores_later_design_parameter_with_its_name() {
     // A design value that names a builtin keeps the builtin when a later
     // design adds a parameter with that name.

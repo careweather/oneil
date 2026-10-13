@@ -1,0 +1,6 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/unitless_to_length.one\")"
+---
+error: unit mismatch: parameter `n_r` has no unit but design applies value with unit `km`
+  at fixtures/reference_units/unitless_to_length.one:5:1
