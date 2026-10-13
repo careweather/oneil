@@ -13,14 +13,19 @@
 //! Only units with physical dimensions are written. A reference to a
 //! dimensionless unit, such as `dB` or `%`, stays unannotated and evaluates to
 //! a plain number, because `strip` and limits without units read a value in
-//! its display unit. [`UnitResolver::value_unit`] still returns the
-//! dimensionless unit, so the overlay unit check can compare its dimensions.
+//! its display unit. [`UnitResolver::value_unit`] still returns a
+//! dimensionless unit for the check, including a synthetic `:1` when a plain
+//! reference chain ends at an unannotated unitless value.
+
+use std::sync::OnceLock;
 
 use indexmap::IndexMap;
 use oneil_ir as ir;
+use oneil_output::DimensionMap;
 use oneil_shared::{
     InstancePath,
     paths::ModelPath,
+    span::Span,
     symbols::{ParameterName, ReferenceName},
 };
 
@@ -64,6 +69,27 @@ impl<'a> Scope<'a> {
             .and_then(|additions| additions.get(name))
             .or_else(|| self.instance.parameters().get(name))
     }
+}
+
+/// The result of inspecting an unannotated value for a plain reference.
+enum ReferenceTarget<'a> {
+    Parameter(Scope<'a>, &'a ir::Parameter),
+    Unitless,
+    Unresolved,
+}
+
+/// The synthetic `:1` unit used only to compare an unannotated unitless
+/// reference endpoint with another resolved unit.
+fn unitless_unit() -> &'static ir::CompositeUnit {
+    static UNITLESS_UNIT: OnceLock<ir::CompositeUnit> = OnceLock::new();
+    UNITLESS_UNIT.get_or_init(|| {
+        ir::CompositeUnit::new(
+            Vec::new(),
+            ir::DisplayCompositeUnit::One,
+            Span::synthetic(),
+            DimensionMap::dimensionless(),
+        )
+    })
 }
 
 /// How the bare names in a parameter value are bound.
@@ -134,8 +160,8 @@ impl<'a> UnitResolver<'a> {
     }
 
     /// Returns the unit that `value` reaches when it is an unannotated plain
-    /// reference: the annotation of its target, possibly through further
-    /// plain references.
+    /// reference: the annotation of its target, or `:1` when the chain ends at
+    /// an unannotated unitless value.
     ///
     /// The chain continues through a scoped design overlay in the anchor that
     /// the overlay recorded.
@@ -149,11 +175,14 @@ impl<'a> UnitResolver<'a> {
         let mut chain = Vec::new();
 
         let unit = loop {
-            let Some((target_scope, target)) =
-                reference_target(value, binding, &scope, self.graph.pool)
-            else {
-                break None;
-            };
+            let (target_scope, target) =
+                match reference_target(value, binding, &scope, self.graph.pool) {
+                    ReferenceTarget::Parameter(scope, parameter) => (scope, parameter),
+                    ReferenceTarget::Unitless if !chain.is_empty() => {
+                        break Some(unitless_unit());
+                    }
+                    ReferenceTarget::Unitless | ReferenceTarget::Unresolved => break None,
+                };
 
             // A parameter that is still on the chain reaches no unit, because
             // references that form a cycle have no unit to inherit.
@@ -322,37 +351,48 @@ fn reference_target<'a>(
     binding: Binding,
     scope: &Scope<'a>,
     pool: &'a ReferencePool,
-) -> Option<(Scope<'a>, &'a ir::Parameter)> {
+) -> ReferenceTarget<'a> {
     let ir::ParameterValue::Simple(expr, None) = value else {
-        return None;
+        return if annotated_unit(value).is_none() {
+            ReferenceTarget::Unitless
+        } else {
+            ReferenceTarget::Unresolved
+        };
     };
     let ir::Expr::Variable { variable, .. } = expr.as_ref() else {
-        return None;
+        return ReferenceTarget::Unitless;
     };
 
     match variable {
         ir::Variable::Parameter { parameter_name, .. } => {
-            let parameter = scope.parameter(parameter_name)?;
-            Some((scope.clone(), parameter))
+            let Some(parameter) = scope.parameter(parameter_name) else {
+                return ReferenceTarget::Unresolved;
+            };
+            ReferenceTarget::Parameter(scope.clone(), parameter)
         }
         // A parameter that a design adds shadows the builtin with its name,
         // and variable classification turns the builtin into a reference to
         // it everywhere except in design values.
         ir::Variable::Builtin { ident, .. } => match binding {
-            Binding::Scope => {
-                let parameter = scope.parameter(&ParameterName::from(ident.as_str()))?;
-                Some((scope.clone(), parameter))
-            }
-            Binding::Design => None,
+            Binding::Scope => scope
+                .parameter(&ParameterName::from(ident.as_str()))
+                .map_or(ReferenceTarget::Unitless, |parameter| {
+                    ReferenceTarget::Parameter(scope.clone(), parameter)
+                }),
+            Binding::Design => ReferenceTarget::Unitless,
         },
         ir::Variable::External {
             reference_name,
             parameter_name,
             ..
         } => {
-            let target_scope = referenced_scope(scope, reference_name, pool)?;
-            let parameter = target_scope.instance.parameters().get(parameter_name)?;
-            Some((target_scope, parameter))
+            let Some(target_scope) = referenced_scope(scope, reference_name, pool) else {
+                return ReferenceTarget::Unresolved;
+            };
+            let Some(parameter) = target_scope.instance.parameters().get(parameter_name) else {
+                return ReferenceTarget::Unresolved;
+            };
+            ReferenceTarget::Parameter(target_scope, parameter)
         }
     }
 }
@@ -664,6 +704,78 @@ mod tests {
 
         let root = fill(root);
         assert_eq!(unit_of(&root, "G_r"), None);
+    }
+
+    fn reference_dimension_model() -> InstancedModel {
+        model(
+            "root",
+            [
+                parameter("L", lit_number(2.0), Some(kilometers())),
+                parameter("L_r", param_var("L"), None),
+                parameter("n", lit_number(1.0), None),
+                parameter("n_r", param_var("n"), None),
+            ],
+        )
+    }
+
+    #[test]
+    fn physical_to_unitless_override_through_references_has_mismatched_dimensions() {
+        let root = reference_dimension_model();
+        {
+            let pool = ReferencePool::new();
+            let graph = GraphView {
+                root: &root,
+                pool: &pool,
+            };
+            let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+            let target = root
+                .get_parameter(&ParameterName::from("L_r"))
+                .expect("parameter should exist");
+            let overlay = ir::ParameterValue::Simple(Box::new(param_var("n_r")), None);
+            let mut units = UnitResolver::new(graph);
+
+            let target_unit = units
+                .value_unit(target.value(), Binding::of(target), &scope)
+                .expect("physical reference should resolve a unit");
+            let overlay_unit = units
+                .value_unit(&overlay, Binding::Design, &scope)
+                .expect("unitless reference should resolve a dimensionless state");
+
+            assert!(!target_unit.dimension().is_dimensionless());
+            assert!(overlay_unit.dimension().is_dimensionless());
+            assert_ne!(target_unit.dimension(), overlay_unit.dimension());
+        }
+
+        let root = fill(root);
+        assert_eq!(unit_of(&root, "L_r"), Some(&kilometers()));
+        assert_eq!(unit_of(&root, "n_r"), None);
+    }
+
+    #[test]
+    fn unitless_to_physical_override_through_references_has_mismatched_dimensions() {
+        let root = reference_dimension_model();
+        let pool = ReferencePool::new();
+        let graph = GraphView {
+            root: &root,
+            pool: &pool,
+        };
+        let scope = Scope::at(&root, AbsolutePath::Root(InstancePath::root()));
+        let target = root
+            .get_parameter(&ParameterName::from("n_r"))
+            .expect("parameter should exist");
+        let overlay = ir::ParameterValue::Simple(Box::new(param_var("L_r")), None);
+        let mut units = UnitResolver::new(graph);
+
+        let target_unit = units
+            .value_unit(target.value(), Binding::of(target), &scope)
+            .expect("unitless reference should resolve a dimensionless state");
+        let overlay_unit = units
+            .value_unit(&overlay, Binding::Design, &scope)
+            .expect("physical reference should resolve a unit");
+
+        assert!(target_unit.dimension().is_dimensionless());
+        assert!(!overlay_unit.dimension().is_dimensionless());
+        assert_ne!(target_unit.dimension(), overlay_unit.dimension());
     }
 
     #[test]
