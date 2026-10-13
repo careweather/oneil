@@ -1,0 +1,8 @@
+# Design that causes two kinds of error: the `lng` override fails the
+# unit check during composition, and the `x` override introduces a
+# cycle that post-composition validation reports.
+
+design leaf
+
+x = y
+lng = 7 :s

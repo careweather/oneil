@@ -10,6 +10,3 @@ error: unit mismatch: parameter `L` has unit `km` but design applies value with 
 
 error: applied design `length_to_range_after_readd.one` produced invalid contributions
   at fixtures/reference_units/readded_mismatch.on:9:7
-
-error: applied design `length_to_range_after_readd.one` produced invalid contributions
-  at fixtures/reference_units/readded_mismatch.on:9:7

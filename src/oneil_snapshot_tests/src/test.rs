@@ -504,6 +504,14 @@ fn chain_apply_validation_cycle() {
     insta::assert_snapshot!(run_fixture("chain_apply_validation_cycle/parent.on"));
 }
 
+#[test]
+fn apply_with_several_errors_marked_once() {
+    // `mixed` fails a unit check during composition and introduces a cycle
+    // that validation reports. Both errors surface in full, and the `apply`
+    // statement gets a single generic diagnostic.
+    insta::assert_snapshot!(run_fixture("apply_marked_once/parent.on"));
+}
+
 // =============================================================================
 // Python integration
 // =============================================================================
