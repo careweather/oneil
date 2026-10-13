@@ -186,6 +186,11 @@ impl<'a> UnitResolver<'a> {
         binding: Binding,
         scope: Scope<'a>,
     ) -> Option<ValueUnit<'a>> {
+        // Keep pending additions tied to their original path while references
+        // leave that scope. A scoped overlay can later resolve back to it.
+        let pending_additions = scope
+            .additions
+            .map(|additions| (scope.path.clone(), additions));
         let (mut value, mut binding, mut scope) = (value, binding, scope);
         let mut chain = Vec::new();
 
@@ -211,9 +216,14 @@ impl<'a> UnitResolver<'a> {
             if !is_plain_reference(target.value()) {
                 break Some(ValueUnit::Unitless);
             }
-            let Some(target_value_scope) = value_scope(target, &target_scope, self.graph) else {
+            let Some(mut target_value_scope) = value_scope(target, &target_scope, self.graph) else {
                 break None;
             };
+            if let Some((additions_path, additions)) = &pending_additions
+                && same_absolute_path(additions_path, &target_value_scope.path)
+            {
+                target_value_scope.additions = Some(*additions);
+            }
 
             value = target.value();
             binding = Binding::of(target);
@@ -246,6 +256,17 @@ pub(super) fn value_scope<'a>(
     let path = host.path.resolve(anchor_path)?;
     let anchor = host_at_in_view(graph.root, graph.pool, &path)?;
     Some(Scope::at(anchor, path))
+}
+
+fn same_absolute_path(left: &AbsolutePath, right: &AbsolutePath) -> bool {
+    match (left, right) {
+        (AbsolutePath::Root(left), AbsolutePath::Root(right)) => left == right,
+        (
+            AbsolutePath::Pool(left_pool, left_path),
+            AbsolutePath::Pool(right_pool, right_path),
+        ) => left_pool == right_pool && left_path == right_path,
+        _ => false,
+    }
 }
 
 /// Writes the inherited unit into every unannotated plain reference in
@@ -651,6 +672,37 @@ mod tests {
         let unit = UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope);
 
         assert_eq!(unit, Some(ValueUnit::Annotated(&kilometers())));
+    }
+
+    #[test]
+    fn pending_addition_is_kept_when_scoped_overlay_returns_to_anchor() {
+        let root = scoped_overlay_model();
+        let seconds = unit(
+            "s",
+            std::iter::once((Dimension::Time, 1.0)).collect(),
+        );
+        let additions: IndexMap<ParameterName, ir::Parameter> = std::iter::once((
+            ParameterName::from("L"),
+            parameter("L", lit_number(5.0), Some(seconds.clone())),
+        ))
+        .collect();
+        let override_value =
+            ir::ParameterValue::Simple(Box::new(external_var("R", "c")), None);
+        let scope = Scope {
+            instance: &root,
+            path: AbsolutePath::Root(InstancePath::root()),
+            additions: Some(&additions),
+        };
+        let pool = ReferencePool::new();
+        let graph = GraphView {
+            root: &root,
+            pool: &pool,
+        };
+
+        let unit =
+            UnitResolver::new(graph).value_unit(&override_value, Binding::Design, &scope);
+
+        assert_eq!(unit, Some(ValueUnit::Annotated(&seconds)));
     }
 
     #[test]
