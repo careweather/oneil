@@ -2,5 +2,5 @@
 source: src/oneil_snapshot_tests/src/test.rs
 expression: "run_fixture_with_design(\"unit_mismatch_overlay/parent.on\",\n\"unit_mismatch_overlay/mismatch.one\",)"
 ---
-error: unit mismatch: parameter `L` declared as `m` but design applies value with unit `s`
+error: unit mismatch: parameter `L` has unit `m` but design applies value with unit `s`
   at fixtures/unit_mismatch_overlay/mismatch.one:8:1

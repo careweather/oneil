@@ -1,0 +1,9 @@
+# Points the child's `R` at the length `L` with a scoped override, then applies a
+# design that sets `R` to a duration. The nested design's overlay check reads the
+# unit that `R` inherits from the scoped override's anchor, so it rejects `s`.
+
+design parent
+
+R.c = L
+
+apply duration to c

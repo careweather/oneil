@@ -45,20 +45,13 @@ impl Runtime {
         // parse the model and return an error if it fails
         let rc_path: Arc<std::path::Path> = Arc::from(path.as_path());
         let rc_source: Arc<str> = Arc::from(source);
-        match parser::parse_model(
+        let load_result = match parser::parse_model(
             &Arc::clone(&rc_source),
             Some(parser::Config::for_model_path(path, rc_path, rc_source)),
         )
         .into_result()
         {
-            Ok(ast) => {
-                self.ast_cache
-                    .insert(path.clone(), LoadResult::success(ast));
-
-                self.ast_cache
-                    .get_entry(path)
-                    .expect("it was just inserted")
-            }
+            Ok(ast) => LoadResult::success(ast),
             Err(e) => {
                 // need to reload the source for lifetime reasons
                 // TODO: maybe another call to `load_source` once caching works would make more sense?
@@ -66,14 +59,15 @@ impl Runtime {
                 let partial_ast = e.partial_result;
                 let errors = e.error_collection;
 
-                self.ast_cache
-                    .insert(path.clone(), LoadResult::partial(partial_ast, errors));
-
-                self.ast_cache
-                    .get_entry(path)
-                    .expect("it was just inserted")
+                LoadResult::partial(partial_ast, errors)
             }
-        }
+        };
+
+        self.ast_cache.insert(path.clone(), load_result);
+
+        self.ast_cache
+            .get_entry(path)
+            .expect("it was just inserted")
     }
 
     pub(super) fn parse_expression(expression: &str) -> Result<ast::ExprNode, ParserError> {

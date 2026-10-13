@@ -82,6 +82,133 @@ fn basic_failing_test() {
 }
 
 #[test]
+fn basic_reference_inherits_unit() {
+    // A parameter whose value is only a reference, local or `p.r`, inherits
+    // the referenced parameter's unit and display unit without an annotation.
+    // A reference to a dimensionless parameter becomes a plain number.
+    insta::assert_snapshot!(run_fixture("reference_units/parent.on"));
+}
+
+#[test]
+fn overlay_reference_inherits_unit() {
+    // A design override that is a plain reference inherits the referenced unit
+    // in the design's anchor scope, and the overlay check compares it with the
+    // unit that the overridden plain reference inherits.
+    insta::assert_snapshot!(run_fixture("reference_units/overlay.one"));
+}
+
+#[test]
+fn overlay_reference_unit_mismatch() {
+    // A plain reference to a power cannot override a plain reference to a
+    // length, because both carry their inherited units into the overlay check.
+    insta::assert_snapshot!(run_fixture("reference_units/mismatch.one"));
+}
+
+#[test]
+fn overlay_reference_to_addition_unit_mismatch() {
+    // An override that is a plain reference to a parameter that the same
+    // design adds inherits the addition's unit in the overlay check.
+    insta::assert_snapshot!(run_fixture("reference_units/addition_mismatch.one"));
+}
+
+#[test]
+fn nested_override_of_scoped_reference_unit_mismatch() {
+    // A parameter that a scoped override set to a plain reference keeps the
+    // unit it inherits from the override's anchor when a later design
+    // overrides it again.
+    insta::assert_snapshot!(run_fixture("reference_units/nested_mismatch.one"));
+}
+
+#[test]
+fn second_scoped_override_of_reference_unit_mismatch() {
+    // A second scoped override of the same parameter is checked against the
+    // unit that the first one's reference inherits.
+    insta::assert_snapshot!(run_fixture("reference_units/two_scoped_mismatch.on"));
+}
+
+#[test]
+fn override_of_reference_to_scoped_reference_unit_mismatch() {
+    // A reference to a parameter that a scoped override set to a plain
+    // reference inherits the unit from the override's anchor when a later
+    // design overrides it.
+    insta::assert_snapshot!(run_fixture("reference_units/chained_scoped_mismatch.on"));
+}
+
+#[test]
+fn overlay_reference_to_scoped_reference_unit_mismatch() {
+    // An override value that references a parameter that a scoped override set
+    // to a plain reference inherits the unit from the override's anchor.
+    insta::assert_snapshot!(run_fixture("reference_units/chained_overlay_mismatch.on"));
+}
+
+#[test]
+fn overlay_reference_through_scoped_reference_to_readded_parameter_unit_mismatch() {
+    // An override value that reaches the design's target through an earlier
+    // scoped override sees a parameter that the design adds there, including
+    // one that replaces a parameter an earlier design added.
+    insta::assert_snapshot!(run_fixture("reference_units/readded_mismatch.on"));
+}
+
+#[test]
+fn readded_parameter_unit_mismatch() {
+    // A design can't replace a parameter that an earlier design added with one
+    // of other dimensions, because references to it would follow.
+    insta::assert_snapshot!(run_fixture("reference_units/readded_duration_mismatch.on"));
+}
+
+#[test]
+fn readded_parameter_keeps_dimensions() {
+    // A design can replace a parameter that an earlier design added with one in
+    // another unit of the same dimensions.
+    insta::assert_snapshot!(run_fixture("reference_units/readded_length.on"));
+}
+
+#[test]
+fn overlay_dimensionless_reference_unit_mismatch() {
+    // A reference to a dimensionless parameter can't override a length.
+    insta::assert_snapshot!(run_fixture("reference_units/length_to_gain.one"));
+}
+
+#[test]
+fn overlay_onto_dimensionless_reference_unit_mismatch() {
+    // A length can't override a reference to a dimensionless parameter.
+    insta::assert_snapshot!(run_fixture("reference_units/gain_to_length.one"));
+}
+
+#[test]
+fn overlay_unitless_reference_unit_mismatch() {
+    // A reference to a parameter without a unit can't override a length.
+    insta::assert_snapshot!(run_fixture("reference_units/length_to_unitless.one"));
+}
+
+#[test]
+fn overlay_onto_unitless_reference_unit_mismatch() {
+    // A length can't override a reference to a parameter without a unit.
+    insta::assert_snapshot!(run_fixture("reference_units/unitless_to_length.one"));
+}
+
+#[test]
+fn design_builtin_ignores_later_design_parameter_with_its_name() {
+    // A design value that names a builtin keeps the builtin when a later
+    // design adds a parameter with that name.
+    insta::assert_snapshot!(run_fixture("reference_units/shadow_after_builtin.on"));
+}
+
+#[test]
+fn reference_follows_design_display_unit() {
+    // A plain reference inherits the unit that its target has after every
+    // design applies, not the unit the target had in the base model.
+    insta::assert_snapshot!(run_fixture("reference_units/display_unit.one"));
+}
+
+#[test]
+fn reference_to_shadowed_builtin_inherits_unit() {
+    // A design parameter that shadows a builtin turns a plain reference to the
+    // builtin into a reference to the parameter, which then has a unit.
+    insta::assert_snapshot!(run_fixture("reference_units/shadow.one"));
+}
+
+#[test]
 fn basic_undefined_reference_parameter() {
     // A cross-file reference whose parameter access names a parameter that
     // does not exist on the referenced model.  This exercises the
@@ -375,6 +502,14 @@ fn chain_apply_validation_cycle() {
     // Chain provenance fans out: `ParameterCycle` errors against `leaf.on` and
     // a generic contribution diagnostic at `mid.on`'s `apply` span.
     insta::assert_snapshot!(run_fixture("chain_apply_validation_cycle/parent.on"));
+}
+
+#[test]
+fn apply_with_several_errors_marked_once() {
+    // `mixed` fails a unit check during composition and introduces a cycle
+    // that validation reports. Both errors surface in full, and the `apply`
+    // statement gets a single generic diagnostic.
+    insta::assert_snapshot!(run_fixture("apply_marked_once/parent.on"));
 }
 
 // =============================================================================

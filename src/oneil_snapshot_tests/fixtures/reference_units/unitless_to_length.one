@@ -1,0 +1,5 @@
+# Sets the reference to the count, which has no unit, to the length.
+
+design unitless
+
+n_r = L

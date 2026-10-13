@@ -1,0 +1,5 @@
+# A count without a unit, a plain reference to it, and a length.
+
+Count: n = 1
+Count reference: n_r = n
+Length: L = 2 :km

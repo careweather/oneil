@@ -1,0 +1,5 @@
+# Sets the child's range to a duration with a scoped override.
+
+design parent
+
+R.c = 5 :s

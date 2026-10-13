@@ -1,0 +1,8 @@
+# Applies a design whose scoped override points the child's range at the length
+# `L`, then a design that sets `R_c`, a reference to that range, to a duration.
+# The second design can't change the reference's dimensions.
+
+submodel parent as p
+
+apply range_to_length to p
+apply range_reference_to_duration to p

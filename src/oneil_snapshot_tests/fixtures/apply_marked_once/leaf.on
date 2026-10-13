@@ -1,0 +1,7 @@
+# Leaf model targeted by `mixed.one`. The design retargets `x` onto `y`,
+# which closes a cycle with `y = 2 * x`, and overrides the length `lng`
+# with a duration.
+
+First: x = 1
+Second: y = 2 * x
+Length: lng = 5 :m

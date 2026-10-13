@@ -1,0 +1,956 @@
+//! Units that plain parameter references inherit.
+//!
+//! A parameter whose value is only a reference to another parameter, such as
+//! `P_l = P_t.r`, and that has no unit annotation takes the unit of the
+//! parameter it references. Composition writes that unit into the reference's
+//! IR value after every design is applied, so validation, evaluation, and the
+//! rendered view read it like an explicit annotation, and a design that
+//! changes the referenced parameter's unit changes the inherited unit too. The
+//! design overlay unit check runs while designs are still being applied, so it
+//! reads inherited units through [`UnitResolver::value_unit`] without writing
+//! them. A [`GraphView`] carries the parameters that the design being applied
+//! adds, so every reference that reaches the design's target sees them.
+//!
+//! Only units with physical dimensions are written. A reference to a
+//! dimensionless unit, such as `dB` or `%`, stays unannotated and evaluates to
+//! a plain number, because `strip` and limits without units read a value in
+//! its display unit. [`UnitResolver::value_unit`] still returns the
+//! dimensionless unit, so the overlay unit check can compare its dimensions.
+//! It returns [`ValueUnit::Unitless`] for a reference to a parameter without a
+//! unit, which the check also counts as dimensionless.
+
+use std::rc::Rc;
+
+use indexmap::IndexMap;
+use oneil_ir as ir;
+use oneil_shared::{
+    InstancePath, RelativePath,
+    paths::ModelPath,
+    symbols::{ParameterName, ReferenceName},
+};
+
+use super::{
+    InstancedModel,
+    graph::{AbsolutePath, host_at_in_view},
+};
+
+type ReferencePool = IndexMap<ModelPath, Box<InstancedModel>>;
+type Additions = IndexMap<ParameterName, ir::Parameter>;
+
+/// The instances that references resolve in: the root model's tree and the
+/// reference pool, plus the parameters that a design being applied adds.
+#[derive(Clone, Copy)]
+pub(super) struct GraphView<'a> {
+    root: &'a InstancedModel,
+    pool: &'a ReferencePool,
+    // The instance that a design is being applied to and the parameters that
+    // the design adds to it, which aren't in the graph yet.
+    additions: Option<(&'a InstancedModel, &'a Additions)>,
+}
+
+impl<'a> GraphView<'a> {
+    pub(super) const fn new(root: &'a InstancedModel, pool: &'a ReferencePool) -> Self {
+        Self {
+            root,
+            pool,
+            additions: None,
+        }
+    }
+
+    /// Returns this view with `additions` pending on `host`, the instance that
+    /// a design is being applied to.
+    pub(super) const fn with_additions(
+        self,
+        host: &'a InstancedModel,
+        additions: &'a Additions,
+    ) -> Self {
+        Self {
+            additions: Some((host, additions)),
+            ..self
+        }
+    }
+
+    /// Returns the scope of `instance`, which lives at `path`, including the
+    /// pending additions when `instance` is their host.
+    pub(super) fn scope(self, instance: &'a InstancedModel, path: AbsolutePath) -> Scope<'a> {
+        self.scope_in(instance, Location::At(path))
+    }
+
+    fn scope_in(self, instance: &'a InstancedModel, location: Location<'a>) -> Scope<'a> {
+        let additions = self
+            .additions
+            .filter(|(host, _)| std::ptr::eq(*host, instance))
+            .map(|(_, additions)| additions);
+        Scope {
+            instance,
+            location: Rc::new(location),
+            additions,
+        }
+    }
+}
+
+/// The names that a parameter value resolves against: an instance and where
+/// it lives, plus the parameters that a design being applied to it adds.
+#[derive(Clone)]
+pub(super) struct Scope<'a> {
+    instance: &'a InstancedModel,
+    location: Rc<Location<'a>>,
+    additions: Option<&'a Additions>,
+}
+
+/// Where the instance of a scope lives.
+///
+/// A submodel's scope keeps its parent's scope instead of a copy of its path,
+/// so reaching a submodel takes constant time and an anchor above it is found
+/// by walking up.
+enum Location<'a> {
+    /// The instance at this path.
+    At(AbsolutePath),
+    /// A submodel of the instance of this parent scope.
+    Submodel(Scope<'a>),
+}
+
+impl<'a> Scope<'a> {
+    pub(super) const fn instance(&self) -> &'a InstancedModel {
+        self.instance
+    }
+
+    fn parameter(&self, name: &ParameterName) -> Option<&'a ir::Parameter> {
+        self.additions
+            .and_then(|additions| additions.get(name))
+            .or_else(|| self.instance.parameters().get(name))
+    }
+
+    /// Returns the scope of the submodel `alias` on this scope's instance.
+    fn submodel(&self, alias: &ReferenceName, graph: GraphView<'a>) -> Option<Self> {
+        let submodel = self.instance.submodels().get(alias)?;
+        Some(graph.scope_in(&submodel.instance, Location::Submodel(self.clone())))
+    }
+
+    /// Returns the scope that `segment` names below this scope's instance: a
+    /// submodel, or a `with` alias that leads through submodels.
+    fn descend(&self, segment: &ReferenceName, graph: GraphView<'a>) -> Option<Self> {
+        if let Some(scope) = self.submodel(segment, graph) {
+            return Some(scope);
+        }
+        let alias = self.instance.aliases().get(segment)?;
+        alias
+            .alias_path
+            .segments()
+            .iter()
+            .try_fold(self.clone(), |scope, segment| {
+                scope.submodel(segment, graph)
+            })
+    }
+
+    /// Returns the scope that `relative` leads to from this scope, or `None`
+    /// when it walks above the root of this scope's tree.
+    fn resolve(&self, relative: &RelativePath, graph: GraphView<'a>) -> Option<Self> {
+        let mut ancestor = self.clone();
+        for walked in 0..relative.up {
+            let parent = match ancestor.location.as_ref() {
+                Location::Submodel(parent) => parent.clone(),
+                Location::At(path) => {
+                    let rest = RelativePath {
+                        up: relative.up - walked,
+                        down: relative.down.clone(),
+                    };
+                    let path = path.resolve(&rest)?;
+                    let instance = host_at_in_view(graph.root, graph.pool, &path)?;
+                    return Some(graph.scope(instance, path));
+                }
+            };
+            ancestor = parent;
+        }
+        relative
+            .down
+            .iter()
+            .try_fold(ancestor, |scope, segment| scope.descend(segment, graph))
+    }
+}
+
+/// How the bare names in a parameter value are bound.
+#[derive(Clone, Copy)]
+pub(super) enum Binding {
+    /// Variable classification binds them after composition, so a builtin
+    /// name refers to a parameter with that name in the value's scope, such
+    /// as one that a design adds.
+    Scope,
+    /// The design resolver bound them when it resolved the design, and
+    /// variable classification keeps them.
+    Design,
+}
+
+impl Binding {
+    /// Returns how the bare names in `parameter`'s value are bound.
+    pub(super) const fn of(parameter: &ir::Parameter) -> Self {
+        if parameter.design_provenance().is_some() {
+            Self::Design
+        } else {
+            Self::Scope
+        }
+    }
+}
+
+/// The unit of a parameter value, as the design overlay unit check sees it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum ValueUnit<'a> {
+    /// A unit annotation, on the value or on the parameter that its plain
+    /// reference reaches.
+    Annotated(&'a ir::CompositeUnit),
+    /// No unit, because the plain reference reaches a parameter that has no
+    /// annotation and isn't a reference. That parameter evaluates to a plain
+    /// number, or fails because it's missing a unit.
+    Unitless,
+}
+
+impl<'a> ValueUnit<'a> {
+    /// Returns whether `self` and `other` have the same dimensions, counting a
+    /// value without a unit as dimensionless.
+    pub(super) fn has_same_dimensions(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::Annotated(unit), Self::Annotated(other)) => {
+                unit.dimension() == other.dimension()
+            }
+            (Self::Annotated(unit), Self::Unitless) | (Self::Unitless, Self::Annotated(unit)) => {
+                unit.dimension().is_dimensionless()
+            }
+            (Self::Unitless, Self::Unitless) => true,
+        }
+    }
+
+    const fn annotation(self) -> Option<&'a ir::CompositeUnit> {
+        match self {
+            Self::Annotated(unit) => Some(unit),
+            Self::Unitless => None,
+        }
+    }
+}
+
+/// Finds the units that plain references reach in one view of the graph.
+///
+/// It remembers the unit that each referenced parameter reaches, so every
+/// parameter is resolved once. It's only valid while the graph view stays the
+/// same.
+pub(super) struct UnitResolver<'a> {
+    graph: GraphView<'a>,
+    // Keyed by address, because every instance of a model has parameters with
+    // the same names.
+    reached: IndexMap<*const ir::Parameter, Option<ValueUnit<'a>>>,
+}
+
+impl<'a> UnitResolver<'a> {
+    pub(super) fn new(graph: GraphView<'a>) -> Self {
+        Self {
+            graph,
+            reached: IndexMap::new(),
+        }
+    }
+
+    /// Returns the unit of `value`: its annotation, or else the unit that it
+    /// reaches as a plain reference resolved in `scope`, including a
+    /// dimensionless one.
+    pub(super) fn value_unit(
+        &mut self,
+        value: &'a ir::ParameterValue,
+        binding: Binding,
+        scope: &Scope<'a>,
+    ) -> Option<ValueUnit<'a>> {
+        annotated_unit(value)
+            .map(ValueUnit::Annotated)
+            .or_else(|| self.referenced_unit(value, binding, scope.clone()))
+    }
+
+    /// Returns the unit that `value` inherits when it is an unannotated plain
+    /// reference to a unit with physical dimensions.
+    fn inherited_unit(
+        &mut self,
+        value: &'a ir::ParameterValue,
+        binding: Binding,
+        scope: Scope<'a>,
+    ) -> Option<&'a ir::CompositeUnit> {
+        self.referenced_unit(value, binding, scope)
+            .and_then(ValueUnit::annotation)
+            .filter(|unit| !unit.dimension().is_dimensionless())
+    }
+
+    /// Returns the unit that `value` reaches when it is an unannotated plain
+    /// reference: the annotation of its target, possibly through further
+    /// plain references, or no unit when the chain ends at an unannotated
+    /// parameter that isn't a reference.
+    ///
+    /// The chain continues through a scoped design overlay in the anchor that
+    /// the overlay recorded.
+    fn referenced_unit(
+        &mut self,
+        value: &'a ir::ParameterValue,
+        binding: Binding,
+        scope: Scope<'a>,
+    ) -> Option<ValueUnit<'a>> {
+        let (mut value, mut binding, mut scope) = (value, binding, scope);
+        let mut chain = Vec::new();
+
+        let unit = loop {
+            let Some((target_scope, target)) = reference_target(value, binding, &scope, self.graph)
+            else {
+                break None;
+            };
+
+            // A parameter that is still on the chain reaches no unit, because
+            // references that form a cycle have no unit to inherit.
+            let key = std::ptr::from_ref(target);
+            if let Some(&unit) = self.reached.get(&key) {
+                break unit;
+            }
+            self.reached.insert(key, None);
+            chain.push(key);
+
+            if let Some(unit) = annotated_unit(target.value()) {
+                break Some(ValueUnit::Annotated(unit));
+            }
+            if !is_plain_reference(target.value()) {
+                break Some(ValueUnit::Unitless);
+            }
+            let Some(target_value_scope) = value_scope(target, &target_scope, self.graph) else {
+                break None;
+            };
+
+            value = target.value();
+            binding = Binding::of(target);
+            scope = target_value_scope;
+        };
+
+        for key in chain {
+            self.reached.insert(key, unit);
+        }
+        unit
+    }
+}
+
+/// Returns the scope that `parameter`, which lives in `host`, resolves its
+/// value in: the anchor that a scoped design overlay recorded, or else `host`.
+///
+/// Returns `None` when the anchor lies above the root of `host`'s tree.
+pub(super) fn value_scope<'a>(
+    parameter: &ir::Parameter,
+    host: &Scope<'a>,
+    graph: GraphView<'a>,
+) -> Option<Scope<'a>> {
+    let anchor_path = parameter
+        .design_provenance()
+        .map(|provenance| &provenance.anchor_path)
+        .filter(|anchor_path| !anchor_path.is_self());
+    let Some(anchor_path) = anchor_path else {
+        return Some(host.clone());
+    };
+    host.resolve(anchor_path, graph)
+}
+
+/// Writes the unit that each unannotated plain reference in `root`'s subtree
+/// and in `pool` inherits, for references that reach a unit with physical
+/// dimensions.
+pub(super) fn fill_inherited_units(root: &mut InstancedModel, pool: &mut ReferencePool) {
+    let (root_fills, pool_fills) = {
+        let graph = GraphView::new(&*root, &*pool);
+        let mut units = UnitResolver::new(graph);
+        let root_scope = graph.scope(graph.root, AbsolutePath::Root(InstancePath::root()));
+        let root_fills = collect_fills(&root_scope, &mut units);
+        let pool_fills: Vec<(ModelPath, UnitFills)> = graph
+            .pool
+            .iter()
+            .map(|(model_path, instance)| {
+                let path = AbsolutePath::Pool(model_path.clone(), InstancePath::root());
+                let scope = graph.scope(instance, path);
+                (model_path.clone(), collect_fills(&scope, &mut units))
+            })
+            .collect();
+        (root_fills, pool_fills)
+    };
+
+    apply_fills(root, root_fills);
+    for (model_path, fills) in pool_fills {
+        let instance = pool
+            .get_mut(&model_path)
+            .expect("fills are collected from existing pool entries");
+        apply_fills(instance, fills);
+    }
+}
+
+/// The units to write into the parameters of one instance and of its
+/// submodels, shaped like the instance tree so that writing them visits each
+/// submodel once.
+struct UnitFills {
+    parameters: Vec<(ParameterName, ir::CompositeUnit)>,
+    submodels: Vec<(ReferenceName, Self)>,
+}
+
+impl UnitFills {
+    const fn is_empty(&self) -> bool {
+        self.parameters.is_empty() && self.submodels.is_empty()
+    }
+}
+
+/// Returns the fills for the instance of `host` and its submodels.
+fn collect_fills<'a>(host: &Scope<'a>, units: &mut UnitResolver<'a>) -> UnitFills {
+    let parameters = host
+        .instance
+        .parameters()
+        .iter()
+        .filter_map(|(name, parameter)| {
+            let scope = value_scope(parameter, host, units.graph)?;
+            let unit = units.inherited_unit(parameter.value(), Binding::of(parameter), scope)?;
+            Some((name.clone(), unit.clone()))
+        })
+        .collect();
+    let submodels = host
+        .instance
+        .submodels()
+        .iter()
+        .map(|(alias, submodel)| {
+            let location = Location::Submodel(host.clone());
+            let scope = units.graph.scope_in(&submodel.instance, location);
+            (alias.clone(), collect_fills(&scope, units))
+        })
+        .filter(|(_, fills)| !fills.is_empty())
+        .collect();
+    UnitFills {
+        parameters,
+        submodels,
+    }
+}
+
+fn apply_fills(node: &mut InstancedModel, fills: UnitFills) {
+    for (name, unit) in fills.parameters {
+        let parameter = node
+            .parameters_mut()
+            .get_mut(&name)
+            .expect("fills are collected from existing parameters");
+        if let ir::ParameterValue::Simple(_, unit_slot) = parameter.value_mut() {
+            *unit_slot = Some(unit);
+        }
+    }
+    for (alias, submodel_fills) in fills.submodels {
+        let submodel = node
+            .submodels_mut()
+            .get_mut(&alias)
+            .expect("fills are collected from existing submodels");
+        apply_fills(&mut submodel.instance, submodel_fills);
+    }
+}
+
+/// Returns the unit written on `value`, if any.
+pub(super) const fn annotated_unit(value: &ir::ParameterValue) -> Option<&ir::CompositeUnit> {
+    match value {
+        ir::ParameterValue::Simple(_, unit) | ir::ParameterValue::Piecewise(_, unit) => {
+            unit.as_ref()
+        }
+    }
+}
+
+/// Returns whether `value` is a single variable without a unit annotation.
+fn is_plain_reference(value: &ir::ParameterValue) -> bool {
+    matches!(
+        value,
+        ir::ParameterValue::Simple(expr, None) if matches!(**expr, ir::Expr::Variable { .. })
+    )
+}
+
+/// Returns the scope and parameter that `value` refers to when it is an
+/// unannotated plain reference resolved in `scope`.
+fn reference_target<'a>(
+    value: &'a ir::ParameterValue,
+    binding: Binding,
+    scope: &Scope<'a>,
+    graph: GraphView<'a>,
+) -> Option<(Scope<'a>, &'a ir::Parameter)> {
+    let ir::ParameterValue::Simple(expr, None) = value else {
+        return None;
+    };
+    let ir::Expr::Variable { variable, .. } = expr.as_ref() else {
+        return None;
+    };
+
+    match variable {
+        ir::Variable::Parameter { parameter_name, .. } => {
+            let parameter = scope.parameter(parameter_name)?;
+            Some((scope.clone(), parameter))
+        }
+        // A parameter that a design adds shadows the builtin with its name,
+        // and variable classification turns the builtin into a reference to
+        // it everywhere except in design values.
+        ir::Variable::Builtin { ident, .. } => match binding {
+            Binding::Scope => {
+                let parameter = scope.parameter(&ParameterName::from(ident.as_str()))?;
+                Some((scope.clone(), parameter))
+            }
+            Binding::Design => None,
+        },
+        ir::Variable::External {
+            reference_name,
+            parameter_name,
+            ..
+        } => {
+            let target_scope = referenced_scope(scope, reference_name, graph)?;
+            let parameter = target_scope.parameter(parameter_name)?;
+            Some((target_scope, parameter))
+        }
+    }
+}
+
+/// Returns the scope of the instance that `reference_name` names on the
+/// instance of `host`, through a `reference`, a `submodel`, or a `with` alias.
+fn referenced_scope<'a>(
+    host: &Scope<'a>,
+    reference_name: &ReferenceName,
+    graph: GraphView<'a>,
+) -> Option<Scope<'a>> {
+    let direct = |name: &ReferenceName| {
+        let Some(reference) = host.instance.references().get(name) else {
+            return host.submodel(name, graph);
+        };
+        let instance = graph.pool.get(&reference.path)?;
+        let path = AbsolutePath::Pool(reference.path.clone(), InstancePath::root());
+        Some(graph.scope(instance, path))
+    };
+
+    if let Some(scope) = direct(reference_name) {
+        return Some(scope);
+    }
+
+    // An alias path starts at a submodel or reference of the host and then
+    // descends through submodels.
+    let alias = host.instance.aliases().get(reference_name)?;
+    let (first, rest) = alias.alias_path.segments().split_first()?;
+    rest.iter().try_fold(direct(first)?, |scope, segment| {
+        scope.submodel(segment, graph)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use indexmap::IndexMap;
+    use oneil_ir::{
+        self as ir,
+        test_helpers::{
+            expr::{binary, builtin_var, external_var, lit_number, param_var},
+            parameter::build_parameter_from_expr,
+        },
+    };
+    use oneil_output::{Dimension, DimensionMap};
+    use oneil_shared::{
+        InstancePath, RelativePath,
+        span::Span,
+        symbols::{ParameterName, ReferenceName, SubmodelName},
+    };
+
+    use super::{Binding, GraphView, ReferencePool, UnitResolver, ValueUnit, fill_inherited_units};
+    use crate::{
+        instance::{InstancedModel, ReferenceImport, SubmodelImport, graph::AbsolutePath},
+        test::test_model_path,
+    };
+
+    fn unit(name: &str, dimension: DimensionMap) -> ir::CompositeUnit {
+        ir::CompositeUnit::new(
+            Vec::new(),
+            ir::DisplayCompositeUnit::BaseUnit(ir::DisplayUnit::new(name.to_string(), 1.0)),
+            Span::synthetic(),
+            dimension,
+        )
+    }
+
+    fn distance() -> DimensionMap {
+        std::iter::once((Dimension::Distance, 1.0)).collect()
+    }
+
+    fn kilometers() -> ir::CompositeUnit {
+        unit("km", distance())
+    }
+
+    fn parameter(name: &str, expr: ir::Expr, unit: Option<ir::CompositeUnit>) -> ir::Parameter {
+        build_parameter_from_expr(name, expr, unit, ir::Limits::default())
+    }
+
+    fn model(name: &str, parameters: impl IntoIterator<Item = ir::Parameter>) -> InstancedModel {
+        let mut model = InstancedModel::empty_for(test_model_path(name));
+        for parameter in parameters {
+            model.add_parameter(parameter.name().clone(), parameter);
+        }
+        model
+    }
+
+    fn add_child(parent: &mut InstancedModel, alias: &str, child: InstancedModel) {
+        parent.add_submodel(
+            ReferenceName::from(alias),
+            SubmodelImport {
+                name: SubmodelName::new(alias.to_string()),
+                name_span: Span::synthetic(),
+                alias: Some(ReferenceName::from(alias)),
+                alias_span: None,
+                instance: Box::new(child),
+            },
+        );
+    }
+
+    fn unit_of<'a>(model: &'a InstancedModel, name: &str) -> Option<&'a ir::CompositeUnit> {
+        let parameter = model
+            .get_parameter(&ParameterName::from(name))
+            .expect("parameter should exist");
+        match parameter.value() {
+            ir::ParameterValue::Simple(_, unit) | ir::ParameterValue::Piecewise(_, unit) => {
+                unit.as_ref()
+            }
+        }
+    }
+
+    fn fill(mut root: InstancedModel) -> InstancedModel {
+        fill_inherited_units(&mut root, &mut ReferencePool::new());
+        root
+    }
+
+    #[test]
+    fn local_reference_inherits_unit() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("L", lit_number(2.0), Some(kilometers())),
+                parameter("L_r", param_var("L"), None),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "L_r"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn submodel_reference_inherits_unit() {
+        let child = model(
+            "child",
+            [parameter("R", lit_number(3.0), Some(kilometers()))],
+        );
+        let mut root = model("root", [parameter("R_c", external_var("R", "c"), None)]);
+        add_child(&mut root, "c", child);
+
+        let root = fill(root);
+
+        assert_eq!(unit_of(&root, "R_c"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn pooled_reference_and_pool_entry_inherit_units() {
+        let child_path = test_model_path("child");
+        let child = model(
+            "child",
+            [
+                parameter("R", lit_number(3.0), Some(kilometers())),
+                parameter("R_l", param_var("R"), None),
+            ],
+        );
+        let mut pool: ReferencePool = IndexMap::new();
+        pool.insert(child_path.clone(), Box::new(child));
+
+        let mut root = model("root", [parameter("R_r", external_var("R", "r"), None)]);
+        root.add_reference(
+            ReferenceName::from("r"),
+            ReferenceImport::new(
+                ReferenceName::from("child"),
+                Span::synthetic(),
+                Some(ReferenceName::from("r")),
+                None,
+                child_path.clone(),
+            ),
+        );
+
+        fill_inherited_units(&mut root, &mut pool);
+
+        assert_eq!(unit_of(&root, "R_r"), Some(&kilometers()));
+        assert_eq!(unit_of(&pool[&child_path], "R_l"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn reference_chain_inherits_unit() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("a", param_var("b"), None),
+                parameter("b", param_var("c"), None),
+                parameter("c", lit_number(1.0), Some(kilometers())),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "a"), Some(&kilometers()));
+        assert_eq!(unit_of(&root, "b"), Some(&kilometers()));
+    }
+
+    /// A root with `L = 2 :km` and `R_c = R.c`, where a scoped design overlay
+    /// anchored at the root sets the child's `R` to `L`.
+    fn scoped_overlay_model() -> InstancedModel {
+        let provenance = ir::DesignProvenance {
+            design_path: test_model_path("design"),
+            is_addition: false,
+            assignment_span: Span::synthetic(),
+            anchor_path: RelativePath {
+                up: 1,
+                down: Vec::new(),
+            },
+            applied_via: None,
+        };
+        let overlay = parameter("R", param_var("L"), None).with_design_provenance(provenance);
+        let mut root = model(
+            "root",
+            [
+                parameter("L", lit_number(2.0), Some(kilometers())),
+                parameter("R_c", external_var("R", "c"), None),
+            ],
+        );
+        add_child(&mut root, "c", model("child", [overlay]));
+        root
+    }
+
+    #[test]
+    fn scoped_overlay_and_reference_to_it_inherit_units() {
+        let root = fill(scoped_overlay_model());
+
+        let child = &root.submodels()[&ReferenceName::from("c")].instance;
+        assert_eq!(unit_of(child, "R"), Some(&kilometers()));
+        assert_eq!(unit_of(&root, "R_c"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn reference_through_unfilled_scoped_overlay_has_unit() {
+        let root = scoped_overlay_model();
+        let pool = ReferencePool::new();
+        let graph = GraphView::new(&root, &pool);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("R_c"))
+            .expect("parameter should exist");
+
+        let unit = UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope);
+
+        assert_eq!(unit, Some(ValueUnit::Annotated(&kilometers())));
+    }
+
+    #[test]
+    fn reference_through_scoped_overlay_sees_pending_additions() {
+        let root = scoped_overlay_model();
+        let seconds = unit("s", std::iter::once((Dimension::Time, 1.0)).collect());
+        let additions: IndexMap<ParameterName, ir::Parameter> = std::iter::once((
+            ParameterName::from("L"),
+            parameter("L", lit_number(5.0), Some(seconds.clone())),
+        ))
+        .collect();
+        let pool = ReferencePool::new();
+        let graph = GraphView::new(&root, &pool).with_additions(&root, &additions);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("R_c"))
+            .expect("parameter should exist");
+
+        let unit = UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope);
+
+        assert_eq!(unit, Some(ValueUnit::Annotated(&seconds)));
+    }
+
+    #[test]
+    fn deeply_nested_references_inherit_units() {
+        const DEPTH: usize = 200;
+        let leaf = model(
+            "leaf",
+            [parameter("x", lit_number(1.0), Some(kilometers()))],
+        );
+        let root = (0..DEPTH).fold(leaf, |child, level| {
+            let mut parent = model(
+                &format!("level_{level}"),
+                [parameter("x", external_var("x", "s"), None)],
+            );
+            add_child(&mut parent, "s", child);
+            parent
+        });
+
+        let root = fill(root);
+
+        let alias = ReferenceName::from("s");
+        let mut node = &root;
+        for _ in 0..DEPTH {
+            assert_eq!(unit_of(node, "x"), Some(&kilometers()));
+            node = &node.submodels()[&alias].instance;
+        }
+    }
+
+    #[test]
+    fn reference_to_shadowed_builtin_inherits_unit() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("pi", lit_number(3.0), Some(kilometers())),
+                parameter("t", builtin_var("pi"), None),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "t"), Some(&kilometers()));
+    }
+
+    #[test]
+    fn reference_to_design_addition_has_unit() {
+        let host = model("root", []);
+        let additions: IndexMap<ParameterName, ir::Parameter> = std::iter::once((
+            ParameterName::from("d"),
+            parameter("d", lit_number(5.0), Some(kilometers())),
+        ))
+        .collect();
+        let override_value = ir::ParameterValue::Simple(Box::new(param_var("d")), None);
+        let pool = ReferencePool::new();
+        let graph = GraphView::new(&host, &pool).with_additions(&host, &additions);
+        let scope = graph.scope(&host, AbsolutePath::Root(InstancePath::root()));
+
+        let unit = UnitResolver::new(graph).value_unit(&override_value, Binding::Design, &scope);
+
+        assert_eq!(unit, Some(ValueUnit::Annotated(&kilometers())));
+    }
+
+    #[test]
+    fn dimensionless_reference_has_unit_but_stays_unannotated() {
+        let decibels = unit("dB", DimensionMap::dimensionless());
+        let root = model(
+            "root",
+            [
+                parameter("G", lit_number(18.0), Some(decibels.clone())),
+                parameter("G_r", param_var("G"), None),
+            ],
+        );
+        let pool = ReferencePool::new();
+        let graph = GraphView::new(&root, &pool);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("G_r"))
+            .expect("parameter should exist");
+
+        assert_eq!(
+            UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope),
+            Some(ValueUnit::Annotated(&decibels))
+        );
+
+        let root = fill(root);
+        assert_eq!(unit_of(&root, "G_r"), None);
+    }
+
+    #[test]
+    fn reference_to_unitless_parameter_is_unitless_and_stays_unannotated() {
+        let root = model(
+            "root",
+            [
+                parameter("n", lit_number(1.0), None),
+                parameter("n_r", param_var("n"), None),
+            ],
+        );
+        let pool = ReferencePool::new();
+        let graph = GraphView::new(&root, &pool);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("n_r"))
+            .expect("parameter should exist");
+
+        assert_eq!(
+            UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope),
+            Some(ValueUnit::Unitless)
+        );
+
+        let root = fill(root);
+        assert_eq!(unit_of(&root, "n_r"), None);
+    }
+
+    #[test]
+    fn undefined_reference_has_unknown_unit() {
+        let root = model("root", [parameter("x", param_var("missing"), None)]);
+        let pool = ReferencePool::new();
+        let graph = GraphView::new(&root, &pool);
+        let scope = graph.scope(&root, AbsolutePath::Root(InstancePath::root()));
+        let reference = root
+            .get_parameter(&ParameterName::from("x"))
+            .expect("parameter should exist");
+
+        assert_eq!(
+            UnitResolver::new(graph).value_unit(reference.value(), Binding::Scope, &scope),
+            None
+        );
+    }
+
+    #[test]
+    fn calculation_stays_unannotated() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("L", lit_number(2.0), Some(kilometers())),
+                parameter(
+                    "L_2",
+                    binary(ir::BinaryOp::Mul, lit_number(2.0), param_var("L")),
+                    None,
+                ),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "L_2"), None);
+    }
+
+    #[test]
+    fn annotated_reference_keeps_its_unit() {
+        let meters = unit("m", distance());
+        let root = fill(model(
+            "root",
+            [
+                parameter("L", lit_number(2.0), Some(kilometers())),
+                parameter("L_m", param_var("L"), Some(meters.clone())),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "L_m"), Some(&meters));
+    }
+
+    #[test]
+    fn reference_cycle_stays_unannotated() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("a", param_var("b"), None),
+                parameter("b", param_var("a"), None),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "a"), None);
+        assert_eq!(unit_of(&root, "b"), None);
+    }
+
+    #[test]
+    fn reference_into_cycle_stays_unannotated() {
+        let root = fill(model(
+            "root",
+            [
+                parameter("x", param_var("a"), None),
+                parameter("a", param_var("b"), None),
+                parameter("b", param_var("a"), None),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "x"), None);
+        assert_eq!(unit_of(&root, "a"), None);
+    }
+
+    #[test]
+    fn design_builtin_stays_unannotated() {
+        let provenance = ir::DesignProvenance {
+            design_path: test_model_path("design"),
+            is_addition: false,
+            assignment_span: Span::synthetic(),
+            anchor_path: RelativePath::self_path(),
+            applied_via: None,
+        };
+        let root = fill(model(
+            "root",
+            [
+                parameter("pi", lit_number(3.0), Some(kilometers())),
+                parameter("t", builtin_var("pi"), None).with_design_provenance(provenance),
+            ],
+        ));
+
+        assert_eq!(unit_of(&root, "t"), None);
+    }
+}

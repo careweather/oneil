@@ -1,0 +1,6 @@
+# Child model whose parameters declare units
+
+Peak power: P = 16 :dBW
+Range: R = 3|4 :km
+Gain: G = 18 :dB
+Efficiency: eta = 90 :%

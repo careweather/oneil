@@ -1,0 +1,6 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/addition_mismatch.one\")"
+---
+error: unit mismatch: parameter `L` has unit `km` but design applies value with unit `s`
+  at fixtures/reference_units/addition_mismatch.one:6:1
