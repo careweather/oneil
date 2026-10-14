@@ -1,10 +1,9 @@
 /**
- * Detect which Python 3.12 layout is on this machine and how to launch a
- * matching release CLI.
+ * Detect which supported CPython minor version is installed.
  *
- * Homebrew and python.org ("system") binaries bake a stable absolute path.
- * uv's prefix is per-user and patch-versioned, so that flavor is relocatable
- * and the spawner must set the library search path before exec.
+ * Current release archives are one per minor version. The `oneil` loader finds
+ * the install layout itself. The flavor helpers below remain for managed
+ * binaries downloaded from older layout-specific archives.
  */
 
 import { access } from "fs/promises"
@@ -17,6 +16,11 @@ const execFileAsync = promisify(execFile)
 export const PYTHON_FLAVORS = ["homebrew", "uv", "system"] as const
 
 export type PythonFlavor = (typeof PYTHON_FLAVORS)[number]
+
+/** Minor versions the Release workflow publishes, newest first. */
+export const PYTHON_MINORS = ["3.14", "3.12"] as const
+
+export type PythonMinor = (typeof PYTHON_MINORS)[number]
 
 export type DetectedPython = {
     flavor: PythonFlavor
@@ -53,6 +57,13 @@ export function isPythonFlavor(value: string | undefined): value is PythonFlavor
 }
 
 /**
+ * True when `value` is a published Python minor version.
+ */
+export function isPythonMinor(value: string | undefined): value is PythonMinor {
+    return value != null && (PYTHON_MINORS as readonly string[]).includes(value)
+}
+
+/**
  * Flavors published for this OS (Homebrew is macOS-only).
  */
 export function flavorsForPlatform(platform: NodeJS.Platform = process.platform): PythonFlavor[] {
@@ -63,16 +74,55 @@ export function flavorsForPlatform(platform: NodeJS.Platform = process.platform)
 }
 
 /**
- * Hint shown when no supported Python 3.12 layout is present.
+ * Hint shown when neither Python 3.14 nor 3.12 is installed.
  */
 export function missingPythonHint(platform: NodeJS.Platform = process.platform): string {
     if (platform === "darwin") {
-        return "This Oneil CLI needs Python 3.12. Install Homebrew's python@3.12 (`brew install python@3.12`), the official python.org 3.12 installer, or `uv python install 3.12`. Then retry, or set oneil.serverPath to a local oneil."
+        return "This Oneil CLI needs Python 3.12 or 3.14. Install Homebrew's python@3.14 or python@3.12, the official python.org installer, or `uv python install 3.14`. Then retry, or set oneil.serverPath to a local oneil."
     }
     if (platform === "win32") {
-        return "This Oneil CLI needs Python 3.12. Install it from python.org or with `uv python install 3.12`, then retry, or set oneil.serverPath to a local oneil."
+        return "This Oneil CLI needs Python 3.12 or 3.14. Install it from python.org or with `uv python install 3.14`, then retry, or set oneil.serverPath to a local oneil."
     }
-    return "This Oneil CLI needs Python 3.12. Install python3.12 (and libpython3.12) from your package manager or with `uv python install 3.12`, then retry, or set oneil.serverPath to a local oneil."
+    return "This Oneil CLI needs Python 3.12 or 3.14. Install python3.14 or python3.12 (and the matching libpython) from your package manager or with `uv python install 3.14`, then retry, or set oneil.serverPath to a local oneil."
+}
+
+/**
+ * Newest installed minor version the Release workflow publishes.
+ */
+export async function detectPythonMinor(
+    platform: NodeJS.Platform = process.platform,
+): Promise<PythonMinor | undefined> {
+    for (const minor of PYTHON_MINORS) {
+        if (await pythonMinorInstalled(minor, platform)) {
+            return minor
+        }
+    }
+    return undefined
+}
+
+async function pythonMinorInstalled(minor: PythonMinor, platform: NodeJS.Platform): Promise<boolean> {
+    if (await findCommandPython312(`python${minor}`)) {
+        return true
+    }
+    if (platform === "win32" && (await findCommandPython312("py", [`-${minor}`]))) {
+        return true
+    }
+    if (platform === "darwin") {
+        const framework = `/Library/Frameworks/Python.framework/Versions/${minor}/Python`
+        const homebrew = `/opt/homebrew/opt/python@${minor}/Frameworks/Python.framework/Versions/${minor}/Python`
+        if ((await fileExists(framework)) || (await fileExists(homebrew))) {
+            return true
+        }
+    }
+    try {
+        const { stdout } = await execFileAsync("uv", ["python", "find", minor], {
+            timeout: 10_000,
+            windowsHide: true,
+        })
+        return stdout.trim() !== ""
+    } catch {
+        return false
+    }
 }
 
 /**

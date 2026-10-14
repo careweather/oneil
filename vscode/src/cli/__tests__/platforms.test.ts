@@ -12,14 +12,14 @@ describe("resolveCliPlatform archive names", () => {
         const win = resolveCliPlatform("win32", "x64")
         const mac = resolveCliPlatform("darwin", "arm64")
 
-        expect(linux && cliArchiveName(linux, "v1.0.0-beta.4", "uv")).toBe(
-            "oneil-v1.0.0-beta.4-x86_64-unknown-linux-gnu-uv.tar.gz",
+        expect(linux && cliArchiveName(linux, "v1.0.0-beta.4", "3.12")).toBe(
+            "oneil-v1.0.0-beta.4-x86_64-unknown-linux-gnu-py3.12.tar.gz",
         )
-        expect(win && cliArchiveName(win, "v1.0.0-beta.4", "system")).toBe(
-            "oneil-v1.0.0-beta.4-x86_64-pc-windows-msvc-system.zip",
+        expect(win && cliArchiveName(win, "v1.0.0-beta.4", "3.14")).toBe(
+            "oneil-v1.0.0-beta.4-x86_64-pc-windows-msvc-py3.14.zip",
         )
-        expect(mac && cliArchiveName(mac, "v1.0.0-beta.4", "homebrew")).toBe(
-            "oneil-v1.0.0-beta.4-aarch64-apple-darwin-homebrew.tar.gz",
+        expect(mac && cliArchiveName(mac, "v1.0.0-beta.4", "3.12")).toBe(
+            "oneil-v1.0.0-beta.4-aarch64-apple-darwin-py3.12.tar.gz",
         )
         expect(linux?.binaryName).toBe("oneil")
         expect(win?.binaryName).toBe("oneil.exe")
@@ -31,7 +31,9 @@ describe("resolveCliPlatform archive names", () => {
         expect(linux && cliUnflavoredArchiveName(linux, "v1.0.0")).toBe(
             "oneil-v1.0.0-x86_64-unknown-linux-gnu.tar.gz",
         )
-        expect(linux && cliAssetCandidates(linux, "v1.0.0", "system")).toEqual([
+        expect(linux && cliAssetCandidates(linux, "v1.0.0", "3.12")).toEqual([
+            "oneil-v1.0.0-x86_64-unknown-linux-gnu-py3.12.tar.gz",
+            "oneil-v1.0.0-x86_64-unknown-linux-gnu-uv.tar.gz",
             "oneil-v1.0.0-x86_64-unknown-linux-gnu-system.tar.gz",
             "oneil-v1.0.0-x86_64-unknown-linux-gnu.tar.gz",
         ])

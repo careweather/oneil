@@ -11,18 +11,13 @@ import type * as vscode from "vscode"
 
 import { fetchCliReleaseByTag, releaseDownloadUrl, type GithubRelease } from "./github"
 import { cliAssetCandidates, resolveCliPlatform, SUPPORTED_PLATFORMS_LABEL, type CliPlatform } from "./platforms"
-import {
-    detectPython312,
-    launchEnvForFlavor,
-    missingPythonHint,
-    type PythonFlavor,
-} from "./python"
-import { setInstalledPythonFlavor } from "./state"
+import { detectPythonMinor, missingPythonHint, type PythonMinor } from "./python"
+import { setInstalledPythonMinor } from "./state"
 import { toReleaseTag } from "./version"
 
 const execFileAsync = promisify(execFile)
 
-/** Shown when no supported Python 3.12 layout is present. */
+/** Shown when neither Python 3.14 nor 3.12 is installed. */
 export const PYTHON_312_HINT = missingPythonHint()
 
 /**
@@ -107,6 +102,18 @@ export async function installCliRelease(
         await fs.copyFile(extracted, dest)
         await fs.chmod(dest, 0o755)
 
+        const runnerName = platform.binaryName.endsWith(".exe") ? "oneil-runner.exe" : "oneil-runner"
+        const extractedRunner = path.join(tmpRoot, runnerName)
+        try {
+            await fs.access(extractedRunner)
+            const destRunner = path.join(storageRoot, runnerName)
+            await fs.rm(destRunner, { force: true })
+            await fs.copyFile(extractedRunner, destRunner)
+            await fs.chmod(destRunner, 0o755)
+        } catch {
+            // Older archives contain only the `oneil` binary.
+        }
+
         if (process.platform === "darwin") {
             try {
                 await execFileAsync("xattr", ["-d", "com.apple.quarantine", dest])
@@ -115,9 +122,8 @@ export async function installCliRelease(
             }
         }
 
-        await setInstalledPythonFlavor(context, release.flavor)
-        const env = await launchEnvForFlavor(release.flavor)
-        if (!(await cliBinaryRuns(dest, env))) {
+        await setInstalledPythonMinor(context, release.python)
+        if (!(await cliBinaryRuns(dest))) {
             throw new Error(missingPythonHint())
         }
 
@@ -140,20 +146,20 @@ export async function installCliTag(
             `This platform is not supported for release binaries (${SUPPORTED_PLATFORMS_LABEL}).`,
         )
     }
-    const flavor = await requireDetectedFlavor()
-    const release = await fetchCliReleaseByTag(toReleaseTag(tagOrVersion), platform, flavor)
+    const python = await requireDetectedPython()
+    const release = await fetchCliReleaseByTag(toReleaseTag(tagOrVersion), platform, python)
     return installCliRelease(context, release)
 }
 
 /**
- * Detects a supported Python 3.12 layout or throws a user-facing hint.
+ * Detects Python 3.14 or 3.12, or throws a user-facing hint.
  */
-export async function requireDetectedFlavor(): Promise<PythonFlavor> {
-    const detected = await detectPython312()
+export async function requireDetectedPython(): Promise<PythonMinor> {
+    const detected = await detectPythonMinor()
     if (!detected) {
         throw new Error(missingPythonHint())
     }
-    return detected.flavor
+    return detected
 }
 
 async function downloadReleaseArchive(
@@ -161,7 +167,7 @@ async function downloadReleaseArchive(
     platform: CliPlatform,
     destDir: string,
 ): Promise<{ archivePath: string; assetName: string }> {
-    const names = cliAssetCandidates(platform, release.tag, release.flavor)
+    const names = cliAssetCandidates(platform, release.tag, release.python)
     let lastError: Error | undefined
     for (const assetName of names) {
         const url = releaseDownloadUrl(release.tag, assetName)
