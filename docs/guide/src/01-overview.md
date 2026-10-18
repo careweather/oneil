@@ -55,7 +55,7 @@ Window count: n_w = 20
 Space domain: D_s = 'interstellar'
 ```
 
-Here `Retry count` / `Space domain` are names, `n_retry` / `D_s` are identifiers
+Here `Window count` / `Space domain` are names, `n_w` / `D_s` are identifiers
 (symbols), and `20` / `'interstellar'` are values.
 
 Parameters that are directly assigned values are referred to as "independent
