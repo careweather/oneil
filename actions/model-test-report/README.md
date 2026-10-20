@@ -110,7 +110,7 @@ Auto-discovery (no `models` input) only considers top-level `.on` and `.one` fil
 ## Requirements
 
 - No Rust toolchain is required; the CLI is downloaded from GitHub Releases.
-- The release CLI links against Python 3.12. On Linux/Windows, `actions/setup-python` with `python-version: "3.12"` is enough for the `system` flavor. On macOS use `brew install python@3.12` or `uv python install 3.12` (`setup-python` does not create the python.org framework path).
+- The release CLI links against Python 3.12 or 3.14. Install either version before the Action (`actions/setup-python`, Homebrew `python@3.12` / `python@3.14`, or `uv python install`). The `oneil` loader selects the matching archive.
 - Pin `oneil-ref` and the Action ref to the **same** Oneil release tag. When the test-report contract changes incompatibly, bump both together.
 
 ## Development

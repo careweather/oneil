@@ -747,6 +747,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oneil_loader"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "oneil_lsp"
 version = "1.0.0"
 dependencies = [

@@ -5,7 +5,7 @@
 import * as vscode from "vscode"
 
 import { fetchLatestCliRelease, listCliReleases, type GithubRelease } from "./github"
-import { installCliRelease, requireDetectedFlavor } from "./install"
+import { installCliRelease, requireDetectedPython } from "./install"
 import {
     getSkippedVersion,
     markUpdateChecked,
@@ -92,8 +92,8 @@ export async function checkForUpdates(
 
     let latest: GithubRelease
     try {
-        const flavor = await requireDetectedFlavor()
-        latest = await fetchLatestCliRelease(platform, flavor)
+        const python = await requireDetectedPython()
+        latest = await fetchLatestCliRelease(platform, python)
     } catch (error) {
         void vscode.window.showErrorMessage(
             `Oneil: could not check for updates (${error instanceof Error ? error.message : String(error)})`,
@@ -180,8 +180,8 @@ export async function installLatestWithProgress(
     }
 
     try {
-        const flavor = await requireDetectedFlavor()
-        const latest = await fetchLatestCliRelease(platform, flavor)
+        const python = await requireDetectedPython()
+        const latest = await fetchLatestCliRelease(platform, python)
         await installReleaseWithProgress(context, latest, restart)
     } catch (error) {
         void vscode.window.showErrorMessage(
@@ -215,8 +215,8 @@ export async function selectCliVersion(
 
     let releases: GithubRelease[]
     try {
-        const flavor = await requireDetectedFlavor()
-        releases = await listCliReleases(platform, flavor)
+        const python = await requireDetectedPython()
+        releases = await listCliReleases(platform, python)
     } catch (error) {
         void vscode.window.showErrorMessage(
             `Oneil: could not list releases (${error instanceof Error ? error.message : String(error)})`,

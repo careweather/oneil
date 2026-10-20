@@ -32,8 +32,7 @@ Oneil makes it easier than ever to build, debug, explore, and version-control mo
 
 ## Requirements
 
-Pre-built binaries are available for Linux, Windows, and macOS. Building from
-source has been primarily tested on Linux.
+Pre-built binaries are available for Linux, Windows, and macOS. The CLI supports CPython 3.12 and 3.14; download the archive that matches the version you have (see [Installation](https://careweather.github.io/oneil/02-installation.html)). Building from source has been primarily tested on Linux.
 
 ## Quickstart
 

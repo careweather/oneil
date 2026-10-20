@@ -26,4 +26,4 @@ Platform coverage matches the release matrix (Linux x86_64, Windows x86_64, Appl
 - Developers can still force a local build via `oneil.serverPath`.
 - The extension must handle GitHub rate limits and unsupported platforms gracefully.
 - Managed updates do not apply while `oneil.serverPath` is set.
-- The managed CLI links against an installed CPython 3.12. Releases ship one archive per layout (Homebrew / system / uv); the extension detects which is present and downloads that flavor. See [portable CLI Python](./2026-08-14-portable-macos-cli-python.md).
+- The managed CLI links against one CPython minor version. Releases ship one archive per OS for Python 3.12 and one for 3.14; `oneil` finds the local install of that version. See [exec loader](./2026-09-23-cli-python-exec-loader.md).

@@ -8,6 +8,7 @@ import { access } from "fs/promises"
 import { constants as fsConstants } from "fs"
 import { execFile } from "child_process"
 import { promisify } from "util"
+import * as path from "path"
 import * as vscode from "vscode"
 
 import { cliBinaryRuns, managedBinaryExists, managedBinaryPath } from "./install"
@@ -41,7 +42,8 @@ export async function resolveCli(context: vscode.ExtensionContext): Promise<Reso
     if (await managedBinaryExists(context)) {
         const command = managedBinaryPath(context)
         const flavor = getInstalledPythonFlavor(context)
-        const env = flavor ? await launchEnvForFlavor(flavor) : undefined
+        const legacy = command != null && !(await runnerBeside(command))
+        const env = legacy && flavor ? await launchEnvForFlavor(flavor) : undefined
         if (command && (await cliBinaryRuns(command, env))) {
             return { command, source: "managed", env, flavor }
         }
@@ -78,6 +80,19 @@ export async function readCliVersion(
         return parseVersionOutput(stdout)
     } catch {
         return undefined
+    }
+}
+
+/**
+ * True when a current archive's `oneil-runner` sits next to the loader.
+ */
+async function runnerBeside(command: string): Promise<boolean> {
+    const runnerName = command.endsWith(".exe") ? "oneil-runner.exe" : "oneil-runner"
+    try {
+        await access(path.join(path.dirname(command), runnerName))
+        return true
+    } catch {
+        return false
     }
 }
 

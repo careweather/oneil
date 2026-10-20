@@ -1,6 +1,7 @@
 [package]
 name = "oneil"
-default-run = "oneil"
+autobins = false
+default-run = "oneil-runner"
 description = "Oneil programming language and tools"
 version.workspace = true
 edition.workspace = true
@@ -11,6 +12,10 @@ readme.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
+
+[[bin]]
+name = "oneil-runner"
+path = "src/main.rs"
 
 [lib]
 name = "oneil"
