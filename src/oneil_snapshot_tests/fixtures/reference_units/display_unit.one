@@ -1,0 +1,6 @@
+# Changes the display unit of `L` from `km` to `m`. The plain reference `L_r = L`
+# inherits the unit that `L` has after the design applies.
+
+design parent
+
+L = 2000 :m

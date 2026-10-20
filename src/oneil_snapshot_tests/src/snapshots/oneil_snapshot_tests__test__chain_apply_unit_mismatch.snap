@@ -5,7 +5,7 @@ expression: "run_fixture(\"chain_apply_unit_mismatch/parent.on\")"
 error: applied design `bad.one` produced invalid contributions
   at fixtures/chain_apply_unit_mismatch/mid.on:7:7
 
-error: unit mismatch: parameter `lng` declared as `m` but design applies value with unit `s`
+error: unit mismatch: parameter `lng` has unit `m` but design applies value with unit `s`
   at fixtures/chain_apply_unit_mismatch/bad.one:8:1
 
 error: submodel `m` has errors

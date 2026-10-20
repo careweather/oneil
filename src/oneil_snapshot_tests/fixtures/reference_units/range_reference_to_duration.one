@@ -1,0 +1,5 @@
+# Sets `R_c`, the parent's reference to the child's range, to a duration.
+
+design parent
+
+R_c = 5 :s

@@ -1,0 +1,10 @@
+# Applies a design that sets the half turn `t` to the builtin `pi`, then a
+# design that adds a length named `pi`. The first design's value keeps the
+# builtin, so `t` and the reference to it are plain numbers.
+
+submodel builtin as b
+
+apply half_turn to b
+apply shadow to b
+
+Half turn of b: t_b = t.b
