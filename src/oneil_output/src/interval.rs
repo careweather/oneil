@@ -526,60 +526,50 @@ impl Interval {
     /// The result is the tightest interval containing the image of this
     /// interval under the cosine function. The domain of the point function
     /// is ℝ and the range is \[−1, 1\].
-    ///
-    /// Based on the [inari crate](https://github.com/unageek/inari) implementation.
     #[must_use]
     pub fn cos(self) -> Self {
+        use std::f64::consts::PI;
+
         if self.is_empty() {
             return self;
         }
 
         let min = self.min;
         let max = self.max;
+        let width = max - min;
 
-        // short circuit for the case where the interval is greater than 2pi
-        //
-        // even though this is technically accounted for below, it appears that
-        // large numbers (for example, `1.0e34`) will cause the calculation to
-        // be incorrect.
-        if (max - min) > 2.0 * std::f64::consts::PI {
+        // An interval wider than one period contains both extremes. The width
+        // is NaN when both bounds are the same infinity.
+        if width.is_nan() || width > 2.0 * PI {
             return Self::new(-1.0, 1.0);
         }
 
-        let pi = Self::from(std::f64::consts::PI);
+        let min_cos = min.cos();
+        let max_cos = max.cos();
 
-        let step = (self / pi).floor();
-        let step_min = step.min;
-        let step_max = step.max;
+        // Dividing a large bound by π loses its position within the period,
+        // so the angle of `min` comes from `sin` and `cos`, which reduce their
+        // argument exactly. The interval covers the angles from `start`, in
+        // [−π, π], to `end`, in [−π, 3π].
+        let start = min.sin().atan2(min_cos);
+        let end = start + width;
 
-        #[expect(
-            clippy::float_cmp,
-            reason = "we want to compare the exact values of the floats"
-        )]
-        let step_delta = if min == max { 0.0 } else { step_max - step_min };
+        // cos is 1 at even multiples of π and −1 at odd multiples of π
+        let contains_peak = (start..=end).contains(&0.0) || end >= 2.0 * PI;
+        let contains_trough = start <= -PI || end >= PI;
 
-        // Half-period index: 0 or 1 (cos decreases on [0, π], increases on [π, 2π], etc.)
-        let min_step_modulo = step_min.rem_euclid(2.0);
-
-        if is_close(step_delta, 0.0) {
-            if is_close(min_step_modulo, 0.0) {
-                // monotonically decreasing
-                Self::new(max.cos(), min.cos())
-            } else {
-                // monotonically increasing
-                Self::new(min.cos(), max.cos())
-            }
-        } else if is_close(step_delta, 1.0) {
-            if is_close(min_step_modulo, 0.0) {
-                // decreasing, then increasing
-                Self::new(-1.0, f64::max(min.cos(), max.cos()))
-            } else {
-                // increasing, then decreasing
-                Self::new(f64::min(min.cos(), max.cos()), 1.0)
-            }
+        let lower = if contains_trough {
+            -1.0
         } else {
-            Self::new(-1.0, 1.0)
-        }
+            f64::min(min_cos, max_cos)
+        };
+        let upper = if contains_peak {
+            1.0
+        } else {
+            f64::max(min_cos, max_cos)
+        };
+
+        Self::new(lower, upper)
     }
 
     /// Returns the tangent of the interval.
@@ -1255,5 +1245,64 @@ mod serde_tests {
         .expect("deserialize interval");
 
         assert_eq!(interval, Interval::new(f64::NEG_INFINITY, f64::INFINITY));
+    }
+}
+
+#[cfg(test)]
+mod cos_tests {
+    use std::f64::consts::{FRAC_PI_2, PI};
+
+    use super::*;
+
+    #[test]
+    fn cos_of_decreasing_half_period() {
+        let result = Interval::new(0.1, 0.2).cos();
+
+        assert_eq!(result, Interval::new(0.2_f64.cos(), 0.1_f64.cos()));
+    }
+
+    #[test]
+    fn cos_of_increasing_half_period() {
+        let result = Interval::new(PI + 0.1, PI + 0.2).cos();
+
+        assert_eq!(result, Interval::new((PI + 0.1).cos(), (PI + 0.2).cos()));
+    }
+
+    #[test]
+    fn cos_includes_peak_at_zero() {
+        let result = Interval::new(-0.5, FRAC_PI_2).cos();
+
+        assert_eq!(result, Interval::new(FRAC_PI_2.cos(), 1.0));
+    }
+
+    #[test]
+    fn cos_includes_trough_at_pi() {
+        let result = Interval::new(FRAC_PI_2, 3.0 * FRAC_PI_2).cos();
+
+        assert_eq!(result, Interval::new(-1.0, FRAC_PI_2.cos()));
+    }
+
+    #[test]
+    fn cos_of_interval_wider_than_period_is_full_range() {
+        assert_eq!(Interval::new(0.0, 7.0).cos(), Interval::new(-1.0, 1.0));
+    }
+
+    #[test]
+    fn cos_of_large_bounds_includes_peak() {
+        // Both bounds are near 1.08e16 and two radians apart, with a multiple
+        // of 2π between them, so the result reaches 1.
+        let min = 1.084_396_145_570_774_6e16;
+        let max = 1.084_396_145_570_774_8e16;
+
+        let result = Interval::new(min, max).cos();
+
+        assert_eq!(result, Interval::new(min.cos(), 1.0));
+    }
+
+    #[test]
+    fn cos_of_infinite_point_is_full_range() {
+        let result = Interval::new(f64::INFINITY, f64::INFINITY).cos();
+
+        assert_eq!(result, Interval::new(-1.0, 1.0));
     }
 }

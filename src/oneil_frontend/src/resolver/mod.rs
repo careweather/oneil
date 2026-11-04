@@ -306,8 +306,8 @@ mod tests {
         let model = test_ast::empty_model_node();
         let (imports, use_models, parameters, tests, sections) = split_model_ast(&model);
 
-        assert!(imports.is_empty());
-        assert!(use_models.is_empty());
+        assert_eq!(imports, [] as [&ast::Node<ast::Import>; 0]);
+        assert_eq!(use_models, [] as [&ast::Node<ast::SubmodelDecl>; 0]);
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
         assert!(sections.is_empty());
@@ -327,7 +327,7 @@ mod tests {
             use_models[0].model_info().top_component().as_str(),
             "submodel"
         );
-        assert!(use_models[0].model_info().subcomponents().is_empty());
+        assert_eq!(use_models[0].model_info().subcomponents(), []);
         assert!(parameters.is_empty());
         assert!(tests.is_empty());
         assert!(sections.is_empty());
@@ -342,7 +342,7 @@ mod tests {
             .build();
         let (imports, use_models, parameters, tests, sections) = split_model_ast(&model);
 
-        assert!(imports.is_empty());
+        assert_eq!(imports, [] as [&ast::Node<ast::Import>; 0]);
         assert_eq!(use_models.len(), 2);
         assert_eq!(
             use_models[0].model_info().top_component().as_str(),

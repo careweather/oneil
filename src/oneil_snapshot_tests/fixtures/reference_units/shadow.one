@@ -1,0 +1,6 @@
+# Adds a length named `pi`, which shadows the builtin. The plain reference `t = pi`
+# then refers to the new parameter and inherits its unit.
+
+design builtin
+
+Shadowing length: pi = 3 :m

@@ -336,10 +336,6 @@ fn piecewise_part(input: InputSpan<'_>) -> Result<'_, PiecewisePartNode, ParserE
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::float_cmp,
-    reason = "it will be obvious when floating point equality fails and we need to use a tolerance"
-)]
 mod tests {
     use super::*;
     use crate::{
@@ -371,11 +367,7 @@ mod tests {
                 panic!("Expected literal");
             };
 
-            let Literal::Number(value) = value.take_value() else {
-                panic!("Expected literal");
-            };
-
-            assert_eq!(value, 42.0);
+            assert_eq!(value.take_value(), Literal::Number(42.0));
 
             assert!(unit.is_none());
         }
@@ -400,18 +392,12 @@ mod tests {
             let Expr::Literal(value) = min.take_value() else {
                 panic!("Expected literal");
             };
-            let Literal::Number(value) = value.take_value() else {
-                panic!("Expected literal");
-            };
-            assert_eq!(value, 0.0);
+            assert_eq!(value.take_value(), Literal::Number(0.0));
 
             let Expr::Literal(value) = max.take_value() else {
                 panic!("Expected literal");
             };
-            let Literal::Number(value) = value.take_value() else {
-                panic!("Expected literal");
-            };
-            assert_eq!(value, 100.0);
+            assert_eq!(value.take_value(), Literal::Number(100.0));
         }
 
         #[test]
@@ -433,26 +419,17 @@ mod tests {
             let Expr::Literal(value) = value1.take_value() else {
                 panic!("Expected literal");
             };
-            let Literal::Number(value) = value.take_value() else {
-                panic!("Expected literal");
-            };
-            assert_eq!(value, 1.0);
+            assert_eq!(value.take_value(), Literal::Number(1.0));
 
             let Expr::Literal(value) = value2.take_value() else {
                 panic!("Expected literal");
             };
-            let Literal::Number(value) = value.take_value() else {
-                panic!("Expected literal");
-            };
-            assert_eq!(value, 2.0);
+            assert_eq!(value.take_value(), Literal::Number(2.0));
 
             let Expr::Literal(value) = value3.take_value() else {
                 panic!("Expected literal");
             };
-            let Literal::Number(value) = value.take_value() else {
-                panic!("Expected literal");
-            };
-            assert_eq!(value, 3.0);
+            assert_eq!(value.take_value(), Literal::Number(3.0));
         }
 
         #[test]
@@ -496,10 +473,7 @@ mod tests {
             let Expr::Literal(value) = expr.take_value() else {
                 panic!("Expected literal");
             };
-            let Literal::Number(value) = value.take_value() else {
-                panic!("Expected literal");
-            };
-            assert_eq!(value, 42.0);
+            assert_eq!(value.take_value(), Literal::Number(42.0));
 
             let Some(UnitExpr::Unit {
                 identifier: name,

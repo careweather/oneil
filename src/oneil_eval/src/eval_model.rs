@@ -194,7 +194,7 @@ mod tests {
         let test = make_test(lit_bool(true), ir::Dependencies::new());
         let result = eval_test_simple(&test).expect("eval should succeed");
         assert!(matches!(result.result, TestResult::Passed));
-        assert!(result.warnings.is_empty());
+        assert_eq!(result.warnings, []);
     }
 
     #[test]
@@ -207,7 +207,7 @@ mod tests {
         assert!(debug_info.builtin_dependency_values.is_empty());
         assert!(debug_info.parameter_dependency_values.is_empty());
         assert!(debug_info.external_dependency_values.is_empty());
-        assert!(result.warnings.is_empty());
+        assert_eq!(result.warnings, []);
     }
 
     #[test]

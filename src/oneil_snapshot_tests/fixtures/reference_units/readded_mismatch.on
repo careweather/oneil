@@ -1,0 +1,9 @@
+# Applies a design that adds the length `x` and points the child's range at it,
+# then a design that replaces `x` with a duration and sets the length `L` to the
+# range. The range reaches the duration once the second design applies, so the
+# second design can't set `L` to it.
+
+submodel parent as p
+
+apply range_to_added_length to p
+apply length_to_range_after_readd to p

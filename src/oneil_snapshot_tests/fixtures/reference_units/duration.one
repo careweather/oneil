@@ -1,0 +1,6 @@
+# Sets the child's range to a duration. `nested_mismatch.one` applies it after a
+# scoped override has pointed the range at a length.
+
+design child
+
+R = 5 :s

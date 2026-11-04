@@ -1,0 +1,6 @@
+# Overrides the length `L` with a reference to the child's gain in dB, which is
+# dimensionless.
+
+design parent
+
+L = G.c

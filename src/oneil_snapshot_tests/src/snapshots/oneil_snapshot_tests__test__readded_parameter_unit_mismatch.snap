@@ -1,0 +1,9 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/readded_duration_mismatch.on\")"
+---
+error: unit mismatch: parameter `x` has unit `m` but design applies value with unit `s`
+  at fixtures/reference_units/readd_duration.one:5:17
+
+error: applied design `readd_duration.one` produced invalid contributions
+  at fixtures/reference_units/readded_duration_mismatch.on:8:7

@@ -1299,6 +1299,6 @@ mod python_call_cache_tests {
             &python_module(1),
         );
 
-        assert!(cache.warning_diagnostics().is_empty());
+        assert_eq!(cache.warning_diagnostics(), []);
     }
 }

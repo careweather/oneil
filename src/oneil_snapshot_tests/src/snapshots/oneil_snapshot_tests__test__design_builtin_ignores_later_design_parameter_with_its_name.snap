@@ -1,0 +1,8 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/shadow_after_builtin.on\")"
+---
+Model: fixtures/reference_units/shadow_after_builtin.on
+Tests: 0/0
+Parameters:
+  t_b = 3.142

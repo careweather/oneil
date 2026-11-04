@@ -1,0 +1,11 @@
+# Overrides parameters with plain references. Each reference inherits the unit of
+# the parameter it references, and the overlay check compares that unit with the
+# unit of the parameter it replaces.
+
+design parent
+
+# `L_r` inherits `km` from `L`, and `R.c` has `km`.
+L_r = R.c
+
+# Scoped override: `L` resolves on the design's target, `parent`.
+R.c = L

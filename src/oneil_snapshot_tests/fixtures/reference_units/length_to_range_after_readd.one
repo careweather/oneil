@@ -1,0 +1,8 @@
+# Replaces the added `x` with a duration and sets the length `L` to the child's range,
+# which a scoped override points at `x`.
+
+design parent
+
+L = R.c
+
+Added duration: x = 5 :s

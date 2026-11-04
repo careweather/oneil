@@ -1,0 +1,8 @@
+# Overrides a length with a plain reference to a duration that the same design adds.
+# The override inherits `s` from the addition, so the overlay check rejects it.
+
+design parent
+
+L = d
+
+Added duration: d = 5 :s

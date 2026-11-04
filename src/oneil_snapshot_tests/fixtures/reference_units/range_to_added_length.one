@@ -1,0 +1,7 @@
+# Adds a length and points the child's range at it with a scoped override.
+
+design parent
+
+R.c = x
+
+Added length: x = 5 :m

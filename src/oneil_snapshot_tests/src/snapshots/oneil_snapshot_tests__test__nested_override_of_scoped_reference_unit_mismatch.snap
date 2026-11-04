@@ -1,0 +1,9 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/nested_mismatch.one\")"
+---
+error: applied design `duration.one` produced invalid contributions
+  at fixtures/reference_units/nested_mismatch.one:9:7
+
+error: unit mismatch: parameter `R` has unit `km` but design applies value with unit `s`
+  at fixtures/reference_units/duration.one:6:1

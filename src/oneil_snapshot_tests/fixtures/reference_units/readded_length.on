@@ -1,0 +1,11 @@
+# Applies a design that adds the length `x` and points the child's range at it,
+# then a design that replaces `x` with a length in kilometers. The range follows
+# `x` and keeps its dimensions.
+
+submodel parent as p
+
+apply range_to_added_length to p
+apply readd_kilometers to p
+
+Added length: x_p = x.p
+Referenced range: R_p = R_c.p

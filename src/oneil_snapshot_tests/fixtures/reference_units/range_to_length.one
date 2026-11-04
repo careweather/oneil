@@ -1,0 +1,5 @@
+# Points the child's range at the length `L` with a scoped override.
+
+design parent
+
+R.c = L

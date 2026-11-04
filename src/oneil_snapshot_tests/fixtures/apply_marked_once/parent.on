@@ -1,0 +1,7 @@
+# Applies a design that causes both a contribution error and a
+# validation error. Each error surfaces in full, and the `apply` statement
+# gets one generic "applied design produced invalid contributions"
+# diagnostic.
+
+submodel leaf as l
+apply mixed to l

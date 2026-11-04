@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A parameter whose value is only a reference to another parameter with physical dimensions, such as `P_l = P_t.r`, inherits that parameter's unit and display unit, so it no longer needs a unit annotation. Design overlay unit checks and the rendered view use the inherited unit. A reference to a dimensionless parameter, such as a dB gain or a percentage, still becomes a plain number.
+- A design override can't replace a parameter that has physical dimensions with a reference to a dimensionless parameter or to a parameter without a unit, or the other way around. The design overlay unit check used to skip both.
+- A design can't replace a parameter that an earlier design added with one of other dimensions, just as an override can't, because references to the parameter follow it. Another unit with the same dimensions, such as `km` for `m`, is still allowed.
+- The design overlay unit mismatch error says that a parameter "has unit" instead of "declared as", because the unit can be inherited. It also says when the parameter or the value has no unit.
+
+### Fixed
+
+- An `apply` statement whose design causes several errors gets one "applied design produced invalid contributions" diagnostic instead of one per error.
+
 ## [1.0.0-beta.6] - 2026-08-17
 
 ### Added

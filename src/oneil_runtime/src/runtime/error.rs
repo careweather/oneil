@@ -383,18 +383,21 @@ struct IrErrorsResult {
 ///
 /// Returns silently when there is no `applied_via` (synthetic CLI
 /// design-as-root has no apply to attribute to), when the apply lives
-/// in a different file, or when its span is empty.
+/// in a different file, when its span is empty, or when `emitted`
+/// already holds the apply's span offsets.
 ///
 /// Used by both `surface_contribution_diagnostic` (for
 /// `ContributionDiagnostic`s) and
 /// `surface_design_caused_parameter_errors` (for design-overridden /
 /// -added parameters that fail post-composition validation) so the
-/// rendered per-apply diagnostic stays identical across error classes.
+/// rendered per-apply diagnostic stays identical across error classes,
+/// and an apply that causes several errors is marked once.
 fn surface_apply_hop(
     applied_via: Option<&ir::DesignApplication>,
     model_path: &ModelPath,
     path_buf: &std::path::Path,
     source: &str,
+    emitted: &mut std::collections::HashSet<(usize, usize)>,
     out: &mut Vec<OneilDiagnostic>,
 ) {
     let Some(hop) = applied_via else {
@@ -404,6 +407,9 @@ fn surface_apply_hop(
         return;
     }
     if hop.apply_span.clone().start() == hop.apply_span.clone().end() {
+        return;
+    }
+    if !emitted.insert((hop.apply_span.start().offset, hop.apply_span.end().offset)) {
         return;
     }
     let design_basename = hop
@@ -485,6 +491,7 @@ fn surface_contribution_diagnostic(
     model_path: &ModelPath,
     path_buf: &std::path::Path,
     source: &str,
+    emitted_applies: &mut std::collections::HashSet<(usize, usize)>,
     out: &mut Vec<OneilDiagnostic>,
 ) {
     if &diag.design_file == model_path {
@@ -494,7 +501,14 @@ fn surface_contribution_diagnostic(
             source,
         ));
     }
-    surface_apply_hop(diag.applied_via.as_ref(), model_path, path_buf, source, out);
+    surface_apply_hop(
+        diag.applied_via.as_ref(),
+        model_path,
+        path_buf,
+        source,
+        emitted_applies,
+        out,
+    );
 }
 
 /// Walks every parameter on `graph` whose `DesignProvenance.applied_via`
@@ -516,6 +530,7 @@ fn surface_design_caused_parameter_errors(
     model_path: &ModelPath,
     path_buf: &std::path::Path,
     source: &str,
+    emitted_applies: &mut std::collections::HashSet<(usize, usize)>,
     out: &mut Vec<OneilDiagnostic>,
     models_with_errors: &mut IndexSet<EvalInstanceKey>,
 ) {
@@ -537,11 +552,6 @@ fn surface_design_caused_parameter_errors(
         })
         .collect();
 
-    // Dedupe per-apply emissions so two failing parameters sharing
-    // one apply only produce one generic diagnostic at the apply site.
-    let mut emitted_apply_offsets: std::collections::HashSet<(usize, usize)> =
-        std::collections::HashSet::new();
-
     let mut instances: Vec<(InstancePath, &InstancedModel)> = Vec::new();
     collect_tree_instances(graph.root.as_ref(), &InstancePath::root(), &mut instances);
     for instance in graph.reference_pool.values() {
@@ -560,17 +570,14 @@ fn surface_design_caused_parameter_errors(
                 continue;
             }
 
-            if &applied_via.applied_in == model_path
-                && applied_via.apply_span.start() != applied_via.apply_span.end()
-            {
-                let span_key = (
-                    applied_via.apply_span.start().offset,
-                    applied_via.apply_span.end().offset,
-                );
-                if emitted_apply_offsets.insert(span_key) {
-                    surface_apply_hop(Some(applied_via), model_path, path_buf, source, out);
-                }
-            }
+            surface_apply_hop(
+                Some(applied_via),
+                model_path,
+                path_buf,
+                source,
+                emitted_applies,
+                out,
+            );
             extend_models_with_apply(
                 Some(applied_via),
                 &[instance.path()],
@@ -597,7 +604,9 @@ fn collect_tree_instances<'g>(
 
 /// Walks all graph-level contribution diagnostics plus compilation-cycle
 /// diagnostics, surfacing the ones that point at `model_path` and recording
-/// chain files for the recursive `models_with_errors` walk.
+/// chain files for the recursive `models_with_errors` walk. Each `apply`
+/// statement in `model_path` gets at most one generic diagnostic, however
+/// many errors it causes.
 fn collect_graph_contribution_errors(
     graph: &InstanceGraph,
     model_path: &ModelPath,
@@ -606,12 +615,15 @@ fn collect_graph_contribution_errors(
     design_resolution_errors: &mut Vec<OneilDiagnostic>,
     models_with_errors: &mut IndexSet<EvalInstanceKey>,
 ) {
+    let mut emitted_applies = std::collections::HashSet::new();
+
     for diag in &graph.contribution_errors {
         surface_contribution_diagnostic(
             diag,
             model_path,
             path_buf,
             source,
+            &mut emitted_applies,
             design_resolution_errors,
         );
         extend_models_with_chain_files(diag, models_with_errors, model_path);
@@ -632,6 +644,7 @@ fn collect_graph_contribution_errors(
         model_path,
         path_buf,
         source,
+        &mut emitted_applies,
         design_resolution_errors,
         models_with_errors,
     );

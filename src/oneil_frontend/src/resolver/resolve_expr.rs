@@ -342,7 +342,6 @@ pub fn get_expr_internal_dependencies(expr: &ast::ExprNode) -> IndexMap<ast::Ide
                     let identifier_span = identifier_node.span();
                     self.dependencies
                         .insert(identifier, identifier_span.clone());
-                    self
                 }
 
                 ast::Variable::ModelParameter {
@@ -352,9 +351,10 @@ pub fn get_expr_internal_dependencies(expr: &ast::ExprNode) -> IndexMap<ast::Ide
                     // an accessor implies that the dependency is on a parameter
                     // outside of the current model, so it doesn't count as an
                     // internal dependency
-                    self
                 }
             }
+
+            self
         }
     }
 
@@ -383,7 +383,6 @@ pub fn get_expr_dependencies(expr: &ir::Expr) -> Dependencies {
                 ir::Variable::Builtin { ident, ident_span } => {
                     self.dependencies
                         .insert_builtin(ident.clone(), ident_span.clone());
-                    self
                 }
 
                 ir::Variable::Parameter {
@@ -392,7 +391,6 @@ pub fn get_expr_dependencies(expr: &ir::Expr) -> Dependencies {
                 } => {
                     self.dependencies
                         .insert_parameter(parameter_name.clone(), parameter_span.clone());
-                    self
                 }
 
                 ir::Variable::External {
@@ -405,9 +403,10 @@ pub fn get_expr_dependencies(expr: &ir::Expr) -> Dependencies {
                         parameter_name.clone(),
                         span.clone(),
                     );
-                    self
                 }
             }
+
+            self
         }
     }
 
@@ -1236,7 +1235,7 @@ mod tests {
         };
         assert_eq!(value, ir::Literal::Number(5.0));
 
-        assert!(rest_chained.is_empty());
+        assert_eq!(rest_chained, []);
     }
 
     #[test]

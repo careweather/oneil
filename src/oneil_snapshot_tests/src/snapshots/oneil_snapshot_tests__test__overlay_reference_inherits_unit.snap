@@ -1,0 +1,14 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/overlay.one\")"
+---
+Model: fixtures/reference_units/parent.on
+Tests: 1/1
+  test 1: PASS
+Parameters:
+  L = 2 :km
+  P_c = 16 :dBW
+  R_c = 2 :km
+  G_c = 63.1
+  eta_c = 0.9
+  L_r = 2 :km

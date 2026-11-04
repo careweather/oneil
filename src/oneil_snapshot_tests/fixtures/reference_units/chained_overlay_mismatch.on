@@ -1,0 +1,8 @@
+# Applies a design whose scoped override points the child's range at the length
+# `L`, then a design that sets `P_c`, a power, to that range. The second design
+# can't give `P_c` the range's dimensions.
+
+submodel parent as p
+
+apply range_to_length to p
+apply power_to_range to p

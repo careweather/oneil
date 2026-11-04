@@ -1,0 +1,9 @@
+---
+source: src/oneil_snapshot_tests/src/test.rs
+expression: "run_fixture(\"reference_units/chained_scoped_mismatch.on\")"
+---
+error: unit mismatch: parameter `R_c` has unit `km` but design applies value with unit `s`
+  at fixtures/reference_units/range_reference_to_duration.one:5:1
+
+error: applied design `range_reference_to_duration.one` produced invalid contributions
+  at fixtures/reference_units/chained_scoped_mismatch.on:8:7

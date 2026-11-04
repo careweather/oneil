@@ -1,0 +1,6 @@
+# Overrides a plain reference to a length with a plain reference to a power. Both
+# inherit their units, so the overlay check rejects `dBW` for `km`.
+
+design parent
+
+L_r = P.c

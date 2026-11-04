@@ -127,29 +127,18 @@ mod tests {
     use super::*;
     use crate::{Dimension, DimensionMap, DisplayUnit, Interval, MeasuredNumber, Unit};
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "we want to compare the exact values of the floats, which are passed through unmodified"
-    )]
     #[test]
     fn min_and_optional_max_reports_scalars_without_a_max() {
-        let (value, max) = min_and_optional_max(&Number::Scalar(4.0));
-
-        assert_eq!(value, 4.0);
-        assert_eq!(max, None);
+        assert_eq!(min_and_optional_max(&Number::Scalar(4.0)), (4.0, None));
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "we want to compare the exact values of the floats, which are passed through unmodified"
-    )]
     #[test]
     fn min_and_optional_max_reports_intervals_with_min_and_max() {
         let interval = Interval::new(1.0, 3.0);
-        let (value, max) = min_and_optional_max(&Number::Interval(interval));
-
-        assert_eq!(value, 1.0);
-        assert_eq!(max, Some(3.0));
+        assert_eq!(
+            min_and_optional_max(&Number::Interval(interval)),
+            (1.0, Some(3.0))
+        );
     }
 
     #[test]

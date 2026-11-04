@@ -1,0 +1,7 @@
+# Applies two designs whose scoped overrides set the child's range. The first
+# points it at the length `L`, so the second can't set it to a duration.
+
+submodel parent as p
+
+apply range_to_length to p
+apply range_to_duration to p

@@ -32,6 +32,15 @@
 //!    the root unit's cached graph and overlays runtime-supplied
 //!    designs at the root anchor.
 //!
+//! Once every design is applied, composition ends by giving each
+//! unannotated plain parameter reference, such as `P_l = P_t.r`, the
+//! unit of the parameter it references when that unit has physical
+//! dimensions. Cached unit graphs leave plain references unannotated, so
+//! a design that changes a referenced parameter's unit also changes the
+//! inherited unit. The overlay unit check computes the units that both
+//! sides reach when a design is applied, with the design's additions in
+//! scope.
+//!
 //! Per-instance variable classification ([`classify_variables`]) is a
 //! pre-validation step that the post-build validation pass invokes as
 //! its first action. It walks the composed graph and rewrites raw
@@ -74,6 +83,10 @@ use crate::instance::cycle_error::CompilationCycleError;
 use super::{
     CompilationUnit, ContributionDiagnostic, InstancedModel,
     design::{ApplyDesign, Design, OverlayParameterValue},
+    reference_units::{
+        Binding, GraphView, Scope, UnitResolver, ValueUnit, annotated_unit, fill_inherited_units,
+        value_scope,
+    },
     validation_error::InstanceValidationError,
 };
 
@@ -269,6 +282,8 @@ pub fn apply_designs(
 
         *composed.root = root;
     }
+
+    fill_inherited_units(&mut composed.root, &mut composed.reference_pool);
 
     composed
 }
@@ -699,12 +714,34 @@ fn apply_design_at_host(
     applied_via: Option<&ir::DesignApplication>,
     ctx: &GraphCtx<'_>,
 ) {
+    let unit_errors = {
+        let host =
+            host_at_in_view(root, pool, &host_loc.absolute_path).expect("host_loc just resolved");
+        let graph = GraphView::new(root, pool).with_additions(host, &design.parameter_additions);
+        let scope = graph.scope(host, host_loc.absolute_path.clone());
+        // An addition replaces a parameter only when an earlier design added
+        // it, because a name that the target model defines is an override.
+        let additions = design
+            .parameter_additions
+            .iter()
+            .map(|(name, parameter)| (name, parameter.value(), parameter.span()));
+        let mut errors = unit_mismatches(
+            override_values(&design.parameter_overrides),
+            &scope,
+            &scope,
+            graph,
+        );
+        errors.extend(unit_mismatches(additions, &scope, &scope, graph));
+        errors
+    };
+
     {
         let host = host_at_mut(root, pool, host_loc).expect("host_loc just resolved");
         apply_overlay_at_host(
             host,
             &design.parameter_overrides,
             &design.parameter_additions,
+            &unit_errors,
             &design.parameter_section_placements,
             &host_loc.absolute_path.host_path(),
             &RelativePath::self_path(),
@@ -794,11 +831,27 @@ fn apply_scoped_overlay(
         return;
     };
 
+    // A scoped overlay resolves its names from the anchor, not from its host.
+    let unit_errors = {
+        let anchor = host_at_in_view(root, pool, &anchor_loc.absolute_path)
+            .expect("the caller resolved anchor_loc");
+        let host = host_at_in_view(root, pool, &host_loc.absolute_path)
+            .expect("scoped host just resolved");
+        let graph = GraphView::new(root, pool);
+        unit_mismatches(
+            override_values(overrides),
+            &graph.scope(host, host_loc.absolute_path.clone()),
+            &graph.scope(anchor, anchor_loc.absolute_path.clone()),
+            graph,
+        )
+    };
+
     let host = host_at_mut(root, pool, &host_loc).expect("scoped host must exist");
     apply_overlay_at_host(
         host,
         overrides,
         additions,
+        &unit_errors,
         &IndexMap::new(),
         &host_loc.absolute_path.host_path(),
         &anchor_relative,
@@ -809,13 +862,53 @@ fn apply_scoped_overlay(
     );
 }
 
+/// Returns the overrides of a design as the parameter values it applies.
+fn override_values(
+    overrides: &IndexMap<ParameterName, OverlayParameterValue>,
+) -> impl Iterator<Item = (&ParameterName, &ir::ParameterValue, &Span)> {
+    overrides
+        .iter()
+        .map(|(name, overlay)| (name, &overlay.value, &overlay.design_span))
+}
+
+/// Returns the unit mismatch error of each value in `values` that has other
+/// dimensions than the parameter with its name that it replaces on the
+/// instance of `host`, keyed by the parameter name.
+///
+/// The values resolve their names in `overlay_scope`. Both sides count the
+/// unit that a plain reference reaches at this point in the build, including a
+/// dimensionless one.
+fn unit_mismatches<'a, 'v>(
+    values: impl IntoIterator<Item = (&'v ParameterName, &'a ir::ParameterValue, &'v Span)>,
+    host: &Scope<'a>,
+    overlay_scope: &Scope<'a>,
+    graph: GraphView<'a>,
+) -> IndexMap<ParameterName, DesignResolutionError> {
+    let mut units = UnitResolver::new(graph);
+    values
+        .into_iter()
+        .filter_map(|(name, value, span)| {
+            let target = host.instance().parameters().get(name)?;
+            let target_unit = value_scope(target, host, graph).map_or_else(
+                || annotated_unit(target.value()).map(ValueUnit::Annotated),
+                |scope| units.value_unit(target.value(), Binding::of(target), &scope),
+            )?;
+            let value_unit = units.value_unit(value, Binding::Design, overlay_scope)?;
+            let error = check_unit_compatibility(name, target_unit, value_unit, span)?;
+            Some((name.clone(), error))
+        })
+        .collect()
+}
+
 /// Applies one host's worth of design contributions in place,
-/// recording errors for missing / unit-mismatched overlay targets.
+/// recording errors for missing overlay targets and the unit mismatches
+/// in `unit_errors`, which skip the override or addition with their name.
 #[expect(clippy::too_many_arguments, reason = "single internal helper")]
 fn apply_overlay_at_host(
     host: &mut InstancedModel,
     overrides: &IndexMap<ParameterName, OverlayParameterValue>,
     additions: &IndexMap<ParameterName, ir::Parameter>,
+    unit_errors: &IndexMap<ParameterName, DesignResolutionError>,
     addition_placements: &IndexMap<ParameterName, (SectionLabel, Option<ir::Note>)>,
     host_path: &InstancePath,
     anchor_path: &RelativePath,
@@ -824,9 +917,24 @@ fn apply_overlay_at_host(
     contribution_errors: &mut Vec<ContributionDiagnostic>,
     _ctx: &GraphCtx<'_>,
 ) {
+    let unit_error = |name: &ParameterName| {
+        unit_errors.get(name).map(|error| {
+            ContributionDiagnostic::new(
+                host_path.clone(),
+                error.clone(),
+                design_file.clone(),
+                applied_via.cloned(),
+            )
+        })
+    };
+
     // Insert additions first so subsequent override RHS expressions can
     // reference them.
     for (name, parameter) in additions {
+        if let Some(diagnostic) = unit_error(name) {
+            contribution_errors.push(diagnostic);
+            continue;
+        }
         let provenance = ir::DesignProvenance {
             design_path: design_file.clone(),
             is_addition: true,
@@ -863,13 +971,8 @@ fn apply_overlay_at_host(
             ));
             continue;
         };
-        if let Some(err) = check_unit_compatibility(parameter, name, overlay) {
-            contribution_errors.push(ContributionDiagnostic::new(
-                host_path.clone(),
-                err,
-                design_file.clone(),
-                applied_via.cloned(),
-            ));
+        if let Some(diagnostic) = unit_error(name) {
+            contribution_errors.push(diagnostic);
             continue;
         }
         let provenance = ir::DesignProvenance {
@@ -910,8 +1013,10 @@ struct HostLocation {
     absolute_path: AbsolutePath,
 }
 
+/// Where an instance lives: in the root model's tree or in the tree of a
+/// reference-pool entry.
 #[derive(Debug, Clone)]
-enum AbsolutePath {
+pub(super) enum AbsolutePath {
     /// Node at the given path in `graph.root`'s subtree.
     Root(InstancePath),
     /// Node at the given sub-path of pool entry `ModelPath`.
@@ -919,16 +1024,38 @@ enum AbsolutePath {
 }
 
 impl AbsolutePath {
-    fn host_path(&self) -> InstancePath {
+    /// Returns the path within this path's tree.
+    pub(super) fn host_path(&self) -> InstancePath {
         match self {
             Self::Root(p) | Self::Pool(_, p) => p.clone(),
         }
     }
 
-    fn append(&self, seg: ReferenceName) -> Self {
+    /// Returns the path of the submodel `seg` of the instance at this path.
+    pub(super) fn append(&self, seg: ReferenceName) -> Self {
         match self {
             Self::Root(p) => Self::Root(p.child(seg)),
             Self::Pool(pp, p) => Self::Pool(pp.clone(), p.child(seg)),
+        }
+    }
+
+    /// Returns the path that `relative` leads to from this path, or `None`
+    /// when it walks above the root of this path's tree.
+    pub(super) fn resolve(&self, relative: &RelativePath) -> Option<Self> {
+        let walk = |path: &InstancePath| {
+            let ancestor = (0..relative.up).try_fold(path.clone(), |path, _| {
+                path.split_parent_and_self().map(|(parent, _)| parent)
+            })?;
+            Some(
+                relative
+                    .down
+                    .iter()
+                    .fold(ancestor, |path, segment| path.child(segment.clone())),
+            )
+        };
+        match self {
+            Self::Root(p) => walk(p).map(Self::Root),
+            Self::Pool(pp, p) => walk(p).map(|p| Self::Pool(pp.clone(), p)),
         }
     }
 }
@@ -970,7 +1097,7 @@ fn resolve_host_location(
     })
 }
 
-fn host_at_in_view<'a>(
+pub(super) fn host_at_in_view<'a>(
     root: &'a InstancedModel,
     pool: &'a IndexMap<ModelPath, Box<InstancedModel>>,
     absolute: &AbsolutePath,
@@ -1112,30 +1239,38 @@ fn render_path(p: &InstancePath) -> String {
 
 // ── Apply-time helpers ───────────────────────────────────────────────────────
 
+/// Returns an error, at the design assignment `design_span`, when the value
+/// that a design applies to `parameter_name` has a unit with other dimensions
+/// than the parameter it replaces.
 fn check_unit_compatibility(
-    target_param: &ir::Parameter,
     parameter_name: &ParameterName,
-    overlay: &OverlayParameterValue,
+    target_unit: ValueUnit<'_>,
+    overlay_unit: ValueUnit<'_>,
+    design_span: &Span,
 ) -> Option<DesignResolutionError> {
-    let target_unit = match target_param.value() {
-        ir::ParameterValue::Simple(_, u) | ir::ParameterValue::Piecewise(_, u) => u.as_ref()?,
-    };
-    let overlay_unit = match &overlay.value {
-        ir::ParameterValue::Simple(_, u) | ir::ParameterValue::Piecewise(_, u) => u.as_ref()?,
-    };
-
-    if target_unit.dimension() == overlay_unit.dimension() {
+    if target_unit.has_same_dimensions(overlay_unit) {
         return None;
     }
 
+    let target = match target_unit {
+        ValueUnit::Annotated(unit) => {
+            format!("has unit `{}`", unit.display_unit().to_resolved_display())
+        }
+        ValueUnit::Unitless => "has no unit".to_string(),
+    };
+    let value = match overlay_unit {
+        ValueUnit::Annotated(unit) => format!(
+            "value with unit `{}`",
+            unit.display_unit().to_resolved_display()
+        ),
+        ValueUnit::Unitless => "value without a unit".to_string(),
+    };
     Some(DesignResolutionError::new(
         format!(
-            "unit mismatch: parameter `{}` declared as `{}` but design applies value with unit `{}`",
+            "unit mismatch: parameter `{}` {target} but design applies {value}",
             parameter_name.as_str(),
-            target_unit.display_unit().to_resolved_display(),
-            overlay_unit.display_unit().to_resolved_display(),
         ),
-        overlay.design_span.clone(),
+        design_span.clone(),
     ))
 }
 
