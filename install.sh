@@ -25,9 +25,9 @@ Options:
 Prerequisites:
   - Cargo (Rust): https://rustup.rs/
   - gcc (or another C toolchain Cargo can use for linking on this platform)
-  - Python 3.12 development headers (the CLI links against libpython).
-    Preferred: `uv python install 3.12` or `brew install python@3.12`
-  - For --with-python-package: Python 3.12 with pip
+  - Python 3.12 or 3.14 development headers (the CLI links against libpython).
+    Preferred: `uv python install 3.14` or `brew install python@3.14`
+  - For --with-python-package: that same Python with pip
 EOF
 }
 
@@ -90,18 +90,31 @@ if [[ ! -f "$ONEIL_PKG/Cargo.toml" ]]; then
 	exit 1
 fi
 
-# Prefer the supported 3.12 via uv, then Homebrew, then python3 on PATH.
+# Prefer 3.14, then 3.12: uv, Homebrew, then pythonX.Y on PATH.
+pick_python() {
+	local minor="$1"
+	local found
+	if command -v uv >/dev/null 2>&1; then
+		if found="$(uv python find "$minor" 2>/dev/null || true)" && [[ -n "$found" ]]; then
+			PYTHON_CMD="$found"
+			return 0
+		fi
+	fi
+	if command -v brew >/dev/null 2>&1; then
+		if found="$(brew --prefix "python@${minor}" 2>/dev/null)" && [[ -x "$found/bin/python${minor}" ]]; then
+			PYTHON_CMD="$found/bin/python${minor}"
+			return 0
+		fi
+	fi
+	if command -v "python${minor}" >/dev/null 2>&1; then
+		PYTHON_CMD="python${minor}"
+		return 0
+	fi
+	return 1
+}
+
 PYTHON_CMD=""
-if command -v uv >/dev/null 2>&1; then
-	if UV_PY="$(uv python find 3.12 2>/dev/null || true)" && [[ -n "$UV_PY" ]]; then
-		PYTHON_CMD="$UV_PY"
-	fi
-fi
-if [[ -z "$PYTHON_CMD" ]] && command -v brew >/dev/null 2>&1; then
-	if BREW_PREFIX="$(brew --prefix python@3.12 2>/dev/null)" && [[ -x "$BREW_PREFIX/bin/python3.12" ]]; then
-		PYTHON_CMD="$BREW_PREFIX/bin/python3.12"
-	fi
-fi
+pick_python 3.14 || pick_python 3.12 || true
 if [[ -z "$PYTHON_CMD" ]]; then
 	if command -v python3 >/dev/null 2>&1; then
 		PYTHON_CMD="python3"
@@ -111,20 +124,20 @@ if [[ -z "$PYTHON_CMD" ]]; then
 fi
 if [[ -z "$PYTHON_CMD" ]]; then
 	cat <<'EOF' >&2
-Error: Python 3.12 was not found (needed to link the Rust CLI's model Python support).
+Error: Python 3.12 or 3.14 was not found (needed to link the Rust CLI's model Python support).
 
 Install it with one of:
-  uv python install 3.12
-  brew install python@3.12
+  uv python install 3.14
+  brew install python@3.14
 EOF
 	exit 1
 fi
 
 export PYO3_PYTHON="$PYTHON_CMD"
 
-if ! "$PYTHON_CMD" -c 'import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)' 2>/dev/null; then
-	echo "Error: Oneil supports Python 3.12. Found: $($PYTHON_CMD --version 2>&1)" >&2
-	echo "Install 3.12 with: uv python install 3.12   or   brew install python@3.12" >&2
+if ! "$PYTHON_CMD" -c 'import sys; sys.exit(0 if sys.version_info[:2] in ((3, 12), (3, 14)) else 1)' 2>/dev/null; then
+	echo "Error: Oneil supports Python 3.12 and 3.14. Found: $($PYTHON_CMD --version 2>&1)" >&2
+	echo "Install one with: uv python install 3.14   or   brew install python@3.14" >&2
 	exit 1
 fi
 
@@ -134,11 +147,11 @@ Error: Python development headers were not found (Python.h is missing).
 
 The Rust CLI links against Python so models can import `.py` files.
 
-Install Python 3.12 with headers, then re-run this script:
-  uv python install 3.12
-  brew install python@3.12
-  Fedora/RHEL: sudo dnf install python3.12-devel
-  Debian/Ubuntu: sudo apt install python3.12-dev
+Install Python 3.12 or 3.14 with headers, then re-run this script:
+  uv python install 3.14
+  brew install python@3.14
+  Fedora/RHEL: sudo dnf install python3.14-devel
+  Debian/Ubuntu: sudo apt install python3.14-dev
 EOF
 	exit 1
 fi
@@ -148,7 +161,8 @@ if [[ "$WITH_PYTHON_COMPILER" == true && ! -f "$SCRIPT_DIR/pyproject.toml" ]]; t
 	exit 1
 fi
 
-echo "Installing Rust Oneil CLI (default features: rust-lib + python-lib)..."
+echo "Installing oneil and oneil-runner (default features: rust-lib + python-lib)..."
+cargo install --force --path "$SCRIPT_DIR/src/oneil_loader"
 cargo install --force --path "$ONEIL_PKG"
 
 if [[ "$WITH_PYTHON_COMPILER" == true ]]; then

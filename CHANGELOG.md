@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The release CLI supports CPython 3.12 and 3.14. Each OS publishes one `py3.12` archive and one `py3.14` archive (six archives). Install that Python version, then download the matching archive; `oneil` finds a Homebrew, python.org, distro, or uv install of it. The install script and the VS Code / Cursor extension prefer 3.14 when both are installed. Layout-specific archives (homebrew / system / uv) are no longer published.
+
 ## [1.0.0-beta.6] - 2026-08-17
 
 ### Added

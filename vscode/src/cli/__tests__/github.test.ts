@@ -37,13 +37,13 @@ describe("fetchLatestCliRelease", () => {
             }),
         )
 
-        const release = await fetchLatestCliRelease(platform, "homebrew")
+        const release = await fetchLatestCliRelease(platform, "3.14")
         expect(release.tag).toBe("v1.0.0-beta.5")
         expect(release.assetName).toBe(
-            "oneil-v1.0.0-beta.5-aarch64-apple-darwin-homebrew.tar.gz",
+            "oneil-v1.0.0-beta.5-aarch64-apple-darwin-py3.14.tar.gz",
         )
         expect(release.assetUrl).toContain(
-            "/releases/download/v1.0.0-beta.5/oneil-v1.0.0-beta.5-aarch64-apple-darwin-homebrew.tar.gz",
+            "/releases/download/v1.0.0-beta.5/oneil-v1.0.0-beta.5-aarch64-apple-darwin-py3.14.tar.gz",
         )
         expect(urls.every((url) => !url.includes("/releases"))).toBe(true)
         expect(urls.some((url) => url.includes("/tags?"))).toBe(true)
@@ -73,10 +73,10 @@ describe("fetchLatestCliRelease", () => {
             }),
         )
 
-        const pending = fetchLatestCliRelease(platform, "uv")
+        const pending = fetchLatestCliRelease(platform, "3.12")
         await vi.runAllTimersAsync()
         const release = await pending
-        expect(release.assetName).toContain("-uv.tar.gz")
+        expect(release.assetName).toContain("-py3.12.tar.gz")
         expect(tagsCalls).toBe(2)
     })
 })
@@ -107,7 +107,7 @@ describe("listCliReleases", () => {
             }),
         )
 
-        const releases = await listCliReleases(platform, "system")
+        const releases = await listCliReleases(platform, "3.12")
         expect(releases.map((item) => item.tag)).toEqual(["v1.0.0-beta.5", "v1.0.0-beta.4"])
         expect(urls).toHaveLength(1)
         expect(urls[0]).toContain("/tags?")

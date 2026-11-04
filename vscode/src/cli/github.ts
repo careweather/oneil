@@ -3,7 +3,7 @@
  *
  * Do not call `GET /repos/.../releases` (the collection or a single release).
  * Those payloads embed every asset and 504 now that each tag ships several
- * CLI flavors plus wheels. List git tags, then download archives directly
+ * CLI archives plus wheels. List git tags, then download archives directly
  * from `github.com/releases/download/...`.
  */
 
@@ -15,7 +15,7 @@ import {
     toReleaseTag,
 } from "./version"
 import { cliArchiveName, type CliPlatform } from "./platforms"
-import type { PythonFlavor } from "./python"
+import type { PythonMinor } from "./python"
 
 const REPO = "careweather/oneil"
 const API = `https://api.github.com/repos/${REPO}`
@@ -30,8 +30,8 @@ export type GithubRelease = {
     /** Browser download URL for the CLI archive on this platform. */
     assetUrl: string
     assetName: string
-    /** Flavor used to select the asset (unflavored fallback still records the requested flavor). */
-    flavor: PythonFlavor
+    /** Python minor version used to select the asset. */
+    python: PythonMinor
 }
 
 type GithubApiTag = {
@@ -48,16 +48,16 @@ type GithubApiTag = {
  */
 export async function fetchLatestCliRelease(
     platform: CliPlatform,
-    flavor: PythonFlavor,
+    python: PythonMinor,
 ): Promise<GithubRelease> {
     const tags = await listManagedTags(30)
     const picked = pickLatestManagedRelease(tags.map((tag) => ({ tag })))
     if (!picked) {
         throw new Error(
-            `No ${MIN_MANAGED_CLI_VERSION}+ CLI archive was found for ${platform.triple} (${flavor})`,
+            `No ${MIN_MANAGED_CLI_VERSION}+ CLI archive was found for ${platform.triple} (Python ${python})`,
         )
     }
-    return cliReleaseFromTag(picked.tag, platform, flavor)
+    return cliReleaseFromTag(picked.tag, platform, python)
 }
 
 /**
@@ -66,11 +66,11 @@ export async function fetchLatestCliRelease(
  */
 export async function listCliReleases(
     platform: CliPlatform,
-    flavor: PythonFlavor,
+    python: PythonMinor,
     limit = 30,
 ): Promise<GithubRelease[]> {
     const tags = await listManagedTags(limit)
-    return tags.map((tag) => cliReleaseFromTag(tag, platform, flavor)).slice(0, limit)
+    return tags.map((tag) => cliReleaseFromTag(tag, platform, python)).slice(0, limit)
 }
 
 /**
@@ -79,13 +79,13 @@ export async function listCliReleases(
 export async function fetchCliReleaseByTag(
     tag: string,
     platform: CliPlatform,
-    flavor: PythonFlavor,
+    python: PythonMinor,
 ): Promise<GithubRelease> {
     const releaseTag = toReleaseTag(tag)
     if (!isManagedReleaseVersion(releaseTag)) {
         throw new Error(unsupportedReleaseMessage(releaseTag))
     }
-    return cliReleaseFromTag(releaseTag, platform, flavor)
+    return cliReleaseFromTag(releaseTag, platform, python)
 }
 
 /**
@@ -94,17 +94,17 @@ export async function fetchCliReleaseByTag(
 export function cliReleaseFromTag(
     tag: string,
     platform: CliPlatform,
-    flavor: PythonFlavor,
+    python: PythonMinor,
 ): GithubRelease {
     const releaseTag = toReleaseTag(tag)
-    const assetName = cliArchiveName(platform, releaseTag, flavor)
+    const assetName = cliArchiveName(platform, releaseTag, python)
     return {
         tag: releaseTag,
         name: releaseTag,
         prerelease: isPrereleaseVersion(releaseTag),
         assetUrl: releaseDownloadUrl(releaseTag, assetName),
         assetName,
-        flavor,
+        python,
     }
 }
 

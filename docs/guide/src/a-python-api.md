@@ -2,7 +2,7 @@
 
 The `python-lib` Cargo feature builds Oneil’s Python extension module (`oneil_python::py_compat`). It exposes builtin values, units, and functions, plus Python classes for **Interval**, **MeasuredNumber**, and **Unit**.
 
-The Rust CLI enables `python-lib` by default. When a model [`import`](./11-importing-python.md)s a `.py` file, the CLI injects this same module into the machine’s installed Python 3.12, so helpers can `import oneil` without a pip package.
+The Rust CLI enables `python-lib` by default. When a model [`import`](./11-importing-python.md)s a `.py` file, the CLI injects this same module into the machine’s installed Python 3.12 or 3.14, so helpers can `import oneil` without a pip package.
 
 You can also install the module for a standalone Python process (`pip install` / maturin) when you want those types outside the CLI. Oneil’s primary interface is still the **Rust CLI** — see [Installation](./02-installation.md).
 

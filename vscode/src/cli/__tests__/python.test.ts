@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
     flavorsForPlatform,
     isPythonFlavor,
+    isPythonMinor,
     missingPythonHint,
     pythonLaunchEnv,
 } from "../python"
@@ -19,13 +20,15 @@ describe("python flavors", () => {
         expect(isPythonFlavor("system")).toBe(true)
         expect(isPythonFlavor("pyenv")).toBe(false)
         expect(isPythonFlavor(undefined)).toBe(false)
+        expect(isPythonMinor("3.12")).toBe(true)
+        expect(isPythonMinor("3.14")).toBe(true)
+        expect(isPythonMinor("3.13")).toBe(false)
     })
 
-    it("mentions the layouts that work on this OS", () => {
-        expect(missingPythonHint("darwin")).toContain("brew install python@3.12")
-        expect(missingPythonHint("darwin")).toContain("uv python install 3.12")
-        expect(missingPythonHint("win32")).toContain("uv python install 3.12")
-        expect(missingPythonHint("linux")).toContain("python3.12")
+    it("mentions Python 3.12 and 3.14", () => {
+        expect(missingPythonHint("darwin")).toContain("uv python install 3.14")
+        expect(missingPythonHint("win32")).toContain("uv python install 3.14")
+        expect(missingPythonHint("linux")).toContain("python3.14")
     })
 })
 

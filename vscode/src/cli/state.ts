@@ -5,7 +5,7 @@
 
 import type * as vscode from "vscode"
 
-import { isPythonFlavor, type PythonFlavor } from "./python"
+import { isPythonFlavor, isPythonMinor, type PythonFlavor, type PythonMinor } from "./python"
 
 export const STATE_LAST_UPDATE_CHECK = "oneil.cli.lastUpdateCheck"
 export const STATE_SKIPPED_VERSION = "oneil.cli.skippedVersion"
@@ -49,7 +49,7 @@ export async function setSkippedVersion(
 }
 
 /**
- * Python 3.12 layout of the managed binary last written to globalStorage.
+ * Layout flavor recorded for a managed binary from before the exec loader.
  */
 export function getInstalledPythonFlavor(context: vscode.ExtensionContext): PythonFlavor | undefined {
     const value = context.globalState.get<string>(STATE_PYTHON_FLAVOR)
@@ -64,4 +64,22 @@ export async function setInstalledPythonFlavor(
     flavor: PythonFlavor | undefined,
 ): Promise<void> {
     await context.globalState.update(STATE_PYTHON_FLAVOR, flavor)
+}
+
+/**
+ * Python minor version of the managed binary from a current release archive.
+ */
+export function getInstalledPythonMinor(context: vscode.ExtensionContext): PythonMinor | undefined {
+    const value = context.globalState.get<string>(STATE_PYTHON_FLAVOR)
+    return isPythonMinor(value) ? value : undefined
+}
+
+/**
+ * Records the Python minor version the managed binary was downloaded for.
+ */
+export async function setInstalledPythonMinor(
+    context: vscode.ExtensionContext,
+    python: PythonMinor | undefined,
+): Promise<void> {
+    await context.globalState.update(STATE_PYTHON_FLAVOR, python)
 }

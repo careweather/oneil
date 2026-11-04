@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [one CLI binary per Python minor version](./2026-09-23-cli-python-exec-loader.md).
 
 ## Context
 
