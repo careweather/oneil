@@ -235,12 +235,11 @@ impl Runtime {
         // `compose` pulls (or builds) the root unit's self-rooted graph,
         // clones it, and overlays runtime-supplied designs at the root.
         // We then run the post-walk validation pass over the composed graph
-        // before evaluation; the pass pushes per-instance diagnostics into
-        // each [`oneil_frontend::InstancedModel`]'s `validation_errors`
-        // bucket. Walk-link / apply / overlay-target-missing errors are
-        // already on the per-instance buckets, and cycle errors live on
-        // the graph itself, so all error sources are now reachable through
-        // `self.composed_graph` once we stash it below.
+        // before evaluation; the pass fills the graph's `validation_errors`
+        // bucket. Apply / overlay-target-missing errors are already in
+        // `contribution_errors` and cycle errors in `cycle_errors`, so all
+        // error sources are reachable through `self.composed_graph` once we
+        // stash it below.
         let mut graph = self.compose_root_graph(path, &runtime_designs);
         validate_instance_graph(&mut graph, &RuntimeBuiltinLookup { runtime: self });
 
@@ -280,7 +279,7 @@ impl Runtime {
         }
 
         // Hand the composed graph to the runtime so `get_model_diagnostics`
-        // can pull diagnostics directly off the per-instance buckets.
+        // can pull diagnostics directly off the graph's error buckets.
         self.composed_graph = Some(graph);
     }
 

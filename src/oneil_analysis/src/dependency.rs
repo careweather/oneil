@@ -411,9 +411,8 @@ where
 
 /// Gets the dependency graph for all models in the evaluation cache.
 ///
-/// The graph is built from the cached evaluation results. The cache must
-/// have been populated by a prior call to [`Runtime::load_ir`]. This
-/// can be done indirectly by calling [`Runtime::eval_model`].
+/// The graph is built from the cached evaluation results, so the cache must
+/// have been populated by a prior call to `Runtime::eval_model`.
 #[must_use]
 fn get_dependency_graph<E: ExternalAnalysisContext>(
     external_context: &E,
