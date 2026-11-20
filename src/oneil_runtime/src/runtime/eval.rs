@@ -266,7 +266,7 @@ impl Runtime {
                 match maybe_partial.into_result() {
                     Ok(model) => {
                         self.eval_cache
-                            .insert(instance_key.clone(), LoadResult::success(model));
+                            .insert(instance_key, LoadResult::success(model));
                     }
                     Err(partial) => {
                         self.eval_cache.insert(
