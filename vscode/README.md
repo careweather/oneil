@@ -27,7 +27,7 @@ We are actively working on expanding the capabilities of this extension. Upcomin
 
 ## Requirements
 
-- Visual Studio Code version 1.0.0 or higher
+- Visual Studio Code version 1.91 or higher (or a compatible editor such as Cursor)
 - An Oneil CLI for the language server. The extension can **download it from GitHub Releases** (Command Palette: “Oneil: Install or Update CLI”, or accept the prompt when none is found). You can also put `oneil` on your PATH, set `ONEIL_PATH`, or set **Oneil: Server Path** to a local build.
 - **Python 3.12** for the release CLI (`brew install python@3.12`, the python.org 3.12 installer, or `uv python install 3.12`). The extension downloads the archive that matches that layout.
 
@@ -40,5 +40,5 @@ Please [report any issues](https://github.com/careweather/oneil/issues) you enco
 
 ## Contributing
 
-We welcome contributions! Feel free to [submit pull requests](https://github.com/careweather/oneil/pulls) or [open issues](https://github.com/careweather/oneil/issues) on our GitHub repository.
+We welcome contributions! Feel free to [submit pull requests](https://github.com/careweather/oneil/pulls) or [open issues](https://github.com/careweather/oneil/issues) on our GitHub repository. See the [contributing guide](https://github.com/careweather/oneil/blob/main/vscode/docs/CONTRIBUTING.md) for development setup.
 

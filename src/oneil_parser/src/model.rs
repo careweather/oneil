@@ -443,8 +443,8 @@ mod tests {
         let input = InputSpan::new_extra("", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
-        assert!(model.decls().is_empty());
-        assert!(model.sections().is_empty());
+        assert_eq!(model.decls(), []);
+        assert_eq!(model.sections(), []);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -453,8 +453,8 @@ mod tests {
         let input = InputSpan::new_extra("~ This is a note\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with note");
         assert!(model.note().is_some());
-        assert!(model.decls().is_empty());
-        assert!(model.sections().is_empty());
+        assert_eq!(model.decls(), []);
+        assert_eq!(model.sections(), []);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -470,7 +470,7 @@ mod tests {
         };
         assert_eq!(import_node.path().as_str(), "foo");
 
-        assert!(model.sections().is_empty());
+        assert_eq!(model.sections(), []);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -491,7 +491,7 @@ mod tests {
         assert_eq!(submodel_info.subcomponents().len(), 0);
         assert_eq!(submodel_info.get_alias().as_str(), "foo");
 
-        assert!(model.sections().is_empty());
+        assert_eq!(model.sections(), []);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -500,7 +500,7 @@ mod tests {
         let input = InputSpan::new_extra("section foo\nimport bar\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse model with section");
         assert!(model.note().is_none());
-        assert!(model.decls().is_empty());
+        assert_eq!(model.decls(), []);
         assert_eq!(model.sections().len(), 1);
         let section = &model.sections()[0];
         assert_eq!(section.header().label().as_str(), "foo");
@@ -521,7 +521,7 @@ mod tests {
         let (rest, model) =
             parse_complete(input).expect("should parse model with multiple sections");
         assert!(model.note().is_none());
-        assert!(model.decls().is_empty());
+        assert_eq!(model.decls(), []);
         assert_eq!(model.sections().len(), 2);
 
         let section1 = &model.sections()[0];
@@ -548,8 +548,8 @@ mod tests {
         let input = InputSpan::new_extra("\n", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
-        assert!(model.decls().is_empty());
-        assert!(model.sections().is_empty());
+        assert_eq!(model.decls(), []);
+        assert_eq!(model.sections(), []);
         assert_eq!(rest.fragment(), &"");
     }
 
@@ -585,8 +585,8 @@ mod tests {
         let input = InputSpan::new_extra("", Config::default());
         let (rest, model) = parse_complete(input).expect("should parse empty model");
         assert!(model.note().is_none());
-        assert!(model.decls().is_empty());
-        assert!(model.sections().is_empty());
+        assert_eq!(model.decls(), []);
+        assert_eq!(model.sections(), []);
         assert_eq!(rest.fragment(), &"");
     }
 

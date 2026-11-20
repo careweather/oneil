@@ -196,36 +196,32 @@ Two distinct buckets, with distinct lifetimes:
 
 - **File-local** (cached on each unit's `InstanceGraph`):
   - parse / lower
-  - bare-name resolution against own params
-  - reference-name resolution against own refs
   - own-`apply` target existence
   - own-`apply` overlay-target-missing (message + best-match suggestion +
     design assignment span)
   - dimensional grammar
-  - file-local SCC over parameter dependencies
-  - `p.r` where `p` doesn't exist on the spliced child *after* the local apply
-    ran (locally-applied designs are visible at link time)
 - **Composition** (computed per `eval_model` / `check_model` call):
   - runtime-overlay-target-missing (same diagnostic, both callsites)
   - runtime-overlay unit mismatch
   - composition-introduced cycles
 - **Post-composition validation** (run once after composition via
   `validate_instance_graph`):
+  - reclassification of bare names against each instance's final scope
   - undefined parameters (`Variable::Parameter` not in binding scope)
   - undefined cross-instance references (`p.r` where `r` not in any import map)
   - undefined cross-instance reference parameters (`p.r` where `p` not in `r`'s
-    model)
-  - cross-instance SCC over parameter dependencies
+    model); locally-applied designs are already visible here
+  - SCC over parameter dependencies, both file-local and cross-instance
 
 All error buckets live on the graph itself, not on individual `InstancedModel`
-nodes. This lets `get_model_errors` read a single structure rather than
+nodes. This lets `get_model_diagnostics` read a single structure rather than
 traversing the tree.
 
 ### No runtime side tables
 
 `Runtime` holds no `*_errors` fields. Instead it holds
 `composed_graph: Option<InstanceGraph>` populated by `eval_model_internal` and
-`check_model_internal`. `get_model_errors` reads the four error buckets
+`check_model_internal`. `get_model_diagnostics` reads the four error buckets
 (`cycle_errors`, `resolution_errors`, `contribution_errors`,
 `validation_errors`) straight off the composed graph, falling back through
 `unit_graph_cache` for paths not yet reached by composition.
@@ -241,13 +237,12 @@ enum CompilationUnit {
 type UnitGraphCache = IndexMap<CompilationUnit, InstanceGraph>;
 ```
 
-One map, one source of structural truth per unit. Cache invalidation:
+One map, one source of structural truth per unit. Because cached graphs are self-rooted, the cache supports per-unit invalidation:
 
-- Edit `foo.on` → invalidate `CompilationUnit::Model(foo)` only.
-- Edit `bar.one` → invalidate `CompilationUnit::Design(bar)` only.
+- Edit `foo.on` → invalidate `CompilationUnit::Model(foo)` and the units that depend on it.
+- Edit `bar.one` → invalidate `CompilationUnit::Design(bar)` and the units that depend on it.
 
-Anyone composing with the affected unit re-composes on next `eval_model` /
-`check_model` call (composition is cheap).
+The runtime currently clears the whole cache on any source change; see [Per-unit invalidation](#per-unit-invalidation). Anyone composing with an affected unit re-composes on the next `eval_model` / `check_model` call (composition is cheap).
 
 ### Settled semantics
 
@@ -302,7 +297,7 @@ described above. Key pieces:
 
 - **`composed_graph`.** `Runtime` holds `composed_graph: Option<InstanceGraph>`
   populated by each `eval_model_internal` / `check_model_internal`.
-  `get_model_errors` reads the four error buckets directly off it.
+  `get_model_diagnostics` reads the four error buckets directly off it.
 
 - **`CompilationCycleError`.** First-class cycle errors with
   `cycle: Vec<CompilationUnit>` and `(unit, imported_at)` stack frames,
@@ -322,7 +317,7 @@ described above. Key pieces:
   `applied_via: Option<DesignApplication>`. The build pass writes the
   originating apply (the `apply X to Y` statement that brought this
   contribution in) when one exists; `None` is reserved for the synthetic
-  CLI design-as-root path. `get_model_errors` uses
+  CLI design-as-root path. `get_model_diagnostics` uses
   `surface_contribution_diagnostic` to render the precise diagnostic at the
   design file and a generic "applied design produced invalid contributions"
   diagnostic at the apply site. The same primitive (`surface_apply_hop`)
@@ -339,7 +334,7 @@ described above. Key pieces:
 - **Resolution errors on graph.** `InstanceGraph::resolution_errors:
   IndexMap<ModelPath, ResolutionErrorCollection>` carries file-time resolver
   diagnostics alongside the graph. `merge_child_graph` merges child entries in.
-  `get_model_errors` prefers the composed graph, falls back to the per-unit
+  `get_model_diagnostics` prefers the composed graph, falls back to the per-unit
   cached graph, then `ir_cache` for paths not yet reached by composition.
 
 - **`validate_instance_graph`.** Runs cross-instance `p.r` existence and
@@ -376,13 +371,17 @@ described above. Key pieces:
 call. Profiling will dictate whether to introduce a composed-graph memo keyed
 by `(root, runtime_designs)`.
 
+### Per-unit invalidation
+
+`Runtime::clear_non_source_caches` clears the entire `UnitGraphCache`, design info, eval cache, and composed graph whenever any source changes. Invalidating only the changed unit and its dependents is not implemented yet.
+
 ### Analysis split — per-unit vs composition check map
 
 For reference, the settled assignment of checks to passes:
 
 | Check | Where it runs |
 |---|---|
-| Bare-name existence | Per-unit build (reclassify-and-link) |
+| Bare-name classification and existence | `validate_instance_graph` over the composed graph |
 | Reference-name existence | `validate_instance_graph` over the composed graph |
 | Unit compatibility (overlay vs target) | Inline in `apply_contribution_here`, both per-unit splice and runtime-design |
 | Overlay-target-missing | Same |
@@ -414,8 +413,7 @@ as its own root — a degenerate composition with no parent overlays.
 | Design `design <target>` doesn't match resolved model | `InstanceGraph::contribution_errors` | At every depth |
 | Overlay unit dimensionally incompatible with target | `InstanceGraph::contribution_errors` | File-local for own-applies, composition for runtime designs |
 | Overlay overrides nonexistent target parameter | `InstanceGraph::contribution_errors` | Same diagnostic, both callsites |
-| File-local SCC on parameter dependencies | File-local (per-unit build) | Detectable without runtime designs |
-| Cross-instance SCC on parameter dependencies | `InstanceGraph::validation_errors` | Post-composition only |
+| SCC on parameter dependencies (file-local and cross-instance) | `InstanceGraph::validation_errors` | Post-composition only |
 | Composition cycle introduced by runtime designs | `InstanceGraph::cycle_errors` | Only emerges with runtime overlays |
 | Best-match suggestions for typo'd identifiers | File-local or `contribution_errors` | Same machinery in both buckets |
 | Test expression has unresolved variable | File-local (per-unit build) | Tests lower like parameters |
@@ -463,8 +461,7 @@ What becomes easier:
 - **LSP open-file flows have a natural diagnostics target.** No synthetic root
   needed: the cached unit graph for the opened file carries every file-local
   diagnostic.
-- **Cache invalidation is per-file.** Editing `foo.on` invalidates one entry;
-  downstream composers rebuild composition cheaply on next eval.
+- **Cache invalidation can be per-file.** Self-rooted unit graphs let an edit to `foo.on` invalidate only `foo` and its dependents, with downstream composers rebuilding composition cheaply on the next eval. The runtime does not do this yet (see [Per-unit invalidation](#per-unit-invalidation)).
 - **Diagnostic shape is uniform across the two callsites.** Local-apply and
   runtime-overlay errors share the same emit path through `merge_child_graph` +
   `apply_contribution_here`, so message / span / best-match logic doesn't fork.
@@ -482,7 +479,7 @@ What becomes harder / requires care:
   profiling.
 - **Mutual references are a hard error.** Files that share circular dependencies
   surface cycles through the per-build stack.
-- **Composition errors live on a transient graph.** `get_model_errors` has to
+- **Composition errors live on a transient graph.** `get_model_diagnostics` has to
   materialize the composed graph on demand, since composition errors don't
   survive on the cached unit graphs. The cost is bounded by the per-unit cache
   and the linearity of composition.

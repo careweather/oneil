@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded in direction by [Check As Early As Possible](2026-11-20-check-as-early-as-possible.md). Value-dependent checks still run during evaluation, as described below.
 
 ## Context
 

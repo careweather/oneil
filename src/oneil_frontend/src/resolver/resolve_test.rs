@@ -6,8 +6,7 @@ use oneil_ir as ir;
 use oneil_shared::symbols::TestIndex;
 
 use crate::{
-    ExternalResolutionContext, ResolutionContext,
-    error::{self},
+    ExternalResolutionContext, ResolutionContext, error,
     resolver::{
         resolve_expr::{get_expr_dependencies, resolve_expr},
         resolve_trace_level::resolve_trace_level,

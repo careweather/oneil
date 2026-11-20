@@ -70,27 +70,33 @@ settings](https://users.rust-lang.org/t/how-to-use-clippy-in-vs-code-with-rust-a
 1. Clone the repository
 2. Install the following dependencies (or use `nix develop` if in a Nix environment):
     - latest stable Rust toolchain
-    - `nodejs`
-    - `npm` or `pnpm`
-    - `vscode`
+    - `nodejs` and `npm`
+    - VS Code (or a compatible editor such as Cursor)
 3. Run `cargo build` to compile Oneil
-4. Run `cd vscode` followed by `pnpm run compile` to bundle Oneil as a vscode LSP plugin
-5. If not already opened, open VSCode in the current directory
-6. Press the `F5` key to launch VSCode's Extension Development Host (should open a separate window)
-7. Open any `.on` file you want to try the LSP on! Have a look at [the `test` directory](./test) for some example files
+4. Run `npm install` in `vscode/` and in `vscode/model-renderer/`
+5. Open the `vscode/` folder, run the **Build All** task, then press `F5` to launch the Extension Development Host
+6. Open any `.on` file you want to try the LSP on! The [`examples` directory](./examples) has example models
+
+See [`vscode/docs/CONTRIBUTING.md`](vscode/docs/CONTRIBUTING.md) for details, including how to point the extension at your local CLI build.
 
 ## System Architecture
 
-The architecture of the system is described in [`docs/architecture/README.md`](docs/architecture/README.md). The code itself is found in [`src/`](src/).
+- [`docs/architecture/README.md`](docs/architecture/README.md) gives an overview of the crates and the libraries they use. The code itself is found in [`src/`](src/).
+- [`docs/architecture/compiler-pipeline.md`](docs/architecture/compiler-pipeline.md) describes each compiler phase, what it validates, what is fixed after it, and where new checks belong.
+- [`docs/architecture/vscode-extension.md`](docs/architecture/vscode-extension.md) describes the VS Code extension and the Rendered View.
+- Significant design decisions are recorded in [`docs/decisions/`](docs/decisions/README.md), and the language is specified in [`docs/specs/`](docs/specs/).
 
 ## Coding Standards
 
-Code should follow the principles laid out in
-[`docs/principles.md`](docs/principles.md).
+Rust code should follow [`docs/CODING_STANDARDS.md`](docs/CODING_STANDARDS.md). Oneil models (examples, fixtures, and the guide) should follow [`docs/ONEIL_CODING_STANDARDS.md`](docs/ONEIL_CODING_STANDARDS.md).
 
 ## Git hooks
 
-Run `git config core.hooksPath .githooks` to set up some automated checks to run before committing and pushing.
+Run `git config core.hooksPath .githooks` once after cloning. The hooks (see [`.githooks/README.md`](.githooks/README.md)) do the following when Rust files are involved:
+
+- **pre-commit:** run `cargo fmt` and regenerate the TypeScript bindings in `packages/ts-interfaces`, staging the results;
+- **post-commit:** run `cargo clippy --fix` and amend the commit with any fixes;
+- **pre-push:** run clippy and the full test suite with warnings denied.
 
 ## Building the user guide
 
@@ -140,6 +146,13 @@ pull requests:
 
 - **Unused dependencies** — `cargo udeps` on nightly to catch crates that are
   declared but unused.
+
+### Editor tooling and generated types (when their paths change)
+
+- [`.github/workflows/vscode-extension.yml`](.github/workflows/vscode-extension.yml) runs the extension's Vitest suite (`npm test` in `vscode/`).
+- [`.github/workflows/model-renderer.yml`](.github/workflows/model-renderer.yml) builds the Rendered View webview and runs its tests (`vscode/model-renderer/`).
+- [`.github/workflows/ts-interfaces.yml`](.github/workflows/ts-interfaces.yml) runs `./scripts/check-ts-interfaces.sh`, which fails if the committed TypeScript bindings in `packages/ts-interfaces` differ from what the Rust types generate.
+- [`.github/workflows/model-test-report-action.yml`](.github/workflows/model-test-report-action.yml) typechecks, lints, tests, and checks the built output of the [`model-test-report`](actions/model-test-report/README.md) GitHub Action.
 
 ### Semgrep (pull requests)
 

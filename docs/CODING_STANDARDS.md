@@ -49,22 +49,30 @@ Make sure that you *include an informative error message* no matter which option
 you decide to use. Note that the messages for the macros can be formatted in the
 same way as `println!`.
 
-## Mark TODOs And Unimplemented Features
+## Deferred Work And Unimplemented Features
 
 When implementing a feature, you may think of future improvements that could be
 made to the code. In addition, you often don't have time to handle every path or
 edge case.
 
-If the code works as is but could be improved in the future, use a `// TODO`
-comment. This makes these tasks easier to find.
+Don't record deferred work in code comments. Semgrep rejects comments containing
+`TODO`, `FIXME`, `XXX`, `TBD`, and similar markers. Instead:
+
+- **External contributors:** open a [GitHub issue](https://github.com/careweather/oneil/issues)
+  describing the deferred work and link it from the pull request.
+- **Care Weather contributors:** record it in the pull request discussion, or ask
+  a maintainer to add it to the roadmap.
+
+Code comments describe the code as it is: its behavior, contracts, and invariants.
 
 When you are developing, mark unhandled paths and edge cases with the
 `todo!(<message>)` macro. This ensures that those paths fail when you encounter
 them.
 
-However, if you try to merge a pull request with `todo!`s in the code, it will
-fail when linted. If you don't intend to resolve the `todo!`s in the pull request,
-change the `todo!` macro to `unimplemented!`.
+However, `todo!` and `unimplemented!` can't be merged; Semgrep rejects both. Before
+merging, implement the path or return a clear error (a recoverable error the user
+sees, such as "this is not supported yet"), and record the deferred work as
+described above. Use `unreachable!("why")` only for a path that can never run.
 
 > Note that the `todo!` and `unimplemented!` macros returns a type that coerces
 > to any other type. So the following code is valid.

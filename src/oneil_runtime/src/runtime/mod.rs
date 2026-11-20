@@ -68,12 +68,11 @@ pub struct Runtime {
     design_info: IndexMap<ModelPath, ModelDesignInfo>,
     eval_cache: EvalCache,
     /// The most recently composed instance graph, kept reachable from
-    /// `&self` so [`Runtime::get_model_diagnostics`] can pull per-instance
-    /// diagnostics straight off it (validation, contribution, overlay-target-missing)
-    /// and the graph-level cycle bucket.
+    /// `&self` so [`Runtime::get_model_diagnostics`] can pull diagnostics
+    /// straight off its error buckets (validation, contribution, cycle).
     ///
-    /// Populated by `eval_model_internal` after each composition + eval
-    /// pass; cleared whenever any source cache changes (see
+    /// Populated by `eval_model_internal` and `check_model_internal` after
+    /// each composition; cleared whenever any source cache changes (see
     /// [`Runtime::clear_non_source_caches`]) since stale graphs would
     /// surface diagnostics whose spans no longer match the current
     /// source. `None` before the first eval (or after a cache clear),

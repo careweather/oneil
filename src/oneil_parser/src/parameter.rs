@@ -336,10 +336,6 @@ fn piecewise_part(input: InputSpan<'_>) -> Result<'_, PiecewisePartNode, ParserE
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::float_cmp,
-    reason = "it will be obvious when floating point equality fails and we need to use a tolerance"
-)]
 mod tests {
     use super::*;
     use crate::{

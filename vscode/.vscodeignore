@@ -4,7 +4,6 @@
 
 # Developer docs
 .gitignore
-vsc-extension-quickstart.md
 docs/**
 
 # Extension source — bundled into out/extension.js by esbuild

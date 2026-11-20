@@ -12,7 +12,7 @@ You are reviewing a pull request for compliance with this repository's coding st
    contents for large or truncated hunks.
 4. Give concise, actionable feedback keyed to these sections from the standards:
    - Error handling (recoverable `Result` vs unrecoverable `expect` / `assert!` / `unreachable!` / `panic!`)
-   - TODOs and unimplemented features (`// TODO`, `todo!`, `unimplemented!`)
+   - Deferred work and unimplemented features (no deferred-work comments; no `todo!` or `unimplemented!` at merge; deferred work recorded in the PR or a linked issue)
    - Prefer flat code
    - Prefer readable code over terse code
    - Use macros when it would make things easier to read and maintain, prefer simpler macros.

@@ -387,8 +387,8 @@ fn eval_fallback<E: ExternalEvaluationContext>(
                     context.push_eval_warning(EvalWarning::UsedFallback {
                         function_name,
                         function_call_span,
-                        message: message.clone(),
-                        traceback: traceback.clone(),
+                        message,
+                        traceback,
                     });
                 }
 

@@ -17,4 +17,5 @@ git config core.hooksPath .githooks
   any binding changes.
 - **post-commit** — when the commit touched Rust: run `cargo clippy --fix`
   and amend with any fixes.
-- **pre-push** — run clippy with warnings denied.
+- **pre-push** — when the pushed commits touch Rust: run `cargo fmt`, then
+  clippy and the full test suite with warnings denied.

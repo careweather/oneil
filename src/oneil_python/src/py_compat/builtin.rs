@@ -64,7 +64,7 @@ pub fn units(m: &Bound<'_, PyModule>) -> PyResult<()> {
                 let python_prefixed_name = format!("{prefix_str}{python_alias_str}");
 
                 let prefixed_display = DisplayUnit::Unit {
-                    name: prefixed_name.clone(),
+                    name: prefixed_name,
                     exponent: 1.0,
                 };
 
