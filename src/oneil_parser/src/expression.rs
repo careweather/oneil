@@ -515,10 +515,6 @@ fn parenthesized_expr(input: InputSpan<'_>) -> Result<'_, ExprNode, ParserError>
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::float_cmp,
-    reason = "it will be obvious when floating point equality fails and we need to use a tolerance"
-)]
 mod tests {
     use super::*;
     use crate::Config;

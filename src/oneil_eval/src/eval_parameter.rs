@@ -452,7 +452,7 @@ fn eval_number_discrete_limits(
                         errors.push(EvalError::DiscreteLimitUnitMismatch {
                             limit_unit: limit_unit.display_unit.clone(),
                             limit_span: limit_expr_span.clone(),
-                            value_unit: number_result_unit.display_unit.clone(),
+                            value_unit: number_result_unit.display_unit,
                             value_unit_span: expr_span.clone(),
                         });
                     }
@@ -1394,7 +1394,7 @@ mod tests {
         );
         let result = eval_parameter_simple(&parameter).expect("eval should succeed");
         assert_eq!(result.value, Value::Boolean(true));
-        assert!(result.warnings.is_empty());
+        assert_eq!(result.warnings, [] as [EvalWarning; 0]);
     }
 
     #[test]
