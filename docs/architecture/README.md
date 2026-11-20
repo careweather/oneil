@@ -4,7 +4,11 @@ The Rust code lives under `src/` as a single workspace. The **frontend** is what
 
 **Data flow (simplified):** source text is parsed into an AST (**`oneil_ast`** / **`oneil_parser`**), per-file IR is produced and then composed into an `InstanceGraph` (**`oneil_ir`** / **`oneil_frontend`**), the composed graph is validated (**`oneil_analysis`**), and expressions are evaluated to values (**`oneil_eval`** / **`oneil_output`**). Standard units, prefixes, and builtins come from **`oneil_builtins`**. Optional Python interop is implemented in **`oneil_python`**. Cross-cutting types and helpers live in **`oneil_shared`**.
 
-The pipeline is two-pass: a per-unit build pass (cached by compilation unit) produces a self-rooted `InstanceGraph` for every file or design, and a composition step clones the cached root-unit graph and overlays runtime designs to produce the graph that eval runs against. See [`../decisions/2026-04-24-two-pass-instance-graph.md`](../decisions/2026-04-24-two-pass-instance-graph.md) for the decision record and [`design-overlays.md`](design-overlays.md) for the developer-facing implementation guide.
+Further reading:
+
+- [`compiler-pipeline.md`](compiler-pipeline.md) describes each phase: what it consumes and produces, what it validates, what is fixed afterwards, how caches are invalidated, and where a new check belongs.
+- [`design-overlays.md`](design-overlays.md) is the implementation guide for designs, `apply`, and the two-pass instance graph. The motivating decision is [`../decisions/2026-04-24-two-pass-instance-graph.md`](../decisions/2026-04-24-two-pass-instance-graph.md).
+- [`vscode-extension.md`](vscode-extension.md) describes the VS Code extension, its Rendered View webview, and how they talk to the language server.
 
 The **`oneil`** crate is the entrypoint for external reuse. As a binary, it runs the Oneil CLI. As a library, it exports all other libraries with the `oneil_` prefix stripped.
 
@@ -100,8 +104,28 @@ flowchart TD
 | **`oneil_eval`** | Evaluates IR to values: the core interpreter for expressions and the dynamic semantics. Takes resolved IR and `oneil_output` types; does not parse or resolve by itself. |
 | **`oneil_builtins`** | Supplies the standard environment: builtin functions, physical units, SI prefixes, and related values. Built on the evaluator and value types; the runtime installs this as the default builtins. |
 | **`oneil_python`** | Bridges Oneil and an installed CPython: converting values and calling into Python from evaluated Oneil code. Used from the runtime path that supports Python interop, not from the parser alone. |
-| **`oneil_analysis`** | Semantic analysis and static checks over IR—extra diagnostics beyond “does it parse and resolve,” such as consistency rules the language cares about before or alongside execution. |
-| **`oneil_runtime`** | The `Runtime` type and glue: caches for sources, ASTs, and per-unit `InstanceGraph`s (`UnitGraphCache`); loads files; wires parser → frontend → analysis → eval; holds builtins and optional Python state. Both **`oneil_cli`** and **`oneil_lsp`** depend on this, not on each backend crate separately. |
-| **`oneil_cli`** | The command-line interface: run files, print results and errors, file watching where supported, and a command that starts the language server (via **`oneil_lsp`**). |
-| **`oneil_lsp`** | Language Server Protocol server for editors: diagnostics, hover, and related features, implemented on top of **`oneil_runtime`** (async server stack). |
+| **`oneil_py_call_cache`** | Persists Python call results to disk under `__oncache__/`, keyed by the import's content hash, the function, and its inputs, so unchanged Python calls are not re-run. The runtime's read and write cache policies control it. |
+| **`oneil_analysis`** | Validation of the composed instance graph (name existence, variable classification, parameter cycles), plus analyses over evaluated models: dependency and reference trees and independent parameters. |
+| **`oneil_runtime`** | The `Runtime` type and glue: caches for sources, ASTs, per-unit `InstanceGraph`s (`UnitGraphCache`), evaluated models, and Python; loads files; wires parser → frontend → analysis → eval; collects diagnostics. Both **`oneil_cli`** and **`oneil_lsp`** depend on this, not on each backend crate separately. |
+| **`oneil_cli`** | The command-line interface: `eval`, `check`, `test`, `tree`, `independent`, `builtins`, and `lsp` (which starts **`oneil_lsp`**), with file watching and hidden `dev` commands for printing the AST and IR. |
+| **`oneil_lsp`** | Language Server Protocol server for editors: diagnostics, hover, definition, references, rename, highlights, and the `oneil/instanceTree` command behind the Rendered View, implemented on top of **`oneil_runtime`**. |
 | **`oneil_snapshot_tests`** | Integration tests that run the runtime against fixtures and compare output to saved snapshots. Keeps behavior stable across refactors; not shipped to end users. |
+
+## External libraries
+
+Each choice below is the default for its concern. Prefer it over adding a new dependency that does the same job.
+
+| Concern | Library | Used in |
+| --- | --- | --- |
+| Parsing | `nom` with `nom_locate` (combinators in a recursive-descent style; no separate lexer) | `oneil_parser` |
+| Ordered maps and sets | `indexmap` | most crates |
+| Serialization of wire types | `serde`, `serde_json` | `oneil_shared`, `oneil_ir`, `oneil_output`, `oneil_lsp`, `oneil_cli`, `oneil_py_call_cache` |
+| TypeScript bindings for wire types | `ts-rs` (behind the `ts-bindings` feature; output in `packages/ts-interfaces`) | `oneil_shared`, `oneil_ir`, `oneil_output`, `oneil_lsp`, `oneil_cli` |
+| Python interop | `pyo3` (stable `abi3-py310` ABI) | `oneil_python`, `oneil` (optional Python extension module) |
+| Hashing Python sources | `xxhash-rust` | `oneil_python` |
+| Command-line parsing | `clap` (derive) | `oneil_cli` |
+| File watching | `notify` | `oneil_cli` |
+| Terminal colour | `owo-colors`, `anstream` | `oneil_cli`, `oneil_analysis` |
+| Language server | `tower-lsp-server` on `tokio` | `oneil_lsp` |
+| Snapshot tests | `insta` | `oneil_snapshot_tests` |
+| Fuzzing | `cargo fuzz` with `arbitrary` | `oneil_output/fuzz` |

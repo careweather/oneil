@@ -17,9 +17,9 @@ user-facing spec) with developer-focused details.
 parse → resolve (per-file IR) → per-unit build (cached) → composition → validate → eval
 ```
 
-The resolver produces a clean per-file IR (`Model`, `Design`, `ApplyDesign`).
-It does **not** stamp out per-instance overlays, walk reference chains, or
-cross-link variables.
+The contract for each phase (inputs, outputs, validations, and what is fixed afterwards) is in [`compiler-pipeline.md`](compiler-pipeline.md). This guide covers how designs move through those phases.
+
+The resolver produces a clean per-file result: an `InstancedModel` template, an optional `Design` export, and the file's `ApplyDesign` declarations. It does **not** stamp out per-instance overlays, walk reference chains, or cross-link variables.
 
 The **instance graph** is built in two phases in `oneil_frontend::instance::graph`:
 
@@ -43,14 +43,13 @@ composition. Evaluation runs lazily over the validated composed graph.
 
 ### Per-file IR: `Design` and `ApplyDesign`
 
-`Design` (in `oneil_ir::design_overlay`) is the resolved form of a `.one`
+`Design` (in `oneil_frontend::instance::design`, alongside `ApplyDesign`) is the resolved form of a `.one`
 design file. It holds the optional target model path, parameter overrides and
 additions at the top level, and scoped overrides for a single nested reference
 declared directly in the design (e.g. `x.ref = value`). Nested `apply X to ref`
 declarations within a design file are recorded as `ApplyDesign` records on the
-model IR (not in `Design`) and are processed recursively by the graph builder.
-A model's IR carries `applied_designs: Vec<ApplyDesign>`, consumed during the
-per-unit build.
+model's design metadata (not in `Design`) and are processed recursively by the graph builder.
+Each file's `ModelDesignInfo` carries `applied_designs: Vec<ApplyDesign>` and its `design_export`, consumed during the per-unit build and composition.
 
 ### Variables are unresolved at file time
 
@@ -110,13 +109,11 @@ in the tree.
 A `CompilationUnit` is either a `Model(ModelPath)` or a `Design(DesignPath)`
 (defined in `oneil_frontend::instance::compilation_unit`). The `UnitGraphCache`
 maps each `CompilationUnit` to its cached `InstanceGraph` and lives on
-`Runtime` as `unit_graph_cache`. Cache invalidation:
+`Runtime` as `unit_graph_cache`.
 
-- Edit `foo.on` → invalidate `CompilationUnit::Model(foo)` only.
-- Edit `bar.one` → invalidate `CompilationUnit::Design(bar)` only.
+Cache invalidation is currently whole-cache: any source change clears every unit graph, the design info, the eval cache, and the composed graph (`Runtime::clear_non_source_caches`). Self-rooted unit graphs make per-unit invalidation possible, but it is not implemented.
 
-Composition is cheap (linear in instance count); downstream composers rebuild
-on the next `eval_model` / `check_model` call.
+Composition is cheap (linear in instance count); it is rebuilt on every `eval_model` / `check_model` call.
 
 ## Resolution phase
 
@@ -211,6 +208,7 @@ Errors fall into two distinct buckets with distinct lifetimes:
 - design `design <target>` doesn't match resolved model
 
 **Post-composition validation** (run once via `validate_instance_graph`):
+- bare-name reclassification (parameter vs. builtin) against the final instance scope
 - bare-name existence (`Variable::Parameter` not in binding scope)
 - reference-name existence (`p.r` where `r` not in any import map)
 - reference parameter existence (`p.r` where `p` not in `r`'s model)
@@ -229,20 +227,18 @@ graph is never mutated.
 
 `Runtime` holds no `*_errors` fields. Instead it holds
 `composed_graph: Option<InstanceGraph>` populated by each
-`eval_model_internal` / `check_model_internal`. `get_model_errors` reads the
+`eval_model_internal` / `check_model_internal`. `get_model_diagnostics` reads the
 four error buckets directly off the composed graph, falling back through
 `unit_graph_cache` for paths not yet reached by composition.
 
 ## Evaluation phase
 
-Evaluation uses a **lazy memoized** strategy. `EvalContext::from_graph` seeds
+Evaluation is skipped entirely when the composed graph has validation, cycle, or contribution errors. Otherwise, evaluation uses a **lazy memoized** strategy. `EvalContext::from_graph` seeds
 one `ParamSlot` per parameter per instance from the (already applied + linked)
 composed graph. Parameters are forced on demand; cycles surface on re-entrance
 via `ParamSlot::InProgress`.
 
-Design-application failures (e.g. overlay-target-missing) are recorded on the
-composed graph and surfaced through the same parameter-error machinery as any
-other evaluation failure.
+Design-application failures (e.g. overlay-target-missing) are recorded in the composed graph's `contribution_errors` and reported through `Runtime::get_model_diagnostics` alongside every other diagnostic.
 
 ### Memo table: `ParamSlot`
 
