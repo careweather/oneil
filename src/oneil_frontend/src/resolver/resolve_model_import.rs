@@ -110,7 +110,7 @@ pub fn resolve_model_imports<E>(
                         model_import,
                         reference_name.clone(),
                         SubmodelName::from(reference_name.as_str()),
-                        reference_name_span.clone(),
+                        reference_name_span,
                         is_submodel,
                         resolution_context,
                     );
@@ -140,7 +140,7 @@ pub fn resolve_model_imports<E>(
                     model_import,
                     reference_name.clone(),
                     SubmodelName::from(reference_name.as_str()),
-                    reference_name_span.clone(),
+                    reference_name_span,
                     is_submodel,
                     resolution_context,
                 );
@@ -501,7 +501,7 @@ fn handle_resolution_error<E>(
         );
 
         resolution_context.add_model_import_resolution_error_to_active_model(
-            reference_name.clone(),
+            reference_name,
             Some(parent_model_name.clone()),
             error,
         );
