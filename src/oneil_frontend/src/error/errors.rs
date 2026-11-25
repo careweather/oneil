@@ -19,9 +19,9 @@ use super::variable::VariableResolutionError;
 /// [`InstancedModel`](crate::InstancedModel) template — they don't
 /// require an instance graph or runtime designs to be detected.
 /// Graph-time diagnostics (e.g. compilation cycles, overlay-target
-/// misses) live on the [`InstanceGraph`](crate::InstanceGraph) and on
-/// the per-instance [`InstancedModel`](crate::InstancedModel) buckets
-/// that the instancing pass populates.
+/// misses, validation errors) live in the error buckets on the
+/// [`InstanceGraph`](crate::InstanceGraph), never on individual
+/// [`InstancedModel`](crate::InstancedModel) nodes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolutionErrorCollection {
     python_import: IndexMap<PythonPath, PythonImportResolutionError>,

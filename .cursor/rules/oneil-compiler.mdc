@@ -1,0 +1,77 @@
+---
+description: Conventions for the Oneil Rust workspace (compiler, runtime, CLI, LSP) and repository workflow
+globs:
+alwaysApply: true
+---
+# General Project Rules
+
+## Stick to Rust idioms
+Use idiomatic Rust: ownership, borrowing, lifetimes, enums, and pattern matching. Avoid unnecessary unsafe code unless absolutely required.
+
+## Prefer functional
+Prefer a functional coding style to an imperative coding style. Sometimes an imperative style can keep the code readable, but in the case that it doesn't, use the functional style.
+
+## One module = one concern
+Organize the project as separate crates and modules by concern (parser, frontend, analysis, eval, runtime, and so on). The crate map and the libraries each concern uses are in `docs/architecture/README.md`; prefer those libraries over adding new dependencies that do the same job.
+
+## Prefer enums over trait objects
+Use enums with variants instead of trait objects where performance and clarity are important (e.g., for AST nodes).
+
+## Clear and simple error handling
+Use `Result<T, E>` for all fallible operations. Define clear custom error types per module, and make every diagnostic convertible to `oneil_shared::error::OneilDiagnostic`. Follow `docs/CODING_STANDARDS.md` for recoverable vs. unrecoverable errors.
+
+## Avoid premature optimization
+Prioritize clarity and correctness in early stages; optimize only when there's a proven bottleneck.
+
+## Comments
+Write a documentation comment for every function. If the function is public-facing, ensure that the documentation comments include doc tests as well.
+
+## Good tests
+Write tests to test the code. This includes both unit tests and integration tests. Behaviour that spans phases belongs in `oneil_snapshot_tests`.
+
+## Test Refactoring
+When refactoring tests that don't compile, do not do anything more than getting them to compile unless explicitly directed. If a test is failing after it compiles, then the developer should be the one to figure out why.
+
+## Editing
+Any time you change code, or do a refactor, run `cargo clippy --all-targets --all-features` and `cargo test --all-features` when the change is complete. The git hooks format and regenerate TypeScript bindings on commit, apply `clippy --fix` after commit, and refuse a push if clippy or tests fail.
+
+## Checking out a worktree
+Put worktrees in the `.worktrees` folder, and run `git config core.hooksPath .githooks` in each one so the hooks run while developing.
+
+## PR Workflow
+Work within a worktree unless explicitly asked to work in `~/careweather/oneil`. Before creating the worktree tell the developer what you are doing with a short explanation of worktree based development. When doing a large refactor and changing directions ask the user if they would like to stash the current progress in a local branch before switching directions. Keep the branch history clean: make a fixup commit for changes that belong to an earlier commit on the branch, and autosquash the fixups before pushing. Once a PR has review feedback, put the work that addresses it in a commit addressing the feedback. Fold unrelated new changes into the earlier commits and add a note to the PR about the change.
+
+# Oneil Rules
+
+Oneil is implemented in Rust in the `src/` workspace. `src/oneil` is the umbrella crate that re-exports the other crates and builds the CLI binary. Python is supported only as an interop target for model imports (`oneil_python`).
+
+## Know the pipeline before changing it
+Read `docs/architecture/compiler-pipeline.md` before changing the parser, frontend, analysis, evaluator, or runtime. It defines what each phase consumes and produces, what it validates, and what is fixed after it. Keep these invariants:
+- Never mutate data from an earlier phase: ASTs, resolved templates, and cached unit graphs are only ever cloned.
+- Runtime designs are applied only during composition.
+- Graph-time diagnostics live in the `InstanceGraph` error buckets, never on individual `InstancedModel` nodes.
+- Go through `oneil_runtime::Runtime` from the CLI and LSP; don't call phase crates directly from them.
+Update that document when a phase's contract changes.
+
+## Check as early as possible
+Put every check and transformation in the earliest phase that has the information it needs, and only leave value-dependent rules in evaluation (see `docs/decisions/2026-11-20-check-as-early-as-possible.md`). Within a phase, fold independent per-node work into the existing traversal; add a sequential pass only when it needs a whole-graph result that an earlier pass produces.
+
+## Keep a specification that is up-to-date
+Ensure that there is a grammar and a specification that defines the language, and update it any time new things are added to the language. These documents live in `docs/specs/` (the grammar is `docs/specs/grammar.ebnf`). User-facing behaviour is documented in the guide under `docs/guide/`.
+
+## Reference implementation description
+Details about the Oneil programming language can be found in `README.md` on the top level and in the user guide under `docs/guide/src/`.
+
+## Architectural Decision Records (ADRs)
+Whenever a decision needs to be documented, make a new ADR in `docs/decisions` using `template.md`. The ADR file should be named as `<yyyy>-<mm>-<dd>-<adr-name>.md`. When a decision replaces an earlier one, update the earlier ADR's status to point at the new one.
+
+An "ADR" may also be referred to as a "decision".
+
+## Use recursive descent
+The parser uses `nom` combinators (with `nom_locate` for spans) in a recursive-descent style, with no separate lexer. Keep new syntax in that style.
+
+## AST should be expressive but minimal
+Avoid unnecessary intermediate nodes; keep the tree clean and navigable.
+
+## Wire types
+Rust types sent to the editor or written as JSON reports are the source of truth. After changing them, run `./scripts/generate-ts-interfaces.sh`; never edit `packages/ts-interfaces/src/generated/` by hand.

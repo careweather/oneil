@@ -4,11 +4,22 @@ Thank you for your interest in contributing to the Oneil VS Code extension! This
 
 ## Developing
 
+How the extension, the language server, and the Rendered View fit together is described in [`docs/architecture/vscode-extension.md`](../../docs/architecture/vscode-extension.md).
+
 ### Running the extension locally
 
-From the repo root, press `F5` (or **Debug: Start Debugging**) to run **Run Oneil Extension**. That builds the extension and webview, then opens an Extension Development Host on `examples/` so you can try notes, citations, and the Rendered View.
+1. Install dependencies once: run `npm install` in `vscode/` and in `vscode/model-renderer/`.
+2. Build the CLI with `cargo build` from the repo root. The launch configuration points `ONEIL_PATH` at `target/debug/oneil`.
+3. Open the `vscode/` folder in VS Code and run the **Build All** task (the default build task), which compiles the extension and the webview. For iterative work, start **Watch All** instead.
+4. Press `F5` (or **Debug: Start Debugging**) to run the **Extension** launch configuration. It opens an Extension Development Host; open `examples/` there to try notes, citations, and the Rendered View.
 
-The first time, run `npm install` in `vscode/` and `vscode/model-renderer/`. To use a local `oneil` CLI instead of the managed download, set `oneil.serverPath` in the host window (for example `~/.cargo/bin/oneil`).
+`ONEIL_PATH` has lower priority than `oneil.serverPath` and the managed download. If the host window already has a managed CLI installed, set `oneil.serverPath` there to your local build (for example `../target/debug/oneil` or `~/.cargo/bin/oneil`).
+
+After changing Rust types that are sent to the extension, regenerate the TypeScript bindings with `./scripts/generate-ts-interfaces.sh` from the repo root (the pre-commit hook does this too).
+
+### Tests and lint
+
+From `vscode/`, run `npm test` and `npm run lint`. From `vscode/model-renderer/`, run `npm test` and `npm run build`.
 
 ### Syntax highlighting
 
